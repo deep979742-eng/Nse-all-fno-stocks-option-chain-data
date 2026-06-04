@@ -9,6 +9,7 @@ from plotly.subplots import make_subplots
 from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
+import concurrent.futures
 
 # ==========================================
 # 1. FYERS CREDENTIALS & MEMORY SETUP
@@ -50,6 +51,7 @@ today_str = now_ist.strftime("%Y-%m-%d")
 HISTORY_FILE = "chart_history.csv"
 SNAPSHOT_FILE = "snapshot_950.json"
 TOKEN_STORE_FILE = "fyers_token_store.json"
+AUTO_SAVE_FILE = "auto_save_tracker.txt"
 
 @st.cache_resource
 def get_gsheet():
@@ -173,6 +175,21 @@ def get_raw_symbol(fyers_sym):
     return s
 
 # ==========================================
+# MULTITHREADING HELPER FUNCTION (FAST SPEED)
+# ==========================================
+def fetch_option_chain_fast(q):
+    sym = q['n']
+    time.sleep(0.1) # Halka sa break taaki block na ho
+    try:
+        oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
+        if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
+            time.sleep(0.5)
+            oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
+        return q, oc
+    except:
+        return q, None
+
+# ==========================================
 # 3. STOCK LIST & AUTO LOGIN
 # ==========================================
 st.sidebar.header("🔑 Fyers Quick Login")
@@ -194,24 +211,22 @@ else:
     st.sidebar.markdown(f"### [👉 Step 1: Click to Get Code]({magic_url})")
     auth_code = st.sidebar.text_input("Step 2: Paste Code Here:", type="password")
 
-# ==========================================
-# 3.30 PM EOD SAVE BUTTON (NOW SAVES TO GOOGLE SHEETS)
-# ==========================================
 st.sidebar.markdown("---")
 st.sidebar.header("💾 End Of Day (EOD) Save")
-st.sidebar.info("Market band hone ke baad (3:30 PM+) is par click karein.")
-if st.sidebar.button("Save 3:30 PM Closing Data"):
+st.sidebar.info("3:30 PM par data ab AUTOMATIC save hoga! Manual button bhi yahan hai.")
+
+def save_eod_data():
     if st.session_state.strike_memory and sheet is not None:
         try:
-            # Data Google Sheet ke Cell 'A1' mein permanent save hoga
             sheet.update_acell('A1', json.dumps(st.session_state.strike_memory))
-            st.sidebar.success("✅ EOD Data Saved PERMANENTLY to Google Sheets!")
+            return True
         except Exception as e:
             st.sidebar.error(f"Google Sheet Save Error: {e}")
-    elif sheet is None:
-        st.sidebar.error("⚠️ Google Sheets Connected nahi है! Secrets check karein.")
-    else:
-        st.sidebar.warning("⚠️ Pehle live scan hone dein!")
+    return False
+
+if st.sidebar.button("Manual Save 3:30 PM Data"):
+    if save_eod_data():
+        st.sidebar.success("✅ EOD Data Saved PERMANENTLY!")
 
 raw_symbols = [
     "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
@@ -264,56 +279,58 @@ if auth_code:
             time_str = now_ist.strftime('%H:%M')
             today_str = now_ist.strftime("%Y-%m-%d")
             
-            with st.spinner('Scanning Live Market...'):
+            with st.spinner('🚀 Multithreading Scan Running... (Very Fast)'):
+                all_quotes = []
                 for i in range(0, len(raw_symbols), 50):
                     batch = raw_symbols[i:i+50]
                     q_syms = ",".join([get_fyers_symbol(s) for s in batch])
                     quotes = fyers.quotes({"symbols": q_syms})
                     if quotes and quotes.get('s') == 'ok' and len(quotes.get('d', [])) > 0:
-                        for q in quotes['d']:
-                            s_name = get_raw_symbol(q['n'])
-                            v = q['v']
-                            ltp_val = float(v.get('lp', 0))
-                            open_p, prev_c = float(v.get('open_price', 0)), float(v.get('prev_close_price', 0))
-                            if open_p == 0 or prev_c == 0: open_status = "NA"
-                            elif open_p > prev_c: open_status = "Gap Up 🔼"
-                            elif open_p < prev_c: open_status = "Gap Down 🔽"
-                            else: open_status = "Same ➖"
-                            
-                            time.sleep(0.3) 
-                            oc = fyers.optionchain(data={"symbol": q['n'], "strikecount": 150, "timestamp": ""})
-                            if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
-                                time.sleep(1.0)
-                                oc = fyers.optionchain(data={"symbol": q['n'], "strikecount": 150, "timestamp": ""})
+                        all_quotes.extend(quotes['d'])
 
-                            if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
-                                chain = oc['data']['optionsChain']
-                                c_oi = sum(float(x.get('oi', 0)) for x in chain if str(x.get('symbol', '')).endswith('CE') or x.get('option_type') == 'CE')
-                                p_oi = sum(float(x.get('oi', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
-                                c_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('CE') or x.get('volume_type') == 'CE') 
-                                p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
-                                o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
-                                
-                                pcr_abs, vol_abs, pcr_pct, vol_pct = calc_checker_data(s_name, v_pcr, v_cpr, now_ist.time())
-                                
-                                final_list.append({
-                                    'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
-                                    'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val,
-                                    'VOL_ABS': vol_abs, 'PCR_ABS': pcr_abs, 
-                                    'VOL_PCT': vol_pct, 'PCR_PCT': pcr_pct,
-                                    'CE_CON': calc_conviction(chain, 'CE'), 'PE_CON': calc_conviction(chain, 'PE')
-                                })
-                                
-                                if s_name not in st.session_state.chart_history: 
-                                    st.session_state.chart_history[s_name] = []
-                                
-                                new_row = {'Date': today_str, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr}
-                                st.session_state.chart_history[s_name].append(new_row)
-                                csv_row = new_row.copy()
-                                csv_row['Symbol'] = s_name
-                                new_csv_rows.append(csv_row)
-                            else:
-                                final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
+                # 10 workers ek sath data laayenge
+                with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                    results = executor.map(fetch_option_chain_fast, all_quotes)
+                    
+                    for q, oc in results:
+                        s_name = get_raw_symbol(q['n'])
+                        v = q['v']
+                        ltp_val = float(v.get('lp', 0))
+                        open_p, prev_c = float(v.get('open_price', 0)), float(v.get('prev_close_price', 0))
+                        
+                        if open_p == 0 or prev_c == 0: open_status = "NA"
+                        elif open_p > prev_c: open_status = "Gap Up 🔼"
+                        elif open_p < prev_c: open_status = "Gap Down 🔽"
+                        else: open_status = "Same ➖"
+
+                        if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
+                            chain = oc['data']['optionsChain']
+                            c_oi = sum(float(x.get('oi', 0)) for x in chain if str(x.get('symbol', '')).endswith('CE') or x.get('option_type') == 'CE')
+                            p_oi = sum(float(x.get('oi', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
+                            c_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('CE') or x.get('volume_type') == 'CE') 
+                            p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
+                            o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
+                            
+                            pcr_abs, vol_abs, pcr_pct, vol_pct = calc_checker_data(s_name, v_pcr, v_cpr, now_ist.time())
+                            
+                            final_list.append({
+                                'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
+                                'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val,
+                                'VOL_ABS': vol_abs, 'PCR_ABS': pcr_abs, 
+                                'VOL_PCT': vol_pct, 'PCR_PCT': pcr_pct,
+                                'CE_CON': calc_conviction(chain, 'CE'), 'PE_CON': calc_conviction(chain, 'PE')
+                            })
+                            
+                            if s_name not in st.session_state.chart_history: 
+                                st.session_state.chart_history[s_name] = []
+                            
+                            new_row = {'Date': today_str, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr}
+                            st.session_state.chart_history[s_name].append(new_row)
+                            csv_row = new_row.copy()
+                            csv_row['Symbol'] = s_name
+                            new_csv_rows.append(csv_row)
+                        else:
+                            final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
             
             st.session_state.cached_data = final_list
             st.session_state.last_api_call = datetime.datetime.now(IST)
@@ -324,6 +341,23 @@ if auth_code:
                     new_df.to_csv(HISTORY_FILE, index=False)
                 else:
                     new_df.to_csv(HISTORY_FILE, mode='a', header=False, index=False)
+
+            # ==========================================
+            # AUTOMATIC 3:30 PM SAVE LOGIC
+            # ==========================================
+            last_auto_save = ""
+            if os.path.exists(AUTO_SAVE_FILE):
+                try:
+                    with open(AUTO_SAVE_FILE, "r") as f:
+                        last_auto_save = f.read().strip()
+                except: pass
+
+            if now_ist.time() >= datetime.time(15, 30) and last_auto_save != today_str:
+                if save_eod_data():
+                    try:
+                        with open(AUTO_SAVE_FILE, "w") as f:
+                            f.write(today_str)
+                    except: pass
 
         # ==========================================
         # 5. DASHBOARD DISPLAY & STYLING
