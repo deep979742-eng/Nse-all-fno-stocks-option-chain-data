@@ -68,14 +68,13 @@ def get_gsheet():
 
 sheet = get_gsheet()
 
-# 🚀 NAYA SYSTEM: Google Sheet se data tukdo me padhna
 if 'strike_memory' not in st.session_state:
     st.session_state.strike_memory = {}
     if sheet is not None:
         try:
-            col_values = sheet.col_values(1) # Pura Column A padhega
+            col_values = sheet.col_values(1)
             if col_values:
-                eod_data_str = "".join(col_values) # Sab tukdo ko jod dega
+                eod_data_str = "".join(col_values)
                 st.session_state.strike_memory = json.loads(eod_data_str)
         except Exception:
             pass
@@ -98,7 +97,6 @@ if st.session_state.current_date != today_str:
     st.session_state.chart_history = {}
     st.session_state.current_date = today_str
 
-# DATA CLEANER: Sirf 9:15 se 3:30 ka data hi load hoga
 if 'chart_history' not in st.session_state or not st.session_state.chart_history:
     st.session_state.chart_history = {}
     if os.path.exists(HISTORY_FILE):
@@ -181,13 +179,15 @@ def get_raw_symbol(fyers_sym):
     if s == "NIFTYBANK": return "BANKNIFTY"
     return s
 
+# 🚀 SMART SPEED & ANTI-BLOCK SYSTEM
 def fetch_option_chain_fast(q):
     sym = q['n']
-    time.sleep(0.1) 
+    time.sleep(0.3) # Fyers ko spam na lage isliye halka sa break
     try:
         oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
+        # Agar Fyers ne API Block kardi ("NA" wala issue), to 1.5s wait karke dobara try karega
         if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
-            time.sleep(0.5)
+            time.sleep(1.5) 
             oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
         return q, oc
     except:
@@ -219,24 +219,16 @@ st.sidebar.markdown("---")
 st.sidebar.header("💾 End Of Day (EOD) Save")
 st.sidebar.info("3:30 PM par data ab AUTOMATIC save hoga! Manual button bhi yahan hai.")
 
-# 🚀 NAYA SYSTEM: Google Sheet me data ko tukdo me baat kar save karna (API Error Fix)
 def save_eod_data():
     if st.session_state.strike_memory and sheet is not None:
         try:
             json_str = json.dumps(st.session_state.strike_memory)
-            
-            # 50,000 ki limit ko beat karne ke liye 40,000 ke tukde banaye
             chunks = [json_str[i:i+40000] for i in range(0, len(json_str), 40000)]
-            
-            # Pehle purani sheet ki safai
             sheet.clear()
-            
-            # A1, A2, A3.. me line se save karna
             cell_list = sheet.range(f'A1:A{len(chunks)}')
             for i, cell in enumerate(cell_list):
                 cell.value = chunks[i]
             sheet.update_cells(cell_list)
-            
             return True
         except Exception as e:
             st.sidebar.error(f"Google Sheet Save Error: {e}")
@@ -299,7 +291,7 @@ if auth_code:
             time_str = now_ist.strftime('%H:%M')
             today_str = now_ist.strftime("%Y-%m-%d")
             
-            with st.spinner('🚀 Multithreading Scan Running... (Very Fast)'):
+            with st.spinner('🚀 Smart Scan Running... (Safe Speed)'):
                 all_quotes = []
                 for i in range(0, len(raw_symbols), 50):
                     batch = raw_symbols[i:i+50]
@@ -308,7 +300,8 @@ if auth_code:
                     if quotes and quotes.get('s') == 'ok' and len(quotes.get('d', [])) > 0:
                         all_quotes.extend(quotes['d'])
 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+                # 🚀 YAHAN WORKERS 10 SE GHATAKAR 4 KAR DIYE HAIN (API Limit bypass karne ke liye)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
                     results = executor.map(fetch_option_chain_fast, all_quotes)
                     
                     for q, oc in results:
