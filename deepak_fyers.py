@@ -7,6 +7,8 @@ import json
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from fyers_apiv3 import fyersModel
+import gspread
+from google.oauth2.service_account import Credentials
 
 # ==========================================
 # 1. FYERS CREDENTIALS & MEMORY SETUP
@@ -19,37 +21,18 @@ REDIRECT_URI = "https://www.google.com/"
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
 # ==========================================
-# SUPER CSS INJECTOR: ANTI-BLUR SHIELD & HEADER DESIGN
+# SUPER CSS INJECTOR: ANTI-BLUR SHIELD
 # ==========================================
 st.markdown("""
     <style>
-        /* ANTI-BLUR SHIELD: Refresh hone par screen dhundhli nahi hogi */
         div[data-testid="stAppViewContainer"] { opacity: 1 !important; filter: none !important; }
         [data-testid="stDataFrame"] { opacity: 1 !important; transition: none !important; }
         [data-testid="stTabs"] { opacity: 1 !important; transition: none !important; }
-        
-        /* Loading ka nishaan chupana */
         [data-testid="stStatusWidget"] { visibility: hidden !important; display: none !important; }
-
-        .block-container {
-            padding-top: 3rem !important; 
-            padding-bottom: 1rem !important;
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-        }
-        [data-testid="stDataFrameTable"] > thead > tr {
-            background-color: darkblue !important;
-        }
-        [data-testid="stDataFrameTable"] > thead > tr > th {
-            background-color: darkblue !important;
-            color: white !important;
-            font-weight: bold !important;
-            text-align: center !important;
-        }
-        th {
-            background-color: darkblue !important;
-            color: white !important;
-        }
+        .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; }
+        [data-testid="stDataFrameTable"] > thead > tr { background-color: darkblue !important; }
+        [data-testid="stDataFrameTable"] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; }
+        th { background-color: darkblue !important; color: white !important; }
         .stApp { opacity: 1 !important; }
     </style>
 """, unsafe_allow_html=True)
@@ -62,14 +45,38 @@ now_ist = datetime.datetime.now(IST)
 today_str = now_ist.strftime("%Y-%m-%d")
 
 # ==========================================
-# MEMORY SYSTEMS (EOD, CHART, AND 9:50 SNAPSHOT)
+# GOOGLE SHEETS CONNECTION & LOCAL MEMORY
 # ==========================================
-EOD_FILE = "eod_closing_data.json"
 HISTORY_FILE = "chart_history.csv"
 SNAPSHOT_FILE = "snapshot_950.json"
 TOKEN_STORE_FILE = "fyers_token_store.json"
 
-# Load 9:50 AM Snapshot from Disk if available for TODAY
+@st.cache_resource
+def get_gsheet():
+    try:
+        if "GOOGLE_CREDS" in st.secrets:
+            scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
+            creds_dict = json.loads(st.secrets["GOOGLE_CREDS"])
+            creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
+            client = gspread.authorize(creds)
+            return client.open("Fyers_EOD_Data").sheet1
+    except Exception as e:
+        st.sidebar.error(f"Google Sheets Link Error: {e}")
+    return None
+
+sheet = get_gsheet()
+
+# Load EOD Data permanently from Google Sheets
+if 'strike_memory' not in st.session_state:
+    st.session_state.strike_memory = {}
+    if sheet is not None:
+        try:
+            eod_data_str = sheet.acell('A1').value
+            if eod_data_str:
+                st.session_state.strike_memory = json.loads(eod_data_str)
+        except Exception:
+            pass
+
 if 'snapshot_950' not in st.session_state:
     st.session_state.snapshot_950 = {}
     if os.path.exists(SNAPSHOT_FILE):
@@ -81,19 +88,6 @@ if 'snapshot_950' not in st.session_state:
         except Exception:
             pass
 
-if 'strike_memory' not in st.session_state:
-    if os.path.exists(EOD_FILE):
-        try:
-            with open(EOD_FILE, 'r') as f:
-                st.session_state.strike_memory = json.load(f)
-        except Exception:
-            st.session_state.strike_memory = {}
-    else:
-        st.session_state.strike_memory = {}
-
-# ==========================================
-# AUTO CLEANUP LOGIC FOR CHART HISTORY
-# ==========================================
 if 'current_date' not in st.session_state:
     st.session_state.current_date = today_str
 
@@ -120,7 +114,6 @@ if 'chart_history' not in st.session_state or not st.session_state.chart_history
             try: os.remove(HISTORY_FILE)
             except: pass
 
-# SMART CACHE
 if 'last_api_call' not in st.session_state:
     st.session_state.last_api_call = datetime.datetime.min.replace(tzinfo=IST)
 if 'cached_data' not in st.session_state:
@@ -129,63 +122,42 @@ if 'cached_data' not in st.session_state:
 # ==========================================
 # 2. CALCULATION FORMULAS
 # ==========================================
-def calc_vol_pcr(ce_vol, pe_vol): 
-    return 0.0 if ce_vol == 0 else round(pe_vol / ce_vol, 2)
-
-def calc_opt_pcr(ce_oi, pe_oi): 
-    return 0.0 if ce_oi == 0 else round(pe_oi / ce_oi, 2)
-
-def calc_vol_cpr(ce_vol, pe_vol): 
-    return 0.0 if pe_vol == 0 else round(ce_vol / pe_vol, 2)
+def calc_vol_pcr(ce_vol, pe_vol): return 0.0 if ce_vol == 0 else round(pe_vol / ce_vol, 2)
+def calc_opt_pcr(ce_oi, pe_oi): return 0.0 if ce_oi == 0 else round(pe_oi / ce_oi, 2)
+def calc_vol_cpr(ce_vol, pe_vol): return 0.0 if pe_vol == 0 else round(ce_vol / pe_vol, 2)
 
 def calc_conviction(oc_data, opt_type):
     strikes = [s for s in oc_data if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
-    total_plus = 0
-    total_minus = 0
-
+    total_plus, total_minus = 0, 0
     for s in strikes:
         sym = str(s.get('symbol', ''))
         ltp = float(s.get('ltp', 0))
         if ltp == 0: continue
-        
         if sym not in st.session_state.strike_memory:
             st.session_state.strike_memory[sym] = ltp
             continue 
-            
         baseline_ltp = st.session_state.strike_memory[sym]
         price_diff = ltp - baseline_ltp
-        
         if price_diff > 0: total_plus += 1 
         elif price_diff < 0: total_minus += 1 
-
     active_total = total_plus + total_minus
     if active_total == 0: return 0.0
-    if total_plus >= total_minus:
-        return round((total_plus / active_total) * 100, 1) 
-    else:
-        return -round((total_minus / active_total) * 100, 1) 
+    if total_plus >= total_minus: return round((total_plus / active_total) * 100, 1) 
+    else: return -round((total_minus / active_total) * 100, 1) 
 
 def calc_checker_data(symbol, current_pcr, current_vol, current_time):
     target_time = datetime.time(9, 50)
-    if current_time < target_time:
-        return 0.0, 0.0, 0.0, 0.0
-        
+    if current_time < target_time: return 0.0, 0.0, 0.0, 0.0
     if symbol not in st.session_state.snapshot_950:
         st.session_state.snapshot_950[symbol] = {'pcr': current_pcr, 'vol_cpr': current_vol}
         try:
-            with open(SNAPSHOT_FILE, 'w') as f:
-                json.dump({"date": today_str, "data": st.session_state.snapshot_950}, f)
-        except Exception:
-            pass
+            with open(SNAPSHOT_FILE, 'w') as f: json.dump({"date": today_str, "data": st.session_state.snapshot_950}, f)
+        except: pass
         return 0.0, 0.0, 0.0, 0.0
-        
     base = st.session_state.snapshot_950[symbol]
-    
-    pcr_abs = current_pcr - base['pcr']
-    vol_abs = current_vol - base['vol_cpr']
+    pcr_abs, vol_abs = current_pcr - base['pcr'], current_vol - base['vol_cpr']
     pcr_pct = ((current_pcr - base['pcr']) / base['pcr']) * 100 if base['pcr'] != 0 else 0.0
     vol_pct = ((current_vol - base['vol_cpr']) / base['vol_cpr']) * 100 if base['vol_cpr'] != 0 else 0.0
-    
     return round(pcr_abs, 2), round(vol_abs, 2), round(pcr_pct, 1), round(vol_pct, 1)
 
 def get_fyers_symbol(s):
@@ -194,7 +166,6 @@ def get_fyers_symbol(s):
     elif s == "FINNIFTY": return "NSE:FINNIFTY-INDEX"
     elif s == "MIDCPNIFTY": return "NSE:MIDCPNIFTY-INDEX"
     else: return f"NSE:{s}-EQ"
-
 def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     if s == "NIFTY50": return "NIFTY"
@@ -213,34 +184,34 @@ if os.path.exists(TOKEN_STORE_FILE):
             token_data = json.load(f)
             if token_data.get("date") == today_str:
                 saved_token = token_data.get("token")
-    except Exception:
-        pass
+    except: pass
 
 if saved_token:
     auth_code = "AUTO_LOGGED_IN"
-    st.sidebar.success("🚀 Connected via Saved Token! (No login required)")
+    st.sidebar.success("🚀 Connected via Saved Token!")
 else:
     magic_url = f"https://api-t1.fyers.in/api/v3/generate-authcode?client_id={APP_ID}&redirect_uri={REDIRECT_URI}&response_type=code&state=deepak"
     st.sidebar.markdown(f"### [👉 Step 1: Click to Get Code]({magic_url})")
     auth_code = st.sidebar.text_input("Step 2: Paste Code Here:", type="password")
 
 # ==========================================
-# 3.30 PM EOD SAVE BUTTON
+# 3.30 PM EOD SAVE BUTTON (NOW SAVES TO GOOGLE SHEETS)
 # ==========================================
 st.sidebar.markdown("---")
 st.sidebar.header("💾 End Of Day (EOD) Save")
-st.sidebar.info("Market band hone ke baad (3:30 PM+) is par click karein taaki data kal subah ke liye lock ho jaye.")
+st.sidebar.info("Market band hone ke baad (3:30 PM+) is par click karein.")
 if st.sidebar.button("Save 3:30 PM Closing Data"):
-    if st.session_state.strike_memory:
+    if st.session_state.strike_memory and sheet is not None:
         try:
-            with open(EOD_FILE, 'w') as f:
-                json.dump(st.session_state.strike_memory, f)
-            st.sidebar.success("✅ EOD Data Saved for Tomorrow!")
+            # Data Google Sheet ke Cell 'A1' mein permanent save hoga
+            sheet.update_acell('A1', json.dumps(st.session_state.strike_memory))
+            st.sidebar.success("✅ EOD Data Saved PERMANENTLY to Google Sheets!")
         except Exception as e:
-            st.sidebar.error(f"Error saving: {e}")
+            st.sidebar.error(f"Google Sheet Save Error: {e}")
+    elif sheet is None:
+        st.sidebar.error("⚠️ Google Sheets Connected nahi है! Secrets check karein.")
     else:
         st.sidebar.warning("⚠️ Pehle live scan hone dein!")
-
 
 raw_symbols = [
     "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
@@ -267,7 +238,6 @@ raw_symbols = [
     "VOLTAS", "WAAREEENER", "WIPRO", "YESBANK", "ZYDUSLIFE"
 ]
 
-
 # ==========================================
 # 4. APP LOGIC & DATA FETCHING
 # ==========================================
@@ -279,7 +249,7 @@ if auth_code:
             token = session.generate_token()['access_token']
             with open(TOKEN_STORE_FILE, 'w') as f:
                 json.dump({"date": today_str, "token": token}, f)
-            st.sidebar.success("✅ Connected & Token Saved!")
+            st.sidebar.success("✅ Token Generated & Saved!")
         else:
             token = saved_token
 
@@ -339,7 +309,6 @@ if auth_code:
                                 
                                 new_row = {'Date': today_str, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr}
                                 st.session_state.chart_history[s_name].append(new_row)
-                                
                                 csv_row = new_row.copy()
                                 csv_row['Symbol'] = s_name
                                 new_csv_rows.append(csv_row)
@@ -426,11 +395,7 @@ if auth_code:
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
                     fig.add_trace(go.Scatter(x=chart_df['Time'], y=chart_df[graph_filter], name=graph_filter, line=dict(color='deepskyblue', width=3)), secondary_y=False)
                     fig.add_trace(go.Scatter(x=chart_df['Time'], y=chart_df['LTP'], name="LTP", line=dict(color='#00AA00', width=3)), secondary_y=True)
-                    
-                    # Height 450 kiya mobile screen par fit baithne ke liye
                     fig.update_layout(title_text=f"{selected_stock} Trend", plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"), height=450)
-                    
-                    # Mobile touch smoothness ke liye range slider band kiya
                     fig.update_xaxes(rangeslider_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
 
