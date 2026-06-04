@@ -179,15 +179,14 @@ def get_raw_symbol(fyers_sym):
     if s == "NIFTYBANK": return "BANKNIFTY"
     return s
 
-# 🚀 SMART SPEED & ANTI-BLOCK SYSTEM
+# 🚀 SUPER SAFE SNIPER MODE: Ekdum pakka aur safe speed
 def fetch_option_chain_fast(q):
     sym = q['n']
-    time.sleep(0.3) # Fyers ko spam na lage isliye halka sa break
+    time.sleep(0.4) # Break badha diya taaki Fyers gussa na ho
     try:
         oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
-        # Agar Fyers ne API Block kardi ("NA" wala issue), to 1.5s wait karke dobara try karega
         if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
-            time.sleep(1.5) 
+            time.sleep(2.0) # Agar block kiya to 2 second ruk kar wapas laayega
             oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
         return q, oc
     except:
@@ -291,7 +290,7 @@ if auth_code:
             time_str = now_ist.strftime('%H:%M')
             today_str = now_ist.strftime("%Y-%m-%d")
             
-            with st.spinner('🚀 Smart Scan Running... (Safe Speed)'):
+            with st.spinner('🚀 Sniper Scan Running... (100% Safe Data)'):
                 all_quotes = []
                 for i in range(0, len(raw_symbols), 50):
                     batch = raw_symbols[i:i+50]
@@ -300,8 +299,8 @@ if auth_code:
                     if quotes and quotes.get('s') == 'ok' and len(quotes.get('d', [])) > 0:
                         all_quotes.extend(quotes['d'])
 
-                # 🚀 YAHAN WORKERS 10 SE GHATAKAR 4 KAR DIYE HAIN (API Limit bypass karne ke liye)
-                with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
+                # 🚀 YAHAN WORKERS 4 SE GHATAKAR 2 KAR DIYE HAIN 
+                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
                     results = executor.map(fetch_option_chain_fast, all_quotes)
                     
                     for q, oc in results:
