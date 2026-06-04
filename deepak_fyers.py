@@ -46,7 +46,7 @@ now_ist = datetime.datetime.now(IST)
 today_str = now_ist.strftime("%Y-%m-%d")
 
 # ==========================================
-# GOOGLE SHEETS CONNECTION & LOCAL MEMORY
+# GOOGLE SHEETS CONNECTION (NEW ERROR-FREE NATIVE METHOD)
 # ==========================================
 HISTORY_FILE = "chart_history.csv"
 SNAPSHOT_FILE = "snapshot_950.json"
@@ -56,9 +56,10 @@ AUTO_SAVE_FILE = "auto_save_tracker.txt"
 @st.cache_resource
 def get_gsheet():
     try:
-        if "GOOGLE_CREDS" in st.secrets:
+        # JSON LOADS KO HATA DIYA HAI, AB ERROR NAHI AAYEGA!
+        if "gcp_service_account" in st.secrets:
             scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-            creds_dict = json.loads(st.secrets["GOOGLE_CREDS"])
+            creds_dict = dict(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
             client = gspread.authorize(creds)
             return client.open("Fyers_EOD_Data").sheet1
@@ -93,6 +94,7 @@ if 'snapshot_950' not in st.session_state:
 if 'current_date' not in st.session_state:
     st.session_state.current_date = today_str
 
+# 🚀 NAYE DIN KA FRESH START LOGIC
 if st.session_state.current_date != today_str:
     st.session_state.chart_history = {}
     st.session_state.current_date = today_str
@@ -175,11 +177,11 @@ def get_raw_symbol(fyers_sym):
     return s
 
 # ==========================================
-# MULTITHREADING HELPER FUNCTION (FAST SPEED)
+# MULTITHREADING HELPER FUNCTION
 # ==========================================
 def fetch_option_chain_fast(q):
     sym = q['n']
-    time.sleep(0.1) # Halka sa break taaki block na ho
+    time.sleep(0.1) 
     try:
         oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
         if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
@@ -272,6 +274,9 @@ if auth_code:
 
         now_ist = datetime.datetime.now(IST)
         time_since_last = (now_ist - st.session_state.last_api_call).total_seconds()
+        
+        # 🚀 9:15 AM se 3:30 PM ka STRICT Filter
+        is_market_hours = (datetime.time(9, 15) <= now_ist.time() <= datetime.time(15, 30))
 
         if time_since_last >= 300:
             final_list = []
@@ -288,7 +293,6 @@ if auth_code:
                     if quotes and quotes.get('s') == 'ok' and len(quotes.get('d', [])) > 0:
                         all_quotes.extend(quotes['d'])
 
-                # 10 workers ek sath data laayenge
                 with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
                     results = executor.map(fetch_option_chain_fast, all_quotes)
                     
@@ -321,14 +325,16 @@ if auth_code:
                                 'CE_CON': calc_conviction(chain, 'CE'), 'PE_CON': calc_conviction(chain, 'PE')
                             })
                             
-                            if s_name not in st.session_state.chart_history: 
-                                st.session_state.chart_history[s_name] = []
-                            
-                            new_row = {'Date': today_str, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr}
-                            st.session_state.chart_history[s_name].append(new_row)
-                            csv_row = new_row.copy()
-                            csv_row['Symbol'] = s_name
-                            new_csv_rows.append(csv_row)
+                            # 🚀 Yahan sirf Market Hours mein hi Chart Data save hoga
+                            if is_market_hours:
+                                if s_name not in st.session_state.chart_history: 
+                                    st.session_state.chart_history[s_name] = []
+                                
+                                new_row = {'Date': today_str, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr}
+                                st.session_state.chart_history[s_name].append(new_row)
+                                csv_row = new_row.copy()
+                                csv_row['Symbol'] = s_name
+                                new_csv_rows.append(csv_row)
                         else:
                             final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
             
@@ -429,8 +435,9 @@ if auth_code:
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
                     fig.add_trace(go.Scatter(x=chart_df['Time'], y=chart_df[graph_filter], name=graph_filter, line=dict(color='deepskyblue', width=3)), secondary_y=False)
                     fig.add_trace(go.Scatter(x=chart_df['Time'], y=chart_df['LTP'], name="LTP", line=dict(color='#00AA00', width=3)), secondary_y=True)
+                    
                     fig.update_layout(title_text=f"{selected_stock} Trend", plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"), height=450)
-                    fig.update_xaxes(rangeslider_visible=False)
+                    fig.update_xaxes(rangeslider_visible=True, rangeslider_thickness=0.05)
                     st.plotly_chart(fig, use_container_width=True)
 
             st.write(f"🔄 Next scan in 5 mins... Last updated: {st.session_state.last_api_call.strftime('%H:%M:%S')}")
