@@ -67,6 +67,7 @@ today_str = now_ist.strftime("%Y-%m-%d")
 EOD_FILE = "eod_closing_data.json"
 HISTORY_FILE = "chart_history.csv"
 SNAPSHOT_FILE = "snapshot_950.json"
+TOKEN_STORE_FILE = "fyers_token_store.json"
 
 # Load 9:50 AM Snapshot from Disk if available for TODAY
 if 'snapshot_950' not in st.session_state:
@@ -91,33 +92,30 @@ if 'strike_memory' not in st.session_state:
         st.session_state.strike_memory = {}
 
 # ==========================================
-# AUTO CLEANUP LOGIC FOR CHART HISTORY (BULLETPROOF FIX)
+# AUTO CLEANUP LOGIC FOR CHART HISTORY
 # ==========================================
 if 'current_date' not in st.session_state:
     st.session_state.current_date = today_str
 
-# Agar app khuli reh gayi aur din badal gaya
 if st.session_state.current_date != today_str:
     st.session_state.chart_history = {}
     st.session_state.current_date = today_str
 
-# File se sirf AAJ KA (Today's) data load karo
 if 'chart_history' not in st.session_state or not st.session_state.chart_history:
     st.session_state.chart_history = {}
     if os.path.exists(HISTORY_FILE):
         try:
             hist_df = pd.read_csv(HISTORY_FILE)
-            # Check karo ki Date column hai aur usme aaj ka data hai
             if 'Date' in hist_df.columns:
-                hist_df = hist_df[hist_df['Date'] == today_str] # Sirf aaj ka data filter kiya
+                hist_df = hist_df[hist_df['Date'] == today_str]
                 if not hist_df.empty:
                     for sym in hist_df['Symbol'].unique():
                         sym_df = hist_df[hist_df['Symbol'] == sym].drop(columns=['Symbol', 'Date'])
                         st.session_state.chart_history[sym] = sym_df.to_dict('records')
                 else:
-                    os.remove(HISTORY_FILE) # Puraana data delete
+                    os.remove(HISTORY_FILE)
             else:
-                os.remove(HISTORY_FILE) # Bina date wali purani file delete
+                os.remove(HISTORY_FILE)
         except Exception:
             try: os.remove(HISTORY_FILE)
             except: pass
@@ -204,12 +202,27 @@ def get_raw_symbol(fyers_sym):
     return s
 
 # ==========================================
-# 3. STOCK LIST
+# 3. STOCK LIST & AUTO LOGIN
 # ==========================================
 st.sidebar.header("🔑 Fyers Quick Login")
-magic_url = f"https://api-t1.fyers.in/api/v3/generate-authcode?client_id={APP_ID}&redirect_uri={REDIRECT_URI}&response_type=code&state=deepak"
-st.sidebar.markdown(f"### [👉 Step 1: Click to Get Code]({magic_url})")
-auth_code = st.sidebar.text_input("Step 2: Paste Code Here:", type="password")
+
+saved_token = None
+if os.path.exists(TOKEN_STORE_FILE):
+    try:
+        with open(TOKEN_STORE_FILE, 'r') as f:
+            token_data = json.load(f)
+            if token_data.get("date") == today_str:
+                saved_token = token_data.get("token")
+    except Exception:
+        pass
+
+if saved_token:
+    auth_code = "AUTO_LOGGED_IN"
+    st.sidebar.success("🚀 Connected via Saved Token! (No login required)")
+else:
+    magic_url = f"https://api-t1.fyers.in/api/v3/generate-authcode?client_id={APP_ID}&redirect_uri={REDIRECT_URI}&response_type=code&state=deepak"
+    st.sidebar.markdown(f"### [👉 Step 1: Click to Get Code]({magic_url})")
+    auth_code = st.sidebar.text_input("Step 2: Paste Code Here:", type="password")
 
 # ==========================================
 # 3.30 PM EOD SAVE BUTTON
@@ -260,11 +273,17 @@ raw_symbols = [
 # ==========================================
 if auth_code:
     try:
-        session = fyersModel.SessionModel(client_id=APP_ID, secret_key=SECRET_ID, redirect_uri=REDIRECT_URI, response_type="code", grant_type="authorization_code")
-        session.set_token(auth_code)
-        token = session.generate_token()['access_token']
+        if auth_code != "AUTO_LOGGED_IN":
+            session = fyersModel.SessionModel(client_id=APP_ID, secret_key=SECRET_ID, redirect_uri=REDIRECT_URI, response_type="code", grant_type="authorization_code")
+            session.set_token(auth_code)
+            token = session.generate_token()['access_token']
+            with open(TOKEN_STORE_FILE, 'w') as f:
+                json.dump({"date": today_str, "token": token}, f)
+            st.sidebar.success("✅ Connected & Token Saved!")
+        else:
+            token = saved_token
+
         fyers = fyersModel.FyersModel(client_id=APP_ID, is_async=False, token=token, log_path="")
-        st.sidebar.success("✅ Connected!")
 
         now_ist = datetime.datetime.now(IST)
         time_since_last = (now_ist - st.session_state.last_api_call).total_seconds()
@@ -272,8 +291,6 @@ if auth_code:
         if time_since_last >= 300:
             final_list = []
             new_csv_rows = [] 
-            
-            # IST variables for saving
             time_str = now_ist.strftime('%H:%M')
             today_str = now_ist.strftime("%Y-%m-%d")
             
@@ -320,7 +337,6 @@ if auth_code:
                                 if s_name not in st.session_state.chart_history: 
                                     st.session_state.chart_history[s_name] = []
                                 
-                                # Date added natively to memory and CSV
                                 new_row = {'Date': today_str, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr}
                                 st.session_state.chart_history[s_name].append(new_row)
                                 
@@ -334,7 +350,6 @@ if auth_code:
             st.session_state.last_api_call = datetime.datetime.now(IST)
 
             if new_csv_rows:
-                # Include 'Date' in CSV columns
                 new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
                 if not os.path.isfile(HISTORY_FILE):
                     new_df.to_csv(HISTORY_FILE, index=False)
@@ -371,7 +386,6 @@ if auth_code:
                         checker_fmt = '{:+.2f}'
                         
                     df = df.drop(columns=['VOL_ABS', 'PCR_ABS', 'VOL_PCT', 'PCR_PCT'])
-                    
                     df = df.rename(columns={'SYMS': 'SYMBOL', 'OPEN_STATUS': 'OPENING', 'V_PCR': 'VOL PCR', 'O_PCR': 'OPTION PCR', 'V_CPR': 'VOL CPR', 'LTP_CH': 'LTP CHANGE', 'CHG_%': 'CHANGE%', 'LTP': 'LTP', 'CE_CON': 'CE_CONTRACT', 'PE_CON': 'PE_CONTRACT'})
 
                     def style_indicators(val):
@@ -391,16 +405,12 @@ if auth_code:
                         return 'text-align: center;'
 
                     format_dict = {'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 'LTP': '{:.2f}', 'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 'VOL CHECKER': checker_fmt, 'PCR CHECKER': checker_fmt, 'CE_CONTRACT': '{:+.1f}%', 'PE_CONTRACT': '{:+.1f}%'}
-                    
                     header_styles = [
                         {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
                         {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
                     ]
 
-                    styled_df = (df.style
-                                 .set_properties(**{'text-align': 'center'}) 
-                                 .format(format_dict)
-                                 .set_table_styles(header_styles)
+                    styled_df = (df.style.set_properties(**{'text-align': 'center'}).format(format_dict).set_table_styles(header_styles)
                                  .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
                                  .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
 
@@ -409,7 +419,6 @@ if auth_code:
             with tab2:
                 col1, col2 = st.columns([1, 2])
                 selected_stock = col1.selectbox("Select Stock:", raw_symbols, index=0)
-                # YAHAN SE VOL PCR KO HTA DIYA GAYA HAI
                 graph_filter = col2.radio("Metric:", ["VOL CPR", "OPT PCR"], horizontal=True)
                 
                 if selected_stock in st.session_state.chart_history and len(st.session_state.chart_history[selected_stock]) > 0:
@@ -417,8 +426,12 @@ if auth_code:
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
                     fig.add_trace(go.Scatter(x=chart_df['Time'], y=chart_df[graph_filter], name=graph_filter, line=dict(color='deepskyblue', width=3)), secondary_y=False)
                     fig.add_trace(go.Scatter(x=chart_df['Time'], y=chart_df['LTP'], name="LTP", line=dict(color='#00AA00', width=3)), secondary_y=True)
-                    fig.update_layout(title_text=f"{selected_stock} Trend", plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"), height=600)
-                    fig.update_xaxes(rangeslider_visible=True, rangeslider_thickness=0.02)
+                    
+                    # Height 450 kiya mobile screen par fit baithne ke liye
+                    fig.update_layout(title_text=f"{selected_stock} Trend", plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"), height=450)
+                    
+                    # Mobile touch smoothness ke liye range slider band kiya
+                    fig.update_xaxes(rangeslider_visible=False)
                     st.plotly_chart(fig, use_container_width=True)
 
             st.write(f"🔄 Next scan in 5 mins... Last updated: {st.session_state.last_api_call.strftime('%H:%M:%S')}")
