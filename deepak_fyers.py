@@ -68,12 +68,14 @@ def get_gsheet():
 
 sheet = get_gsheet()
 
+# 🚀 NAYA SYSTEM: Google Sheet se data tukdo me padhna
 if 'strike_memory' not in st.session_state:
     st.session_state.strike_memory = {}
     if sheet is not None:
         try:
-            eod_data_str = sheet.acell('A1').value
-            if eod_data_str:
+            col_values = sheet.col_values(1) # Pura Column A padhega
+            if col_values:
+                eod_data_str = "".join(col_values) # Sab tukdo ko jod dega
                 st.session_state.strike_memory = json.loads(eod_data_str)
         except Exception:
             pass
@@ -96,7 +98,7 @@ if st.session_state.current_date != today_str:
     st.session_state.chart_history = {}
     st.session_state.current_date = today_str
 
-# 🚀 DATA CLEANER: Sirf 9:15 se 3:30 ka data hi load hoga
+# DATA CLEANER: Sirf 9:15 se 3:30 ka data hi load hoga
 if 'chart_history' not in st.session_state or not st.session_state.chart_history:
     st.session_state.chart_history = {}
     if os.path.exists(HISTORY_FILE):
@@ -104,8 +106,6 @@ if 'chart_history' not in st.session_state or not st.session_state.chart_history
             hist_df = pd.read_csv(HISTORY_FILE)
             if 'Date' in hist_df.columns:
                 hist_df = hist_df[hist_df['Date'] == today_str]
-                
-                # Faltu raat ka data delete karne ka filter
                 if 'Time' in hist_df.columns:
                     hist_df['TimeObj'] = pd.to_datetime(hist_df['Time'], format='%H:%M').dt.time
                     hist_df = hist_df[(hist_df['TimeObj'] >= datetime.time(9, 15)) & (hist_df['TimeObj'] <= datetime.time(15, 30))]
@@ -219,10 +219,24 @@ st.sidebar.markdown("---")
 st.sidebar.header("💾 End Of Day (EOD) Save")
 st.sidebar.info("3:30 PM par data ab AUTOMATIC save hoga! Manual button bhi yahan hai.")
 
+# 🚀 NAYA SYSTEM: Google Sheet me data ko tukdo me baat kar save karna (API Error Fix)
 def save_eod_data():
     if st.session_state.strike_memory and sheet is not None:
         try:
-            sheet.update_acell('A1', json.dumps(st.session_state.strike_memory))
+            json_str = json.dumps(st.session_state.strike_memory)
+            
+            # 50,000 ki limit ko beat karne ke liye 40,000 ke tukde banaye
+            chunks = [json_str[i:i+40000] for i in range(0, len(json_str), 40000)]
+            
+            # Pehle purani sheet ki safai
+            sheet.clear()
+            
+            # A1, A2, A3.. me line se save karna
+            cell_list = sheet.range(f'A1:A{len(chunks)}')
+            for i, cell in enumerate(cell_list):
+                cell.value = chunks[i]
+            sheet.update_cells(cell_list)
+            
             return True
         except Exception as e:
             st.sidebar.error(f"Google Sheet Save Error: {e}")
@@ -438,12 +452,11 @@ if auth_code:
                     
                     fig.update_layout(title_text=f"{selected_stock} Trend", plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"), height=450)
                     
-                    # 🚀 STRICTLY LOCKED X-AXIS RULE
                     start_dt = pd.to_datetime(f"{st.session_state.current_date} 09:15:00")
                     end_dt = pd.to_datetime(f"{st.session_state.current_date} 15:30:00")
                     
                     fig.update_xaxes(
-                        type="date", # Force Plotly to treat this as exact time, not categorical text
+                        type="date",
                         range=[start_dt, end_dt],
                         rangeslider_visible=True, 
                         rangeslider_thickness=0.05,
