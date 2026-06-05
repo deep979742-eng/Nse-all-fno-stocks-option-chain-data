@@ -22,19 +22,23 @@ REDIRECT_URI = "https://www.google.com/"
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
 # ==========================================
-# SUPER CSS INJECTOR: ANTI-BLUR SHIELD
+# SUPER CSS INJECTOR: ULTIMATE ANTI-BLUR SHIELD
 # ==========================================
 st.markdown("""
     <style>
-        div[data-testid="stAppViewContainer"] { opacity: 1 !important; filter: none !important; }
-        [data-testid="stDataFrame"] { opacity: 1 !important; transition: none !important; }
-        [data-testid="stTabs"] { opacity: 1 !important; transition: none !important; }
+        [data-testid="stAppViewContainer"], [data-testid="stAppViewBlockContainer"], 
+        [data-testid="stHeader"], [data-testid="stSidebar"], .stApp, .stApp > div { 
+            opacity: 1 !important; filter: none !important; transition: none !important; 
+        }
+        [data-testid="stDataFrame"], [data-testid="stTabs"] { 
+            opacity: 1 !important; filter: none !important; transition: none !important; 
+        }
         [data-testid="stStatusWidget"] { visibility: hidden !important; display: none !important; }
         .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; }
         [data-testid="stDataFrameTable"] > thead > tr { background-color: darkblue !important; }
         [data-testid="stDataFrameTable"] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; }
         th { background-color: darkblue !important; color: white !important; }
-        .stApp { opacity: 1 !important; }
+        * { cursor: default !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -289,58 +293,59 @@ if auth_code:
             time_str = now_ist.strftime('%H:%M')
             today_str = now_ist.strftime("%Y-%m-%d")
             
-            with st.spinner('🚀 Sniper Scan Running... (100% Safe Data)'):
-                all_quotes = []
-                for i in range(0, len(raw_symbols), 50):
-                    batch = raw_symbols[i:i+50]
-                    q_syms = ",".join([get_fyers_symbol(s) for s in batch])
-                    quotes = fyers.quotes({"symbols": q_syms})
-                    if quotes and quotes.get('s') == 'ok' and len(quotes.get('d', [])) > 0:
-                        all_quotes.extend(quotes['d'])
+            st.toast('🚀 Sniper Scan Running... (100% Safe Data)', icon='🔥')
+            
+            all_quotes = []
+            for i in range(0, len(raw_symbols), 50):
+                batch = raw_symbols[i:i+50]
+                q_syms = ",".join([get_fyers_symbol(s) for s in batch])
+                quotes = fyers.quotes({"symbols": q_syms})
+                if quotes and quotes.get('s') == 'ok' and len(quotes.get('d', [])) > 0:
+                    all_quotes.extend(quotes['d'])
 
-                with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-                    results = executor.map(fetch_option_chain_fast, all_quotes)
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                results = executor.map(fetch_option_chain_fast, all_quotes)
+                
+                for q, oc in results:
+                    s_name = get_raw_symbol(q['n'])
+                    v = q['v']
+                    ltp_val = float(v.get('lp', 0))
+                    open_p, prev_c = float(v.get('open_price', 0)), float(v.get('prev_close_price', 0))
                     
-                    for q, oc in results:
-                        s_name = get_raw_symbol(q['n'])
-                        v = q['v']
-                        ltp_val = float(v.get('lp', 0))
-                        open_p, prev_c = float(v.get('open_price', 0)), float(v.get('prev_close_price', 0))
-                        
-                        if open_p == 0 or prev_c == 0: open_status = "NA"
-                        elif open_p > prev_c: open_status = "Gap Up 🔼"
-                        elif open_p < prev_c: open_status = "Gap Down 🔽"
-                        else: open_status = "Same ➖"
+                    if open_p == 0 or prev_c == 0: open_status = "NA"
+                    elif open_p > prev_c: open_status = "Gap Up 🔼"
+                    elif open_p < prev_c: open_status = "Gap Down 🔽"
+                    else: open_status = "Same ➖"
 
-                        if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
-                            chain = oc['data']['optionsChain']
-                            c_oi = sum(float(x.get('oi', 0)) for x in chain if str(x.get('symbol', '')).endswith('CE') or x.get('option_type') == 'CE')
-                            p_oi = sum(float(x.get('oi', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
-                            c_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('CE') or x.get('volume_type') == 'CE') 
-                            p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
-                            o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
+                    if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
+                        chain = oc['data']['optionsChain']
+                        c_oi = sum(float(x.get('oi', 0)) for x in chain if str(x.get('symbol', '')).endswith('CE') or x.get('option_type') == 'CE')
+                        p_oi = sum(float(x.get('oi', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
+                        c_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('CE') or x.get('volume_type') == 'CE') 
+                        p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
+                        o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
+                        
+                        pcr_abs, vol_abs, pcr_pct, vol_pct = calc_checker_data(s_name, v_pcr, v_cpr, now_ist.time())
+                        
+                        final_list.append({
+                            'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
+                            'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val,
+                            'VOL_ABS': vol_abs, 'PCR_ABS': pcr_abs, 
+                            'VOL_PCT': vol_pct, 'PCR_PCT': pcr_pct,
+                            'CE_CON': calc_conviction(chain, 'CE'), 'PE_CON': calc_conviction(chain, 'PE')
+                        })
+                        
+                        if is_market_hours:
+                            if s_name not in st.session_state.chart_history: 
+                                st.session_state.chart_history[s_name] = []
                             
-                            pcr_abs, vol_abs, pcr_pct, vol_pct = calc_checker_data(s_name, v_pcr, v_cpr, now_ist.time())
-                            
-                            final_list.append({
-                                'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
-                                'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val,
-                                'VOL_ABS': vol_abs, 'PCR_ABS': pcr_abs, 
-                                'VOL_PCT': vol_pct, 'PCR_PCT': pcr_pct,
-                                'CE_CON': calc_conviction(chain, 'CE'), 'PE_CON': calc_conviction(chain, 'PE')
-                            })
-                            
-                            if is_market_hours:
-                                if s_name not in st.session_state.chart_history: 
-                                    st.session_state.chart_history[s_name] = []
-                                
-                                new_row = {'Date': today_str, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr}
-                                st.session_state.chart_history[s_name].append(new_row)
-                                csv_row = new_row.copy()
-                                csv_row['Symbol'] = s_name
-                                new_csv_rows.append(csv_row)
-                        else:
-                            final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
+                            new_row = {'Date': today_str, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr}
+                            st.session_state.chart_history[s_name].append(new_row)
+                            csv_row = new_row.copy()
+                            csv_row['Symbol'] = s_name
+                            new_csv_rows.append(csv_row)
+                    else:
+                        final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
             
             st.session_state.cached_data = final_list
             st.session_state.last_api_call = datetime.datetime.now(IST)
@@ -427,7 +432,7 @@ if auth_code:
                     st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
             # ==========================================
-            # 🚀 ADVANCED PREMIUM CHART UPGRADE
+            # 🚀 NIFTY-TRADER STYLE: WHITE THEME + CROSSING LINES
             # ==========================================
             with tab2:
                 col1, col2 = st.columns([1, 2])
@@ -440,47 +445,46 @@ if auth_code:
                     
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
                     
-                    # 1. Smooth Main Line with Area Fill (Shading)
+                    # 1. Blue Line (No Shading, Free Scale)
                     fig.add_trace(
                         go.Scatter(
                             x=chart_df['Datetime'], 
                             y=chart_df[graph_filter], 
-                            name=graph_filter, 
+                            name=f"{graph_filter} (Left Axis)", 
                             mode='lines',
-                            line=dict(color='rgba(0, 191, 255, 1)', width=3, shape='spline'), # Smooth Line
-                            fill='tozeroy', # Area Shadow
-                            fillcolor='rgba(0, 191, 255, 0.1)'
+                            line=dict(color='#0088FF', width=2.5, shape='spline')
+                            # 'fill' ko hata diya gaya hai taaki line free rahe
                         ), 
                         secondary_y=False
                     )
                     
-                    # 2. Smooth LTP Line (Red/Pinkish like NiftyTrader)
+                    # 2. Red Line (Spot Price)
                     fig.add_trace(
                         go.Scatter(
                             x=chart_df['Datetime'], 
                             y=chart_df['LTP'], 
-                            name="Spot Price (LTP)", 
+                            name="Spot Price (Right Axis)", 
                             mode='lines',
-                            line=dict(color='#FF4B4B', width=3, shape='spline') # Smooth Red Line
+                            line=dict(color='#FF3366', width=2.5, shape='spline') 
                         ), 
                         secondary_y=True
                     )
                     
-                    # 3. Premium Layout & Unified Hover
+                    # 3. Clean White Theme Layout
                     fig.update_layout(
                         title_text=f"<b>{selected_stock} Options Trend</b>",
-                        title_font=dict(size=20, color='white'),
-                        plot_bgcolor='#0E1117',
-                        paper_bgcolor='#0E1117',
-                        font=dict(color="white"),
+                        title_font=dict(size=20, color='black'),
+                        plot_bgcolor='white',   # NiftyTrader jaisa White Background
+                        paper_bgcolor='white',  
+                        font=dict(color="black"), # Black Text
                         height=550,
-                        hovermode="x unified", # Advanced Hover
+                        hovermode="x unified",
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                     )
                     
-                    # 4. Subtle Grid Lines
-                    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='rgba(255, 255, 255, 0.1)', secondary_y=False)
-                    fig.update_yaxes(showgrid=False, secondary_y=True)
+                    # 4. Y-Axes setup (rangemode='normal' makes lines scale fully and cross each other)
+                    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#E5E5E5', zeroline=False, rangemode='normal', secondary_y=False)
+                    fig.update_yaxes(showgrid=False, zeroline=False, rangemode='normal', secondary_y=True)
 
                     start_dt = pd.to_datetime(f"{st.session_state.current_date} 09:15:00")
                     end_dt = pd.to_datetime(f"{st.session_state.current_date} 15:30:00")
@@ -491,7 +495,8 @@ if auth_code:
                         rangeslider_visible=True, 
                         rangeslider_thickness=0.05,
                         tickformat="%H:%M",
-                        showgrid=True, gridwidth=1, gridcolor='rgba(255, 255, 255, 0.1)'
+                        showgrid=True, gridwidth=1, gridcolor='#E5E5E5',
+                        zeroline=False
                     )
                     
                     st.plotly_chart(fig, use_container_width=True)
