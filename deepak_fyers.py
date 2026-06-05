@@ -432,7 +432,7 @@ if auth_code:
                     st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
             # ==========================================
-            # 🚀 NIFTY-TRADER STYLE: CLEAN SCROLLBAR
+            # 🚀 NIFTY-TRADER STYLE CHART + MAGIC PAN MODE
             # ==========================================
             with tab2:
                 col1, col2 = st.columns([1, 2])
@@ -469,7 +469,7 @@ if auth_code:
                         secondary_y=True
                     )
                     
-                    # 3. Clean White Theme Layout
+                    # 3. Clean White Theme Layout + PAN MODE
                     fig.update_layout(
                         title_text=f"<b>{selected_stock} Options Trend</b>",
                         title_font=dict(size=20, color='black'),
@@ -478,6 +478,7 @@ if auth_code:
                         font=dict(color="black"),
                         height=550,
                         hovermode="x unified",
+                        dragmode="pan", # 🚀 NAYA: Direct chart dragging (हाथ का निशान)
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                     )
                     
@@ -487,13 +488,13 @@ if auth_code:
                     start_dt = pd.to_datetime(f"{st.session_state.current_date} 09:15:00")
                     end_dt = pd.to_datetime(f"{st.session_state.current_date} 15:30:00")
                     
-                    # 🚀 SLIDER FIX: Clean but Easy to Drag Scrollbar (Thickness 0.05)
+                    # 🚀 SLIDER FIX: 0.03 (Perfect grip + No lines)
                     fig.update_xaxes(
                         type="date",
                         range=[start_dt, end_dt],
                         rangeslider=dict(
                             visible=True, 
-                            thickness=0.05, 
+                            thickness=0.03, 
                             bgcolor='#E5E5E5'  
                         ),
                         tickformat="%H:%M",
