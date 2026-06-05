@@ -432,7 +432,7 @@ if auth_code:
                     st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
             # ==========================================
-            # 🚀 NIFTY-TRADER STYLE: WHITE THEME + CROSSING LINES
+            # 🚀 NIFTY-TRADER STYLE: CLEAN SCROLLBAR
             # ==========================================
             with tab2:
                 col1, col2 = st.columns([1, 2])
@@ -445,7 +445,7 @@ if auth_code:
                     
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
                     
-                    # 1. Blue Line (No Shading, Free Scale)
+                    # 1. Blue Line
                     fig.add_trace(
                         go.Scatter(
                             x=chart_df['Datetime'], 
@@ -453,7 +453,6 @@ if auth_code:
                             name=f"{graph_filter} (Left Axis)", 
                             mode='lines',
                             line=dict(color='#0088FF', width=2.5, shape='spline')
-                            # 'fill' ko hata diya gaya hai taaki line free rahe
                         ), 
                         secondary_y=False
                     )
@@ -474,26 +473,29 @@ if auth_code:
                     fig.update_layout(
                         title_text=f"<b>{selected_stock} Options Trend</b>",
                         title_font=dict(size=20, color='black'),
-                        plot_bgcolor='white',   # NiftyTrader jaisa White Background
+                        plot_bgcolor='white',
                         paper_bgcolor='white',  
-                        font=dict(color="black"), # Black Text
+                        font=dict(color="black"),
                         height=550,
                         hovermode="x unified",
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                     )
                     
-                    # 4. Y-Axes setup (rangemode='normal' makes lines scale fully and cross each other)
                     fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#E5E5E5', zeroline=False, rangemode='normal', secondary_y=False)
                     fig.update_yaxes(showgrid=False, zeroline=False, rangemode='normal', secondary_y=True)
 
                     start_dt = pd.to_datetime(f"{st.session_state.current_date} 09:15:00")
                     end_dt = pd.to_datetime(f"{st.session_state.current_date} 15:30:00")
                     
+                    # 🚀 SLIDER FIX: Clean and Thin Scrollbar
                     fig.update_xaxes(
                         type="date",
                         range=[start_dt, end_dt],
-                        rangeslider_visible=True, 
-                        rangeslider_thickness=0.05,
+                        rangeslider=dict(
+                            visible=True, 
+                            thickness=0.015, # Isko ekdum patla kar diya (No Mini Chart Visible)
+                            bgcolor='#E5E5E5'  # NiftyTrader jaisa light grey slider track
+                        ),
                         tickformat="%H:%M",
                         showgrid=True, gridwidth=1, gridcolor='#E5E5E5',
                         zeroline=False
