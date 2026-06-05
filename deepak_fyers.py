@@ -10,6 +10,7 @@ from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
 import concurrent.futures
+import streamlit.components.v1 as components
 
 # ==========================================
 # 1. FYERS CREDENTIALS & MEMORY SETUP
@@ -381,7 +382,6 @@ if auth_code:
         # ==========================================
         if len(st.session_state.cached_data) > 0:
             
-            # Styling Functions
             def style_indicators(val):
                 if isinstance(val, str): 
                     if "Gap Up" in val: return 'color: #00AA00; font-weight: bold; text-align: center;'
@@ -403,7 +403,8 @@ if auth_code:
                 {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
             ]
 
-            tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "📈 Trend Graph", "🚀 Top Movers"])
+            # 🚀 NAYA: 4 Tabs Setup (Added NiftyTrader Web Tab)
+            tab1, tab2, tab3, tab4 = st.tabs(["📊 Dashboard", "📈 Trend Graph", "🚀 Top Movers", "🌐 NiftyTrader Web"])
             
             with tab1:
                 col1, col2 = st.columns([3, 1])
@@ -413,7 +414,6 @@ if auth_code:
                     st.write("") 
                     show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
                 
-                # Format setup
                 if show_pct:
                     checker_fmt = '{:+.1f}%'
                 else:
@@ -509,18 +509,15 @@ if auth_code:
                     
                     st.plotly_chart(fig, use_container_width=True)
 
-            # 🚀 NAYA: 3RD TAB - TOP MOVERS (Bullish Breakout Scanner with TRIPLE CONFIRMATION)
             with tab3:
                 st.markdown("### 🚀 Bullish Movers (Strong Breakout Candidates)")
                 st.write("Yahan sirf wahi stocks hain jinme 9:50 AM ke baad **Volume aur PCR dono positive** hain, aur **CE Contract 80% ya usse zyada green** hai.")
                 
                 df_movers = pd.DataFrame(st.session_state.cached_data)
                 if not df_movers.empty:
-                    # 🚀 TRIPLE FILTER: VOL > 0 AND PCR > 0 AND CE_CON >= 80.0
                     df_bullish = df_movers[(df_movers['VOL_PCT'] > 0) & (df_movers['PCR_PCT'] > 0) & (df_movers['CE_CON'] >= 80.0)].copy()
                     
                     if not df_bullish.empty:
-                        # Seniority wise sort (Jiska combined momentum sabse zyada ho)
                         df_bullish['Momentum'] = df_bullish['VOL_PCT'] + df_bullish['PCR_PCT']
                         df_bullish = df_bullish.sort_values(by='Momentum', ascending=False).drop(columns=['Momentum'])
                         
@@ -541,6 +538,21 @@ if auth_code:
                         st.dataframe(styled_bullish, use_container_width=True, height=600, hide_index=True)
                     else:
                         st.info("🕒 Abhi tak koi bhi stock in teeno conditions ko meet nahi kar raha hai (Ya fir 9:50 AM nahi baje hain).")
+
+            # 🚀 NAYA: 4TH TAB - NIFTYTRADER WEB IFRAME
+            with tab4:
+                st.markdown("### 🌐 NiftyTrader Live Options Chart")
+                st.write("Neeche diye gaye dropdown se stock select karein aur uska NiftyTrader chart directly dekhein.")
+                
+                selected_nt_stock = st.selectbox("Select Stock for NiftyTrader:", raw_symbols, index=0, key="nt_stock")
+                nt_url = f"https://www.niftytrader.in/stock-options-chart/{selected_nt_stock.lower()}"
+                
+                st.markdown(f"**[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart in New Full Tab]({nt_url})**")
+                
+                try:
+                    components.iframe(nt_url, height=800, scrolling=True)
+                except Exception as e:
+                    st.error(f"Cannot load external website in iframe. Please use the direct link above. Error: {e}")
 
         else:
             st.warning("⚠️ Dashboard Blank Hai: Naya data nahi mil raha hai! Kripya side bar se naya Auth Code dalkar login karein.")
