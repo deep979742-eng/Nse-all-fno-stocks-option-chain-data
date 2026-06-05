@@ -22,7 +22,7 @@ REDIRECT_URI = "https://www.google.com/"
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
 # ==========================================
-# SUPER CSS INJECTOR: ANTI-BLUR SHIELD (FIXED)
+# SUPER CSS INJECTOR: ULTIMATE ANTI-BLUR SHIELD
 # ==========================================
 st.markdown("""
     <style>
@@ -38,6 +38,7 @@ st.markdown("""
         [data-testid="stDataFrameTable"] > thead > tr { background-color: darkblue !important; }
         [data-testid="stDataFrameTable"] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; }
         th { background-color: darkblue !important; color: white !important; }
+        * { cursor: default !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -349,7 +350,6 @@ if auth_code:
                     else:
                         final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
             
-            # 🚀 SAFE MEMORY: Agar naya data aaya hai tabhi update karo, warna purana rehne do
             if len(final_list) > 0:
                 st.session_state.cached_data = final_list
             
@@ -380,7 +380,31 @@ if auth_code:
         # 5. DASHBOARD DISPLAY & STYLING
         # ==========================================
         if len(st.session_state.cached_data) > 0:
-            tab1, tab2 = st.tabs(["📊 Dashboard", "📈 Trend Graph"])
+            
+            # Styling Functions
+            def style_indicators(val):
+                if isinstance(val, str): 
+                    if "Gap Up" in val: return 'color: #00AA00; font-weight: bold; text-align: center;'
+                    if "Gap Down" in val: return 'color: #FF0000; font-weight: bold; text-align: center;'
+                    if "Same" in val: return 'color: #00BFFF; font-weight: bold; text-align: center;'
+                    return 'text-align: center;'
+                if val > 0: return 'color: #00AA00; font-weight: bold; text-align: center;'
+                elif val < 0: return 'color: #FF0000; font-weight: bold; text-align: center;'
+                return 'color: #888888; font-weight: bold; text-align: center;'
+
+            def style_pcr_columns(val):
+                if isinstance(val, (int, float)):
+                    if val >= 1.0: return 'color: #00AA00; font-weight: bold; text-align: center;'
+                    elif val > 0 and val < 1.0: return 'color: #FF0000; font-weight: bold; text-align: center;'
+                return 'text-align: center;'
+
+            header_styles = [
+                {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
+                {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
+            ]
+
+            tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "📈 Trend Graph", "🚀 Top Movers"])
+            
             with tab1:
                 col1, col2 = st.columns([3, 1])
                 with col1:
@@ -388,6 +412,13 @@ if auth_code:
                 with col2:
                     st.write("") 
                     show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
+                
+                # Format setup
+                if show_pct:
+                    checker_fmt = '{:+.1f}%'
+                else:
+                    checker_fmt = '{:+.2f}'
+                format_dict = {'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 'LTP': '{:.2f}', 'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 'VOL CHECKER': checker_fmt, 'PCR CHECKER': checker_fmt, 'CE_CONTRACT': '{:+.1f}%', 'PE_CONTRACT': '{:+.1f}%'}
                 
                 df = pd.DataFrame(st.session_state.cached_data)
                 if search_query: df = df[df['SYMS'].str.contains(search_query, na=False)]
@@ -399,36 +430,12 @@ if auth_code:
                     if show_pct:
                         df['VOL CHECKER'] = df['VOL_PCT']
                         df['PCR CHECKER'] = df['PCR_PCT']
-                        checker_fmt = '{:+.1f}%'
                     else:
                         df['VOL CHECKER'] = df['VOL_ABS']
                         df['PCR CHECKER'] = df['PCR_ABS']
-                        checker_fmt = '{:+.2f}'
                         
                     df = df.drop(columns=['VOL_ABS', 'PCR_ABS', 'VOL_PCT', 'PCR_PCT'])
                     df = df.rename(columns={'SYMS': 'SYMBOL', 'OPEN_STATUS': 'OPENING', 'V_PCR': 'VOL PCR', 'O_PCR': 'OPTION PCR', 'V_CPR': 'VOL CPR', 'LTP_CH': 'LTP CHANGE', 'CHG_%': 'CHANGE%', 'LTP': 'LTP', 'CE_CON': 'CE_CONTRACT', 'PE_CON': 'PE_CONTRACT'})
-
-                    def style_indicators(val):
-                        if isinstance(val, str): 
-                            if "Gap Up" in val: return 'color: #00AA00; font-weight: bold; text-align: center;'
-                            if "Gap Down" in val: return 'color: #FF0000; font-weight: bold; text-align: center;'
-                            if "Same" in val: return 'color: #00BFFF; font-weight: bold; text-align: center;'
-                            return 'text-align: center;'
-                        if val > 0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-                        elif val < 0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-                        return 'color: #888888; font-weight: bold; text-align: center;'
-
-                    def style_pcr_columns(val):
-                        if isinstance(val, (int, float)):
-                            if val >= 1.0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-                            elif val > 0 and val < 1.0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-                        return 'text-align: center;'
-
-                    format_dict = {'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 'LTP': '{:.2f}', 'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 'VOL CHECKER': checker_fmt, 'PCR CHECKER': checker_fmt, 'CE_CONTRACT': '{:+.1f}%', 'PE_CONTRACT': '{:+.1f}%'}
-                    header_styles = [
-                        {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
-                        {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
-                    ]
 
                     styled_df = (df.style.set_properties(**{'text-align': 'center'}).format(format_dict).set_table_styles(header_styles)
                                  .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
@@ -436,9 +443,6 @@ if auth_code:
 
                     st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
-            # ==========================================
-            # 🚀 NIFTY-TRADER STYLE CHART + MAGIC PAN MODE
-            # ==========================================
             with tab2:
                 col1, col2 = st.columns([1, 2])
                 selected_stock = col1.selectbox("Select Stock:", raw_symbols, index=0)
@@ -450,7 +454,6 @@ if auth_code:
                     
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
                     
-                    # 1. Blue Line
                     fig.add_trace(
                         go.Scatter(
                             x=chart_df['Datetime'], 
@@ -462,7 +465,6 @@ if auth_code:
                         secondary_y=False
                     )
                     
-                    # 2. Red Line (Spot Price)
                     fig.add_trace(
                         go.Scatter(
                             x=chart_df['Datetime'], 
@@ -474,7 +476,6 @@ if auth_code:
                         secondary_y=True
                     )
                     
-                    # 3. Clean White Theme Layout + PAN MODE
                     fig.update_layout(
                         title_text=f"<b>{selected_stock} Options Trend</b>",
                         title_font=dict(size=20, color='black'),
@@ -507,6 +508,40 @@ if auth_code:
                     )
                     
                     st.plotly_chart(fig, use_container_width=True)
+
+            # 🚀 NAYA: 3RD TAB - TOP MOVERS (Bullish Breakout Scanner with TRIPLE CONFIRMATION)
+            with tab3:
+                st.markdown("### 🚀 Bullish Movers (Strong Breakout Candidates)")
+                st.write("Yahan sirf wahi stocks hain jinme 9:50 AM ke baad **Volume aur PCR dono positive** hain, aur **CE Contract 80% ya usse zyada green** hai.")
+                
+                df_movers = pd.DataFrame(st.session_state.cached_data)
+                if not df_movers.empty:
+                    # 🚀 TRIPLE FILTER: VOL > 0 AND PCR > 0 AND CE_CON >= 80.0
+                    df_bullish = df_movers[(df_movers['VOL_PCT'] > 0) & (df_movers['PCR_PCT'] > 0) & (df_movers['CE_CON'] >= 80.0)].copy()
+                    
+                    if not df_bullish.empty:
+                        # Seniority wise sort (Jiska combined momentum sabse zyada ho)
+                        df_bullish['Momentum'] = df_bullish['VOL_PCT'] + df_bullish['PCR_PCT']
+                        df_bullish = df_bullish.sort_values(by='Momentum', ascending=False).drop(columns=['Momentum'])
+                        
+                        if show_pct:
+                            df_bullish['VOL CHECKER'] = df_bullish['VOL_PCT']
+                            df_bullish['PCR CHECKER'] = df_bullish['PCR_PCT']
+                        else:
+                            df_bullish['VOL CHECKER'] = df_bullish['VOL_ABS']
+                            df_bullish['PCR CHECKER'] = df_bullish['PCR_ABS']
+                            
+                        df_bullish = df_bullish.drop(columns=['VOL_ABS', 'PCR_ABS', 'VOL_PCT', 'PCR_PCT'])
+                        df_bullish = df_bullish.rename(columns={'SYMS': 'SYMBOL', 'OPEN_STATUS': 'OPENING', 'V_PCR': 'VOL PCR', 'O_PCR': 'OPTION PCR', 'V_CPR': 'VOL CPR', 'LTP_CH': 'LTP CHANGE', 'CHG_%': 'CHANGE%', 'LTP': 'LTP', 'CE_CON': 'CE_CONTRACT', 'PE_CON': 'PE_CONTRACT'})
+                        
+                        styled_bullish = (df_bullish.style.set_properties(**{'text-align': 'center'}).format(format_dict).set_table_styles(header_styles)
+                                     .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
+                                     .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
+
+                        st.dataframe(styled_bullish, use_container_width=True, height=600, hide_index=True)
+                    else:
+                        st.info("🕒 Abhi tak koi bhi stock in teeno conditions ko meet nahi kar raha hai (Ya fir 9:50 AM nahi baje hain).")
+
         else:
             st.warning("⚠️ Dashboard Blank Hai: Naya data nahi mil raha hai! Kripya side bar se naya Auth Code dalkar login karein.")
 
