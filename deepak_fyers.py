@@ -22,7 +22,7 @@ REDIRECT_URI = "https://www.google.com/"
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
 # ==========================================
-# SUPER CSS INJECTOR: ULTIMATE ANTI-BLUR SHIELD
+# SUPER CSS INJECTOR: ANTI-BLUR SHIELD (FIXED)
 # ==========================================
 st.markdown("""
     <style>
@@ -38,7 +38,6 @@ st.markdown("""
         [data-testid="stDataFrameTable"] > thead > tr { background-color: darkblue !important; }
         [data-testid="stDataFrameTable"] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; }
         th { background-color: darkblue !important; color: white !important; }
-        * { cursor: default !important; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -303,6 +302,9 @@ if auth_code:
                 if quotes and quotes.get('s') == 'ok' and len(quotes.get('d', [])) > 0:
                     all_quotes.extend(quotes['d'])
 
+            if not all_quotes:
+                st.error("⚠️ Fyers API se naya data nahi mil raha hai! Kripya side bar mein naya Auth Code dal kar dobara Login karein.")
+            
             with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
                 results = executor.map(fetch_option_chain_fast, all_quotes)
                 
@@ -347,7 +349,10 @@ if auth_code:
                     else:
                         final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
             
-            st.session_state.cached_data = final_list
+            # 🚀 SAFE MEMORY: Agar naya data aaya hai tabhi update karo, warna purana rehne do
+            if len(final_list) > 0:
+                st.session_state.cached_data = final_list
+            
             st.session_state.last_api_call = datetime.datetime.now(IST)
 
             if new_csv_rows:
@@ -478,7 +483,7 @@ if auth_code:
                         font=dict(color="black"),
                         height=550,
                         hovermode="x unified",
-                        dragmode="pan", # 🚀 NAYA: Direct chart dragging (हाथ का निशान)
+                        dragmode="pan", 
                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                     )
                     
@@ -488,7 +493,6 @@ if auth_code:
                     start_dt = pd.to_datetime(f"{st.session_state.current_date} 09:15:00")
                     end_dt = pd.to_datetime(f"{st.session_state.current_date} 15:30:00")
                     
-                    # 🚀 SLIDER FIX: 0.03 (Perfect grip + No lines)
                     fig.update_xaxes(
                         type="date",
                         range=[start_dt, end_dt],
@@ -503,11 +507,13 @@ if auth_code:
                     )
                     
                     st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.warning("⚠️ Dashboard Blank Hai: Naya data nahi mil raha hai! Kripya side bar se naya Auth Code dalkar login karein.")
 
-            st.write(f"🔄 Next scan in 5 mins... Last updated: {st.session_state.last_api_call.strftime('%H:%M:%S')}")
-            time_diff = (datetime.datetime.now(IST) - st.session_state.last_api_call).total_seconds()
-            time.sleep(max(0, 300 - time_diff))
-            st.rerun()
+        st.write(f"🔄 Next scan in 5 mins... Last updated: {st.session_state.last_api_call.strftime('%H:%M:%S')}")
+        time_diff = (datetime.datetime.now(IST) - st.session_state.last_api_call).total_seconds()
+        time.sleep(max(0, 300 - time_diff))
+        st.rerun()
 
     except Exception as e:
         st.sidebar.error(f"❌ Error: {e}")
