@@ -487,14 +487,14 @@ if auth_code:
                     start_dt = pd.to_datetime(f"{st.session_state.current_date} 09:15:00")
                     end_dt = pd.to_datetime(f"{st.session_state.current_date} 15:30:00")
                     
-                    # 🚀 SLIDER FIX: Clean and Thin Scrollbar
+                    # 🚀 SLIDER FIX: Clean but Easy to Drag Scrollbar (Thickness 0.05)
                     fig.update_xaxes(
                         type="date",
                         range=[start_dt, end_dt],
                         rangeslider=dict(
                             visible=True, 
-                            thickness=0.015, # Isko ekdum patla kar diya (No Mini Chart Visible)
-                            bgcolor='#E5E5E5'  # NiftyTrader jaisa light grey slider track
+                            thickness=0.05, 
+                            bgcolor='#E5E5E5'  
                         ),
                         tickformat="%H:%M",
                         showgrid=True, gridwidth=1, gridcolor='#E5E5E5',
