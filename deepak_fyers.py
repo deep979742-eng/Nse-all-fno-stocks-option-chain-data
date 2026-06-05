@@ -179,14 +179,13 @@ def get_raw_symbol(fyers_sym):
     if s == "NIFTYBANK": return "BANKNIFTY"
     return s
 
-# 🚀 SUPER SAFE SNIPER MODE: Ekdum pakka aur safe speed
 def fetch_option_chain_fast(q):
     sym = q['n']
-    time.sleep(0.4) # Break badha diya taaki Fyers gussa na ho
+    time.sleep(0.4) 
     try:
         oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
         if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
-            time.sleep(2.0) # Agar block kiya to 2 second ruk kar wapas laayega
+            time.sleep(2.0) 
             oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
         return q, oc
     except:
@@ -299,7 +298,6 @@ if auth_code:
                     if quotes and quotes.get('s') == 'ok' and len(quotes.get('d', [])) > 0:
                         all_quotes.extend(quotes['d'])
 
-                # 🚀 YAHAN WORKERS 4 SE GHATAKAR 2 KAR DIYE HAIN 
                 with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
                     results = executor.map(fetch_option_chain_fast, all_quotes)
                     
@@ -428,6 +426,9 @@ if auth_code:
 
                     st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
+            # ==========================================
+            # 🚀 ADVANCED PREMIUM CHART UPGRADE
+            # ==========================================
             with tab2:
                 col1, col2 = st.columns([1, 2])
                 selected_stock = col1.selectbox("Select Stock:", raw_symbols, index=0)
@@ -435,15 +436,52 @@ if auth_code:
                 
                 if selected_stock in st.session_state.chart_history and len(st.session_state.chart_history[selected_stock]) > 0:
                     chart_df = pd.DataFrame(st.session_state.chart_history[selected_stock])
-                    
                     chart_df['Datetime'] = pd.to_datetime(st.session_state.current_date + ' ' + chart_df['Time'])
                     
                     fig = make_subplots(specs=[[{"secondary_y": True}]])
-                    fig.add_trace(go.Scatter(x=chart_df['Datetime'], y=chart_df[graph_filter], name=graph_filter, line=dict(color='deepskyblue', width=3)), secondary_y=False)
-                    fig.add_trace(go.Scatter(x=chart_df['Datetime'], y=chart_df['LTP'], name="LTP", line=dict(color='#00AA00', width=3)), secondary_y=True)
                     
-                    fig.update_layout(title_text=f"{selected_stock} Trend", plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(color="white"), height=450)
+                    # 1. Smooth Main Line with Area Fill (Shading)
+                    fig.add_trace(
+                        go.Scatter(
+                            x=chart_df['Datetime'], 
+                            y=chart_df[graph_filter], 
+                            name=graph_filter, 
+                            mode='lines',
+                            line=dict(color='rgba(0, 191, 255, 1)', width=3, shape='spline'), # Smooth Line
+                            fill='tozeroy', # Area Shadow
+                            fillcolor='rgba(0, 191, 255, 0.1)'
+                        ), 
+                        secondary_y=False
+                    )
                     
+                    # 2. Smooth LTP Line (Red/Pinkish like NiftyTrader)
+                    fig.add_trace(
+                        go.Scatter(
+                            x=chart_df['Datetime'], 
+                            y=chart_df['LTP'], 
+                            name="Spot Price (LTP)", 
+                            mode='lines',
+                            line=dict(color='#FF4B4B', width=3, shape='spline') # Smooth Red Line
+                        ), 
+                        secondary_y=True
+                    )
+                    
+                    # 3. Premium Layout & Unified Hover
+                    fig.update_layout(
+                        title_text=f"<b>{selected_stock} Options Trend</b>",
+                        title_font=dict(size=20, color='white'),
+                        plot_bgcolor='#0E1117',
+                        paper_bgcolor='#0E1117',
+                        font=dict(color="white"),
+                        height=550,
+                        hovermode="x unified", # Advanced Hover
+                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                    )
+                    
+                    # 4. Subtle Grid Lines
+                    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='rgba(255, 255, 255, 0.1)', secondary_y=False)
+                    fig.update_yaxes(showgrid=False, secondary_y=True)
+
                     start_dt = pd.to_datetime(f"{st.session_state.current_date} 09:15:00")
                     end_dt = pd.to_datetime(f"{st.session_state.current_date} 15:30:00")
                     
@@ -452,7 +490,8 @@ if auth_code:
                         range=[start_dt, end_dt],
                         rangeslider_visible=True, 
                         rangeslider_thickness=0.05,
-                        tickformat="%H:%M"
+                        tickformat="%H:%M",
+                        showgrid=True, gridwidth=1, gridcolor='rgba(255, 255, 255, 0.1)'
                     )
                     
                     st.plotly_chart(fig, use_container_width=True)
