@@ -8,7 +8,6 @@ from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
 import concurrent.futures
-import streamlit.components.v1 as components
 
 # ==========================================
 # 1. FYERS CREDENTIALS & MEMORY SETUP
@@ -337,15 +336,6 @@ if auth_code:
                             'CE_CON': calc_conviction(chain, 'CE'), 'PE_CON': calc_conviction(chain, 'PE')
                         })
                         
-                        if is_market_hours:
-                            if s_name not in st.session_state.chart_history: 
-                                st.session_state.chart_history[s_name] = []
-                            
-                            new_row = {'Date': today_str, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr}
-                            st.session_state.chart_history[s_name].append(new_row)
-                            csv_row = new_row.copy()
-                            csv_row['Symbol'] = s_name
-                            new_csv_rows.append(csv_row)
                     else:
                         final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
             
@@ -353,13 +343,6 @@ if auth_code:
                 st.session_state.cached_data = final_list
             
             st.session_state.last_api_call = datetime.datetime.now(IST)
-
-            if new_csv_rows:
-                new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
-                if not os.path.isfile(HISTORY_FILE):
-                    new_df.to_csv(HISTORY_FILE, index=False)
-                else:
-                    new_df.to_csv(HISTORY_FILE, mode='a', header=False, index=False)
 
             last_auto_save = ""
             if os.path.exists(AUTO_SAVE_FILE):
@@ -401,7 +384,7 @@ if auth_code:
                 {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
             ]
 
-            # 🚀 2 TABS ONLY: Dashboard aur NiftyTrader Web
+            # 🚀 ONLY 2 TABS: Dashboard aur NiftyTrader Web
             tab1, tab2 = st.tabs(["📊 Dashboard", "🌐 NiftyTrader Web"])
             
             with tab1:
@@ -441,19 +424,16 @@ if auth_code:
 
                     st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
-            # 🚀 TAB 2: NIFTYTRADER WEB IFRAME (Cleaned Up)
+            # 🚀 TAB 2: NIFTYTRADER WEB (Sirf Direct Link)
             with tab2:
+                st.markdown("### 🌐 NiftyTrader Live Options Chart")
+                st.write("Neeche diye gaye dropdown se stock select karein aur uska chart naye tab mein open karein.")
+                
                 selected_nt_stock = st.selectbox("Select Stock for Chart:", raw_symbols, index=0, key="nt_stock")
                 nt_url = f"https://www.niftytrader.in/stock-options-chart/{selected_nt_stock.lower()}"
                 
-                # Direct Link
-                st.markdown(f"**[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart in New Tab]({nt_url})**")
-                
-                # Iframe 
-                try:
-                    components.iframe(nt_url, height=800, scrolling=True)
-                except Exception as e:
-                    st.error(f"Cannot load external website in iframe. Error: {e}")
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
 
         else:
             st.warning("⚠️ Dashboard Blank Hai: Naya data nahi mil raha hai! Kripya side bar se naya Auth Code dalkar login karein.")
