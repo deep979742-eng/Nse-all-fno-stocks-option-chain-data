@@ -4,8 +4,6 @@ import datetime
 import time
 import os
 import json
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
@@ -403,8 +401,8 @@ if auth_code:
                 {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
             ]
 
-            # 🚀 NAYA: 4 Tabs Setup (Added NiftyTrader Web Tab)
-            tab1, tab2, tab3, tab4 = st.tabs(["📊 Dashboard", "📈 Trend Graph", "🚀 Top Movers", "🌐 NiftyTrader Web"])
+            # 🚀 2 TABS ONLY: Dashboard aur NiftyTrader Web
+            tab1, tab2 = st.tabs(["📊 Dashboard", "🌐 NiftyTrader Web"])
             
             with tab1:
                 col1, col2 = st.columns([3, 1])
@@ -443,116 +441,19 @@ if auth_code:
 
                     st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
+            # 🚀 TAB 2: NIFTYTRADER WEB IFRAME (Cleaned Up)
             with tab2:
-                col1, col2 = st.columns([1, 2])
-                selected_stock = col1.selectbox("Select Stock:", raw_symbols, index=0)
-                graph_filter = col2.radio("Metric:", ["VOL CPR", "OPT PCR"], horizontal=True)
-                
-                if selected_stock in st.session_state.chart_history and len(st.session_state.chart_history[selected_stock]) > 0:
-                    chart_df = pd.DataFrame(st.session_state.chart_history[selected_stock])
-                    chart_df['Datetime'] = pd.to_datetime(st.session_state.current_date + ' ' + chart_df['Time'])
-                    
-                    fig = make_subplots(specs=[[{"secondary_y": True}]])
-                    
-                    fig.add_trace(
-                        go.Scatter(
-                            x=chart_df['Datetime'], 
-                            y=chart_df[graph_filter], 
-                            name=f"{graph_filter} (Left Axis)", 
-                            mode='lines',
-                            line=dict(color='#0088FF', width=2.5, shape='spline')
-                        ), 
-                        secondary_y=False
-                    )
-                    
-                    fig.add_trace(
-                        go.Scatter(
-                            x=chart_df['Datetime'], 
-                            y=chart_df['LTP'], 
-                            name="Spot Price (Right Axis)", 
-                            mode='lines',
-                            line=dict(color='#FF3366', width=2.5, shape='spline') 
-                        ), 
-                        secondary_y=True
-                    )
-                    
-                    fig.update_layout(
-                        title_text=f"<b>{selected_stock} Options Trend</b>",
-                        title_font=dict(size=20, color='black'),
-                        plot_bgcolor='white',
-                        paper_bgcolor='white',  
-                        font=dict(color="black"),
-                        height=550,
-                        hovermode="x unified",
-                        dragmode="pan", 
-                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                    )
-                    
-                    fig.update_yaxes(showgrid=True, gridwidth=1, gridcolor='#E5E5E5', zeroline=False, rangemode='normal', secondary_y=False)
-                    fig.update_yaxes(showgrid=False, zeroline=False, rangemode='normal', secondary_y=True)
-
-                    start_dt = pd.to_datetime(f"{st.session_state.current_date} 09:15:00")
-                    end_dt = pd.to_datetime(f"{st.session_state.current_date} 15:30:00")
-                    
-                    fig.update_xaxes(
-                        type="date",
-                        range=[start_dt, end_dt],
-                        rangeslider=dict(
-                            visible=True, 
-                            thickness=0.03, 
-                            bgcolor='#E5E5E5'  
-                        ),
-                        tickformat="%H:%M",
-                        showgrid=True, gridwidth=1, gridcolor='#E5E5E5',
-                        zeroline=False
-                    )
-                    
-                    st.plotly_chart(fig, use_container_width=True)
-
-            with tab3:
-                st.markdown("### 🚀 Bullish Movers (Strong Breakout Candidates)")
-                st.write("Yahan sirf wahi stocks hain jinme 9:50 AM ke baad **Volume aur PCR dono positive** hain, aur **CE Contract 80% ya usse zyada green** hai.")
-                
-                df_movers = pd.DataFrame(st.session_state.cached_data)
-                if not df_movers.empty:
-                    df_bullish = df_movers[(df_movers['VOL_PCT'] > 0) & (df_movers['PCR_PCT'] > 0) & (df_movers['CE_CON'] >= 80.0)].copy()
-                    
-                    if not df_bullish.empty:
-                        df_bullish['Momentum'] = df_bullish['VOL_PCT'] + df_bullish['PCR_PCT']
-                        df_bullish = df_bullish.sort_values(by='Momentum', ascending=False).drop(columns=['Momentum'])
-                        
-                        if show_pct:
-                            df_bullish['VOL CHECKER'] = df_bullish['VOL_PCT']
-                            df_bullish['PCR CHECKER'] = df_bullish['PCR_PCT']
-                        else:
-                            df_bullish['VOL CHECKER'] = df_bullish['VOL_ABS']
-                            df_bullish['PCR CHECKER'] = df_bullish['PCR_ABS']
-                            
-                        df_bullish = df_bullish.drop(columns=['VOL_ABS', 'PCR_ABS', 'VOL_PCT', 'PCR_PCT'])
-                        df_bullish = df_bullish.rename(columns={'SYMS': 'SYMBOL', 'OPEN_STATUS': 'OPENING', 'V_PCR': 'VOL PCR', 'O_PCR': 'OPTION PCR', 'V_CPR': 'VOL CPR', 'LTP_CH': 'LTP CHANGE', 'CHG_%': 'CHANGE%', 'LTP': 'LTP', 'CE_CON': 'CE_CONTRACT', 'PE_CON': 'PE_CONTRACT'})
-                        
-                        styled_bullish = (df_bullish.style.set_properties(**{'text-align': 'center'}).format(format_dict).set_table_styles(header_styles)
-                                     .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
-                                     .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
-
-                        st.dataframe(styled_bullish, use_container_width=True, height=600, hide_index=True)
-                    else:
-                        st.info("🕒 Abhi tak koi bhi stock in teeno conditions ko meet nahi kar raha hai (Ya fir 9:50 AM nahi baje hain).")
-
-            # 🚀 NAYA: 4TH TAB - NIFTYTRADER WEB IFRAME
-            with tab4:
-                st.markdown("### 🌐 NiftyTrader Live Options Chart")
-                st.write("Neeche diye gaye dropdown se stock select karein aur uska NiftyTrader chart directly dekhein.")
-                
-                selected_nt_stock = st.selectbox("Select Stock for NiftyTrader:", raw_symbols, index=0, key="nt_stock")
+                selected_nt_stock = st.selectbox("Select Stock for Chart:", raw_symbols, index=0, key="nt_stock")
                 nt_url = f"https://www.niftytrader.in/stock-options-chart/{selected_nt_stock.lower()}"
                 
-                st.markdown(f"**[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart in New Full Tab]({nt_url})**")
+                # Direct Link
+                st.markdown(f"**[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart in New Tab]({nt_url})**")
                 
+                # Iframe 
                 try:
                     components.iframe(nt_url, height=800, scrolling=True)
                 except Exception as e:
-                    st.error(f"Cannot load external website in iframe. Please use the direct link above. Error: {e}")
+                    st.error(f"Cannot load external website in iframe. Error: {e}")
 
         else:
             st.warning("⚠️ Dashboard Blank Hai: Naya data nahi mil raha hai! Kripya side bar se naya Auth Code dalkar login karein.")
