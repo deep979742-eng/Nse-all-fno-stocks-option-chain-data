@@ -8,7 +8,6 @@ from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
 import concurrent.futures
-import streamlit.components.v1 as components
 
 # ==========================================
 # 1. FYERS CREDENTIALS & GLOBAL SETUP
@@ -42,22 +41,14 @@ IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 now_ist = datetime.datetime.now(IST)
 today_str = now_ist.strftime("%Y-%m-%d")
 
-HISTORY_FILE = "chart_history.csv"
 SNAPSHOT_FILE = "snapshot_950.json"
 TOKEN_STORE_FILE = "fyers_token_store.json"
 AUTO_SAVE_FILE = "auto_save_tracker.txt"
 STRIKE_MEM_FILE = "intraday_strike_memory.json"
 
 # ==========================================
-# 2. FILE MANAGEMENT (Naya Din = Nayi File)
+# 2. GOOGLE SHEETS & MEMORY MANAGEMENT
 # ==========================================
-if os.path.exists(HISTORY_FILE):
-    try:
-        hist_check = pd.read_csv(HISTORY_FILE)
-        if 'Date' in hist_check.columns and hist_check['Date'].iloc[-1] != today_str:
-            os.remove(HISTORY_FILE)
-    except: os.remove(HISTORY_FILE)
-
 @st.cache_resource
 def get_gsheet():
     try:
@@ -123,12 +114,10 @@ def get_raw_symbol(fyers_sym):
 # ==========================================
 # 4. 🚀 GLOBAL CACHE LOCK (MASTER SCANNER) 🚀
 # ==========================================
-# Ye function 290 seconds (Lagbhag 5 min) mein sirf EK baar chalega! Baki phone yahi se copy lenge.
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
     fyers = fyersModel.FyersModel(client_id=APP_ID, is_async=False, token=token, log_path="")
     scan_time_ist = datetime.datetime.now(IST)
-    time_str = scan_time_ist.strftime('%H:%M')
     
     # Load Persistent Files
     try: strike_mem = json.load(open(STRIKE_MEM_FILE)).get("data", {})
@@ -147,7 +136,6 @@ def run_master_scan(token, date_str):
     if not all_quotes: return None, None # API Failure check
         
     final_list = []
-    new_csv_rows = []
 
     def fetch_option_chain_fast_local(q):
         sym = q['n']
@@ -178,7 +166,7 @@ def run_master_scan(token, date_str):
                 p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
                 o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
                 
-                # Dynamic Checker & Conviction Logic
+                # Dynamic Checker (9:50 AM Logic)
                 target_time = datetime.time(9, 50)
                 if scan_time_ist.time() < target_time: pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
@@ -191,16 +179,25 @@ def run_master_scan(token, date_str):
                         pcr_pct = ((v_pcr - base['pcr']) / base['pcr']) * 100 if base['pcr'] != 0 else 0.0
                         vol_pct = ((v_cpr - base['vol_cpr']) / base['vol_cpr']) * 100 if base['vol_cpr'] != 0 else 0.0
 
+                # CE/PE Conviction & 3:30 PM Lock Logic
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
                     for s in strikes:
                         sym, lp = str(s.get('symbol', '')), float(s.get('ltp', 0))
                         if lp == 0: continue
-                        if sym not in strike_mem: strike_mem[sym] = lp; continue
+                        
+                        if sym not in strike_mem: 
+                            strike_mem[sym] = lp; continue
+                            
                         diff = lp - strike_mem[sym]
                         if diff > 0: tot_p += 1 
                         elif diff < 0: tot_m += 1 
+                        
+                        # 🚀 3:30 PM Fix: Lock today's price for tomorrow!
+                        if scan_time_ist.time() >= datetime.time(15, 30):
+                            strike_mem[sym] = lp
+
                     act = tot_p + tot_m
                     if act == 0: return 0.0
                     return round((tot_p / act) * 100, 1) if tot_p >= tot_m else -round((tot_m / act) * 100, 1)
@@ -212,23 +209,14 @@ def run_master_scan(token, date_str):
                     'VOL_PCT': round(vol_pct, 1), 'PCR_PCT': round(pcr_pct, 1),
                     'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
                 })
-                
-                # Only add chart data during market hours
-                if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
-                    new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
             else:
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
-    # Save Memory & CSV back to files (Only Master writes this)
+    # Save Memory Files
     try: json.dump({"date": date_str, "data": strike_mem}, open(STRIKE_MEM_FILE, "w"))
     except: pass
     try: json.dump({"date": date_str, "data": snap_950}, open(SNAPSHOT_FILE, "w"))
     except: pass
-    
-    if new_csv_rows:
-        new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
-        if not os.path.isfile(HISTORY_FILE): new_df.to_csv(HISTORY_FILE, index=False)
-        else: new_df.to_csv(HISTORY_FILE, mode='a', header=False, index=False)
 
     return final_list, scan_time_ist.timestamp()
 
@@ -286,7 +274,7 @@ if auth_code:
     else:
         token = saved_token
 
-    # 🚀 GLOBAL CACHE CALL (Ek phone master banega, baki view karenge)
+    # 🚀 GLOBAL CACHE CALL 
     cached_result, last_scan_timestamp = run_master_scan(token, today_str)
 
     if cached_result is not None:
@@ -301,18 +289,6 @@ if auth_code:
     else:
         st.warning("⚠️ Fyers API Data Wait... Retrying in 1 min.")
         if 'cached_data' not in st.session_state: st.session_state.cached_data = []
-
-    # Har phone apni screen par chart history file se padhega
-    st.session_state.chart_history = {}
-    if os.path.exists(HISTORY_FILE):
-        try:
-            hist_df = pd.read_csv(HISTORY_FILE)
-            if 'Date' in hist_df.columns:
-                hist_df = hist_df[hist_df['Date'] == today_str]
-                if not hist_df.empty:
-                    for sym in hist_df['Symbol'].unique():
-                        st.session_state.chart_history[sym] = hist_df[hist_df['Symbol'] == sym].drop(columns=['Symbol', 'Date']).to_dict('records')
-        except: pass
 
     if len(st.session_state.cached_data) > 0:
         
@@ -371,12 +347,18 @@ if auth_code:
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
 
-    # Time calculation to auto-refresh nicely
+    # 🚀 NAYA FIX: Screen Blink/Blur rokne ke liye
     if 'last_api_call' in st.session_state:
         st.write(f"🔄 Next master scan in ~5 mins... Last updated: {st.session_state.last_api_call.strftime('%H:%M:%S')}")
         time_diff = (datetime.datetime.now(IST) - st.session_state.last_api_call).total_seconds()
-        # Sleep thoda sa taki interface crash na ho, 30 sec baad refresh karke check karega naya data aya ya nahi
-        time.sleep(max(5, min(30, 290 - time_diff))) 
+        
+        # Agar 5 minute poore nahi hue hain, toh aaram se bacha hua time wait karega
+        if time_diff < 290:
+            time.sleep(290 - time_diff)
+        else:
+            # Agar master data lane mein late ho jaye, toh pagalo ki tarah har 5 sec mein refresh nahi hoga
+            time.sleep(60) 
+            
         st.rerun()
 
 else:
