@@ -8,6 +8,9 @@ from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
 import concurrent.futures
+# 🚀 ADVANCED CHARTING LIBRARIES (For OI Liner)
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 # ==========================================
 # 1. FYERS CREDENTIALS & GLOBAL SETUP
@@ -41,6 +44,7 @@ IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 now_ist = datetime.datetime.now(IST)
 today_str = now_ist.strftime("%Y-%m-%d")
 
+HISTORY_FILE = "chart_history.csv"
 SNAPSHOT_FILE = "snapshot_950.json"
 TOKEN_STORE_FILE = "fyers_token_store.json"
 AUTO_SAVE_FILE = "auto_save_tracker.txt"
@@ -49,6 +53,13 @@ STRIKE_MEM_FILE = "intraday_strike_memory.json"
 # ==========================================
 # 2. GOOGLE SHEETS & MEMORY MANAGEMENT
 # ==========================================
+if os.path.exists(HISTORY_FILE):
+    try:
+        hist_check = pd.read_csv(HISTORY_FILE)
+        if 'Date' in hist_check.columns and hist_check['Date'].iloc[-1] != today_str:
+            os.remove(HISTORY_FILE)
+    except: os.remove(HISTORY_FILE)
+
 @st.cache_resource
 def get_gsheet():
     try:
@@ -64,7 +75,6 @@ def get_gsheet():
 
 sheet = get_gsheet()
 
-# Load initial memory from GSheet once per day
 if not os.path.exists(STRIKE_MEM_FILE) or json.load(open(STRIKE_MEM_FILE)).get('date') != today_str:
     initial_mem = {}
     if sheet is not None:
@@ -118,8 +128,8 @@ def get_raw_symbol(fyers_sym):
 def run_master_scan(token, date_str):
     fyers = fyersModel.FyersModel(client_id=APP_ID, is_async=False, token=token, log_path="")
     scan_time_ist = datetime.datetime.now(IST)
+    time_str = scan_time_ist.strftime('%H:%M')
     
-    # Load Persistent Files
     try: strike_mem = json.load(open(STRIKE_MEM_FILE)).get("data", {})
     except: strike_mem = {}
     try: snap_950 = json.load(open(SNAPSHOT_FILE)).get("data", {})
@@ -133,9 +143,10 @@ def run_master_scan(token, date_str):
         if quotes and quotes.get('s') == 'ok' and len(quotes.get('d', [])) > 0:
             all_quotes.extend(quotes['d'])
             
-    if not all_quotes: return None, None # API Failure check
+    if not all_quotes: return None, None 
         
     final_list = []
+    new_csv_rows = []
 
     def fetch_option_chain_fast_local(q):
         sym = q['n']
@@ -166,7 +177,6 @@ def run_master_scan(token, date_str):
                 p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
                 o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
                 
-                # Dynamic Checker (9:50 AM Logic)
                 target_time = datetime.time(9, 50)
                 if scan_time_ist.time() < target_time: pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
@@ -179,25 +189,19 @@ def run_master_scan(token, date_str):
                         pcr_pct = ((v_pcr - base['pcr']) / base['pcr']) * 100 if base['pcr'] != 0 else 0.0
                         vol_pct = ((v_cpr - base['vol_cpr']) / base['vol_cpr']) * 100 if base['vol_cpr'] != 0 else 0.0
 
-                # CE/PE Conviction & 3:30 PM Lock Logic
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
                     for s in strikes:
                         sym, lp = str(s.get('symbol', '')), float(s.get('ltp', 0))
                         if lp == 0: continue
-                        
                         if sym not in strike_mem: 
                             strike_mem[sym] = lp; continue
-                            
                         diff = lp - strike_mem[sym]
                         if diff > 0: tot_p += 1 
                         elif diff < 0: tot_m += 1 
-                        
-                        # 🚀 3:30 PM Fix: Lock today's price for tomorrow!
                         if scan_time_ist.time() >= datetime.time(15, 30):
                             strike_mem[sym] = lp
-
                     act = tot_p + tot_m
                     if act == 0: return 0.0
                     return round((tot_p / act) * 100, 1) if tot_p >= tot_m else -round((tot_m / act) * 100, 1)
@@ -209,14 +213,23 @@ def run_master_scan(token, date_str):
                     'VOL_PCT': round(vol_pct, 1), 'PCR_PCT': round(pcr_pct, 1),
                     'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
                 })
+
+                # 🚀 GATEKEEPER: Data sirf 9:15 se 3:30 ke beech hi save hoga. 8 baje login kiya toh bhi kuch save nahi hoga!
+                if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
+                    new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
+
             else:
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
-    # Save Memory Files
     try: json.dump({"date": date_str, "data": strike_mem}, open(STRIKE_MEM_FILE, "w"))
     except: pass
     try: json.dump({"date": date_str, "data": snap_950}, open(SNAPSHOT_FILE, "w"))
     except: pass
+    
+    if new_csv_rows:
+        new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
+        if not os.path.isfile(HISTORY_FILE): new_df.to_csv(HISTORY_FILE, index=False)
+        else: new_df.to_csv(HISTORY_FILE, mode='a', header=False, index=False)
 
     return final_list, scan_time_ist.timestamp()
 
@@ -274,14 +287,12 @@ if auth_code:
     else:
         token = saved_token
 
-    # 🚀 GLOBAL CACHE CALL 
     cached_result, last_scan_timestamp = run_master_scan(token, today_str)
 
     if cached_result is not None:
         st.session_state.cached_data = cached_result
         st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
         
-        # EOD Auto Save Trigger
         if now_ist.time() >= datetime.time(15, 30):
             last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
             if last_save != today_str:
@@ -313,7 +324,7 @@ if auth_code:
             {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
         ]
 
-        tab1, tab2 = st.tabs(["📊 Dashboard", "🌐 NiftyTrader Web"])
+        tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "🌐 NiftyTrader Web", "📈 DITTO OI Liner"])
         
         with tab1:
             col1, col2 = st.columns([3, 1])
@@ -347,16 +358,74 @@ if auth_code:
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
 
-    # 🚀 NAYA FIX: Screen Blink/Blur rokne ke liye
+        with tab3:
+            st.markdown("### 📈 Professional OI Liner Analyzer")
+            col_c1, col_c2 = st.columns([2, 2])
+            with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
+            with col_c2: 
+                chart_mode = st.radio("Switch Chart View:", ["Vol CPR", "Option PCR"], horizontal=True)
+
+            if os.path.exists(HISTORY_FILE):
+                try:
+                    hist_df = pd.read_csv(HISTORY_FILE)
+                    df_sym = hist_df[(hist_df['Date'] == today_str) & (hist_df['Symbol'] == sel_stock)].copy()
+                    
+                    if not df_sym.empty:
+                        df_sym = df_sym.sort_values(by='Time')
+                        df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
+                        
+                        target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
+                        line_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF" 
+                        
+                        fig = make_subplots(specs=[[{"secondary_y": True}]])
+                        
+                        fig.add_trace(go.Scatter(
+                            x=df_sym['Datetime'], y=df_sym[target_col], name=f"{chart_mode}", 
+                            line=dict(color=line_color, width=3, shape="spline"), mode="lines"
+                        ), secondary_y=False)
+                        
+                        fig.add_trace(go.Scatter(
+                            x=df_sym['Datetime'], y=df_sym['LTP'], name="Stock LTP", 
+                            line=dict(color="#00CC66", width=3, shape="spline"), mode="lines"
+                        ), secondary_y=True)
+
+                        # 🚀 NAYA LOGIC: SMART START TIME
+                        market_open_time = pd.to_datetime(f"{today_str} 09:15:00")
+                        actual_first_data_time = df_sym['Datetime'].min()
+                        
+                        # Yeh ensure karega ki chart kabhi bhi 9:15 se pehle shuru na ho!
+                        dynamic_start_time = max(actual_first_data_time, market_open_time)
+                        fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
+
+                        fig.update_layout(
+                            template="plotly_dark",
+                            hovermode="x unified",
+                            height=600,
+                            plot_bgcolor="#111111", paper_bgcolor="#111111",
+                            xaxis=dict(
+                                rangeslider_visible=True, 
+                                type="date", 
+                                range=[dynamic_start_time, fixed_end_time], # 🚀 Perfect Dynamic Range Lock!
+                                gridcolor="#333"
+                            ),
+                            yaxis=dict(title=f"{chart_mode} Scale", titlefont=dict(color=line_color), tickfont=dict(color=line_color), gridcolor="#333"),
+                            yaxis2=dict(title="LTP Price Scale", titlefont=dict(color="#00CC66"), tickfont=dict(color="#00CC66"), showgrid=False),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    else: st.info(f"⏳ Waiting for Market Data for {sel_stock}...")
+                except Exception as e:
+                    st.error(f"Chart Load Error: {e}")
+            else:
+                st.info("⏳ Chart History file is being prepared... Data will appear during market hours (9:15 AM - 3:30 PM).")
+
     if 'last_api_call' in st.session_state:
         st.write(f"🔄 Next master scan in ~5 mins... Last updated: {st.session_state.last_api_call.strftime('%H:%M:%S')}")
         time_diff = (datetime.datetime.now(IST) - st.session_state.last_api_call).total_seconds()
         
-        # Agar 5 minute poore nahi hue hain, toh aaram se bacha hua time wait karega
         if time_diff < 290:
             time.sleep(290 - time_diff)
         else:
-            # Agar master data lane mein late ho jaye, toh pagalo ki tarah har 5 sec mein refresh nahi hoga
             time.sleep(60) 
             
         st.rerun()
