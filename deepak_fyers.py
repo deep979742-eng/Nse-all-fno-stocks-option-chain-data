@@ -199,7 +199,7 @@ def run_master_scan(token, date_str):
                 c_oi = sum(float(x.get('oi', 0)) for x in chain if str(x.get('symbol', '')).endswith('CE') or x.get('option_type') == 'CE')
                 p_oi = sum(float(x.get('oi', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
                 c_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('CE') or x.get('volume_type') == 'CE') 
-                p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
+                p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('volume_type') == 'PE')
                 o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
                 
                 # Continuously push live strikes into today's folder segment
@@ -262,4 +262,103 @@ def run_master_scan(token, date_str):
 
     if new_csv_rows:
         new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
-        if not os.path.isfile(HISTORY_FILE):
+        if not os.path.isfile(HISTORY_FILE): new_df.to_csv(HISTORY_FILE, index=False)
+        else: new_df.to_csv(HISTORY_FILE, mode='a', header=False, index=False)
+
+    return final_list, scan_time_ist.timestamp()
+
+# ==========================================
+# 5. SIDEBAR LOGIN & EOD SAVE
+# ==========================================
+st.sidebar.header("🔑 Fyers Quick Login")
+
+saved_token = None
+if os.path.exists(TOKEN_STORE_FILE):
+    try:
+        td = json.load(open(TOKEN_STORE_FILE))
+        if td.get("date") == today_str: saved_token = td.get("token")
+    except: pass
+
+if saved_token:
+    auth_code = "AUTO_LOGGED_IN"
+    st.sidebar.success("🚀 Connected via Saved Token!")
+else:
+    magic_url = f"https://api-t1.fyers.in/api/v3/generate-authcode?client_id={APP_ID}&redirect_uri={REDIRECT_URI}&response_type=code&state=deepak"
+    st.sidebar.markdown(f"### [👉 Step 1: Click to Get Code]({magic_url})")
+    auth_code = st.sidebar.text_input("Step 2: Paste Code Here:", type="password")
+
+st.sidebar.markdown("---")
+st.sidebar.header("💾 End Of Day (EOD) Save")
+
+def save_eod_data():
+    if os.path.exists(STRIKE_MEM_FILE) and sheet is not None:
+        try:
+            db_content = json.load(open(STRIKE_MEM_FILE))
+            hist_db = db_content.get("history", {})
+            if hist_db:
+                # Strictly enforce max 2 days before writing to sheets
+                all_saved_dates = sorted(list(hist_db.keys()))
+                while len(all_saved_dates) > 2:
+                    oldest_date = all_saved_dates.pop(0)
+                    hist_db.pop(oldest_date, None)
+                
+                json_str = json.dumps(hist_db)
+                chunks = [json_str[i:i+40000] for i in range(0, len(json_str), 40000)]
+                sheet.clear()
+                clist = sheet.range(f'A1:A{len(chunks)}')
+                for i, cell in enumerate(clist): cell.value = chunks[i]
+                sheet.update_cells(clist)
+                return True
+        except: pass
+    return False
+
+if st.sidebar.button("Manual Save 3:30 PM Data"):
+    if save_eod_data(): st.sidebar.success("Permanent EOD Save Success!")
+
+# ==========================================
+# 6. APP RENDERING & MAGIC VIEWER
+# ==========================================
+if auth_code:
+    if auth_code != "AUTO_LOGGED_IN":
+        session = fyersModel.SessionModel(client_id=APP_ID, secret_key=SECRET_ID, redirect_uri=REDIRECT_URI, response_type="code", grant_type="authorization_code")
+        session.set_token(auth_code)
+        token = session.generate_token()['access_token']
+        json.dump({"date": today_str, "token": token}, open(TOKEN_STORE_FILE, 'w'))
+        st.sidebar.success("✅ Token Saved!")
+    else:
+        token = saved_token
+
+    cached_result, last_scan_timestamp = run_master_scan(token, today_str)
+
+    if cached_result is not None:
+        st.session_state.cached_data = cached_result
+        st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
+        
+        if now_ist.time() >= datetime.time(15, 30):
+            last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
+            if last_save != today_str:
+                if save_eod_data(): open(AUTO_SAVE_FILE, "w").write(today_str)
+    else:
+        if 'cached_data' not in st.session_state: st.session_state.cached_data = []
+
+    if len(st.session_state.cached_data) > 0:
+        
+        def style_indicators(val):
+            if isinstance(val, str): 
+                if "Gap Up" in val: return 'color: #00AA00; font-weight: bold; text-align: center;'
+                if "Gap Down" in val: return 'color: #FF0000; font-weight: bold; text-align: center;'
+                if "Same" in val: return 'color: #00BFFF; font-weight: bold; text-align: center;'
+                return 'text-align: center;'
+            if val > 0: return 'color: #00AA00; font-weight: bold; text-align: center;'
+            elif val < 0: return 'color: #FF0000; font-weight: bold; text-align: center;'
+            return 'color: #888888; font-weight: bold; text-align: center;'
+
+        def style_pcr_columns(val):
+            if isinstance(val, (int, float)):
+                if val >= 1.0: return 'color: #00AA00; font-weight: bold; text-align: center;'
+                elif val > 0 and val < 1.0: return 'color: #FF0000; font-weight: bold; text-align: center;'
+            return 'text-align: center;'
+
+        header_styles = [
+            {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
+            {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')
