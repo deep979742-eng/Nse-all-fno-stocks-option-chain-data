@@ -8,7 +8,7 @@ from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
 import concurrent.futures
-# 🚀 ADVANCED CHARTING LIBRARIES
+# 🚀 ADVANCED CHARTING LIBRARIES (For OI Liner)
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -323,8 +323,7 @@ if auth_code:
             {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
         ]
 
-        # 🚀 TABS NAME UPDATED TO 'TREND CHART'
-        tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "🌐 NiftyTrader Web", "📈 TREND CHART"])
+        tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "🌐 NiftyTrader Web", "📈 DITTO OI Liner"])
         
         with tab1:
             col1, col2 = st.columns([3, 1])
@@ -339,4 +338,102 @@ if auth_code:
             
             if not df.empty:
                 df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
-                df = df.sort_values
+                df = df.sort_values(by='Conv_Rank', ascending=False).drop(columns=['Conv_Rank']) 
+                df['VOL CHECKER'] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
+                df['PCR CHECKER'] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
+                df = df.drop(columns=['VOL_ABS', 'PCR_ABS', 'VOL_PCT', 'PCR_PCT'])
+                df = df.rename(columns={'SYMS': 'SYMBOL', 'OPEN_STATUS': 'OPENING', 'V_PCR': 'VOL PCR', 'O_PCR': 'OPTION PCR', 'V_CPR': 'VOL CPR', 'LTP_CH': 'LTP CHANGE', 'CHG_%': 'CHANGE%', 'LTP': 'LTP', 'CE_CON': 'CE_CONTRACT', 'PE_CON': 'PE_CONTRACT'})
+
+                styled_df = (df.style.set_properties(**{'text-align': 'center'}).format(format_dict).set_table_styles(header_styles)
+                             .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
+                             .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
+
+                st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
+
+        with tab2:
+            st.markdown("### 🌐 NiftyTrader Live Options Chart")
+            selected_nt_stock = st.selectbox("Select Stock for Chart:", raw_symbols, index=0, key="nt_stock")
+            nt_url = f"https://www.niftytrader.in/stock-options-chart/{selected_nt_stock.lower()}"
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
+
+        with tab3:
+            st.markdown("### 📈 Professional OI Liner Analyzer")
+            col_c1, col_c2 = st.columns([2, 2])
+            with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
+            with col_c2: 
+                chart_mode = st.radio("Switch Chart View:", ["Vol CPR", "Option PCR"], horizontal=True)
+
+            if os.path.exists(HISTORY_FILE):
+                try:
+                    hist_df = pd.read_csv(HISTORY_FILE)
+                    df_sym = hist_df[(hist_df['Date'] == today_str) & (hist_df['Symbol'] == sel_stock)].copy()
+                    
+                    if not df_sym.empty:
+                        df_sym = df_sym.sort_values(by='Time')
+                        df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
+                        
+                        target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
+                        line_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF" 
+                        
+                        fig = make_subplots(specs=[[{"secondary_y": True}]])
+                        
+                        fig.add_trace(go.Scatter(
+                            x=df_sym['Datetime'], y=df_sym[target_col], name=f"{chart_mode}", 
+                            line=dict(color=line_color, width=3, shape="spline"), mode="lines"
+                        ), secondary_y=False)
+                        
+                        fig.add_trace(go.Scatter(
+                            x=df_sym['Datetime'], y=df_sym['LTP'], name="Stock LTP", 
+                            line=dict(color="#00CC66", width=3, shape="spline"), mode="lines"
+                        ), secondary_y=True)
+
+                        market_open_time = pd.to_datetime(f"{today_str} 09:15:00")
+                        actual_first_data_time = df_sym['Datetime'].min()
+                        dynamic_start_time = max(actual_first_data_time, market_open_time)
+                        fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
+
+                        # 🚀 NAYA FIX: 'titlefont' ki jagah modern 'title=dict(font=...)' ka use!
+                        fig.update_layout(
+                            template="plotly_dark",
+                            hovermode="x unified",
+                            height=600,
+                            plot_bgcolor="#111111", paper_bgcolor="#111111",
+                            xaxis=dict(
+                                rangeslider_visible=True, 
+                                type="date", 
+                                range=[dynamic_start_time, fixed_end_time], 
+                                gridcolor="#333"
+                            ),
+                            yaxis=dict(
+                                title=dict(text=f"{chart_mode} Scale", font=dict(color=line_color)), 
+                                tickfont=dict(color=line_color), 
+                                gridcolor="#333"
+                            ),
+                            yaxis2=dict(
+                                title=dict(text="LTP Price Scale", font=dict(color="#00CC66")), 
+                                tickfont=dict(color="#00CC66"), 
+                                showgrid=False
+                            ),
+                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                    else: st.info(f"⏳ Waiting for Market Data for {sel_stock}...")
+                except Exception as e:
+                    st.error(f"Chart Load Error: {e}")
+            else:
+                st.info("⏳ Chart History file is being prepared... Data will appear during market hours (9:15 AM - 3:30 PM).")
+
+    if 'last_api_call' in st.session_state:
+        st.write(f"🔄 Next master scan in ~5 mins... Last updated: {st.session_state.last_api_call.strftime('%H:%M:%S')}")
+        time_diff = (datetime.datetime.now(IST) - st.session_state.last_api_call).total_seconds()
+        
+        if time_diff < 290:
+            time.sleep(290 - time_diff)
+        else:
+            time.sleep(60) 
+            
+        st.rerun()
+
+else:
+    st.info("👈 Please enter Auth Code in sidebar.")
