@@ -8,7 +8,6 @@ from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
 import concurrent.futures
-# 🚀 ADVANCED CHARTING LIBRARIES
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -22,25 +21,8 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# 🚀 COPY-PASTE ERROR FIXED: No multi-line strings, completely safe format!
-st.markdown(
-    "<style>\n"
-    "[data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'],\n"
-    "[data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div {\n"
-    "opacity: 1 !important; filter: none !important; transition: none !important;\n"
-    "}\n"
-    "[data-testid='stDataFrame'], [data-testid='stTabs'] {\n"
-    "opacity: 1 !important; filter: none !important; transition: none !important;\n"
-    "}\n"
-    "[data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; }\n"
-    ".block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; }\n"
-    "[data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; }\n"
-    "[data-testid='stDataFrameTable'] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; }\n"
-    "th { background-color: darkblue !important; color: white !important; }\n"
-    "* { cursor: default !important; }\n"
-    "</style>",
-    unsafe_allow_html=True
-)
+# CLEAN CSS - No Indentation Errors
+st.markdown("<style>[data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } [data-testid='stDataFrameTable'] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; } th { background-color: darkblue !important; color: white !important; } * { cursor: default !important; }</style>", unsafe_allow_html=True)
 
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 now_ist = datetime.datetime.now(IST)
@@ -94,7 +76,6 @@ if not global_history and sheet is not None:
 with open(STRIKE_MEM_FILE, "w") as f:
     json.dump({"date": today_str, "history": global_history}, f)
 
-# Helper function to find the exact previous session close baseline
 def get_previous_market_baseline(history_db, today_date_str):
     past_dates = [d for d in history_db.keys() if d < today_date_str]
     if past_dates:
@@ -153,7 +134,6 @@ def run_master_scan(token, date_str):
     except:
         hist_db = {}
 
-    # Get absolute baseline from previous market session close
     baseline_prices = get_previous_market_baseline(hist_db, date_str)
     
     if date_str not in hist_db:
@@ -175,7 +155,6 @@ def run_master_scan(token, date_str):
     final_list = []
     new_csv_rows = []
 
-    # 🚀 ORIGINAL 2.0 SECONDS STABLE RETRY LOGIC MAINTAINED
     def fetch_option_chain_fast_local(q):
         sym = q['n']
         time.sleep(0.4) 
@@ -201,10 +180,9 @@ def run_master_scan(token, date_str):
                 c_oi = sum(float(x.get('oi', 0)) for x in chain if str(x.get('symbol', '')).endswith('CE') or x.get('option_type') == 'CE')
                 p_oi = sum(float(x.get('oi', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
                 c_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('CE') or x.get('volume_type') == 'CE') 
-                p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('volume_type') == 'PE')
+                p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
                 o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
                 
-                # Continuously push live strikes into today's folder segment
                 for s in chain:
                     sym_str, lp_str = str(s.get('symbol', '')), float(s.get('ltp', 0))
                     if lp_str > 0: 
@@ -222,7 +200,6 @@ def run_master_scan(token, date_str):
                         pcr_pct = ((v_pcr - base['pcr']) / base['pcr']) * 100 if base['pcr'] != 0 else 0.0
                         vol_pct = ((v_cpr - base['vol_cpr']) / base['vol_cpr']) * 100 if base['vol_cpr'] != 0 else 0.0
 
-                # 🚀 ABSOLUTE STABLE CONVICTION: Always measures against baseline_prices (Yesterday's close)
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
@@ -251,7 +228,6 @@ def run_master_scan(token, date_str):
             else:
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
-    # 🚀 DITTO 2-DAY CLEAN PURGE WINDOW: Retaining exactly max 2 days (Yesterday and Today)
     all_saved_dates = sorted(list(hist_db.keys()))
     while len(all_saved_dates) > 2:
         oldest_date = all_saved_dates.pop(0)
@@ -298,7 +274,6 @@ def save_eod_data():
             db_content = json.load(open(STRIKE_MEM_FILE))
             hist_db = db_content.get("history", {})
             if hist_db:
-                # Strictly enforce max 2 days before writing to sheets
                 all_saved_dates = sorted(list(hist_db.keys()))
                 while len(all_saved_dates) > 2:
                     oldest_date = all_saved_dates.pop(0)
@@ -481,3 +456,7 @@ if auth_code:
         st.rerun()
 else:
     st.info("👈 Please enter Auth Code in sidebar.")
+"""
+with open("fo_dashboard.py", "w") as f:
+    f.write(code_content)
+}
