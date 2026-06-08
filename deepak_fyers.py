@@ -122,7 +122,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. 🚀 MASTER SCANNER (MICRO-RETRY BALANCED) 🚀
+# 4. 🚀 GLOBAL CACHE LOCK (MASTER SCANNER) 🚀
 # ==========================================
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
@@ -150,18 +150,17 @@ def run_master_scan(token, date_str):
     final_list = []
     new_csv_rows = []
 
-    # 🚀 SMART FIX: 3 Fast attempts with a 0.2s micro-sleep to prevent rate limits without stalling
+    # 🚀 ORIGINAL 2.0 SECONDS RETRY LOGIC (RESTORED EXACTLY)
     def fetch_option_chain_fast_local(q):
         sym = q['n']
-        for attempt in range(3):
-            try:
+        time.sleep(0.4) 
+        try:
+            oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
+            if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
+                time.sleep(2.0) 
                 oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
-                if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
-                    return q, oc
-                time.sleep(0.2)
-            except:
-                time.sleep(0.2)
-        return q, None
+            return q, oc
+        except: return q, None
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         results = executor.map(fetch_option_chain_fast_local, all_quotes)
