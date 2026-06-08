@@ -214,7 +214,6 @@ def run_master_scan(token, date_str):
                     'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
                 })
 
-                # 🚀 GATEKEEPER: Data sirf 9:15 se 3:30 ke beech hi save hoga. 8 baje login kiya toh bhi kuch save nahi hoga!
                 if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
                     new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
 
@@ -389,14 +388,12 @@ if auth_code:
                             line=dict(color="#00CC66", width=3, shape="spline"), mode="lines"
                         ), secondary_y=True)
 
-                        # 🚀 NAYA LOGIC: SMART START TIME
                         market_open_time = pd.to_datetime(f"{today_str} 09:15:00")
                         actual_first_data_time = df_sym['Datetime'].min()
-                        
-                        # Yeh ensure karega ki chart kabhi bhi 9:15 se pehle shuru na ho!
                         dynamic_start_time = max(actual_first_data_time, market_open_time)
                         fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
 
+                        # 🚀 NAYA FIX: 'titlefont' ki jagah modern 'title=dict(font=...)' ka use!
                         fig.update_layout(
                             template="plotly_dark",
                             hovermode="x unified",
@@ -405,11 +402,19 @@ if auth_code:
                             xaxis=dict(
                                 rangeslider_visible=True, 
                                 type="date", 
-                                range=[dynamic_start_time, fixed_end_time], # 🚀 Perfect Dynamic Range Lock!
+                                range=[dynamic_start_time, fixed_end_time], 
                                 gridcolor="#333"
                             ),
-                            yaxis=dict(title=f"{chart_mode} Scale", titlefont=dict(color=line_color), tickfont=dict(color=line_color), gridcolor="#333"),
-                            yaxis2=dict(title="LTP Price Scale", titlefont=dict(color="#00CC66"), tickfont=dict(color="#00CC66"), showgrid=False),
+                            yaxis=dict(
+                                title=dict(text=f"{chart_mode} Scale", font=dict(color=line_color)), 
+                                tickfont=dict(color=line_color), 
+                                gridcolor="#333"
+                            ),
+                            yaxis2=dict(
+                                title=dict(text="LTP Price Scale", font=dict(color="#00CC66")), 
+                                tickfont=dict(color="#00CC66"), 
+                                showgrid=False
+                            ),
                             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
                         )
                         st.plotly_chart(fig, use_container_width=True)
