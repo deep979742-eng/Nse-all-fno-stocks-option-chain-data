@@ -8,7 +8,7 @@ from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
 import concurrent.futures
-# 🚀 ADVANCED CHARTING LIBRARIES (For OI Liner)
+# 🚀 ADVANCED CHARTING LIBRARIES
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -40,7 +40,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+(IST) = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 now_ist = datetime.datetime.now(IST)
 today_str = now_ist.strftime("%Y-%m-%d")
 
@@ -56,7 +56,7 @@ STRIKE_MEM_FILE = "intraday_strike_memory.json"
 if os.path.exists(HISTORY_FILE):
     try:
         hist_check = pd.read_csv(HISTORY_FILE)
-        if 'Date' in hist_check.columns and hist_check['Date'].iloc[-1] != today_str:
+        if not hist_check.empty and 'Date' in hist_check.columns and hist_check['Date'].iloc[-1] != today_str:
             os.remove(HISTORY_FILE)
     except: os.remove(HISTORY_FILE)
 
@@ -69,8 +69,7 @@ def get_gsheet():
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
             client = gspread.authorize(creds)
             return client.open("Fyers_EOD_Data").sheet1
-    except Exception as e:
-        st.sidebar.error(f"Google Sheets Link Error: {e}")
+    except: pass
     return None
 
 sheet = get_gsheet()
@@ -122,7 +121,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. 🚀 GLOBAL CACHE LOCK (MASTER SCANNER) 🚀
+# 4. 🚀 MASTER SCANNER (FAST & STALL-FREE) 🚀
 # ==========================================
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
@@ -148,14 +147,12 @@ def run_master_scan(token, date_str):
     final_list = []
     new_csv_rows = []
 
+    # 🚀 SPEED FIX: Removed heavy retry sleeps to prevent night stalls
     def fetch_option_chain_fast_local(q):
         sym = q['n']
-        time.sleep(0.4) 
+        time.sleep(0.1) 
         try:
             oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
-            if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
-                time.sleep(2.0) 
-                oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
             return q, oc
         except: return q, None
 
@@ -166,7 +163,6 @@ def run_master_scan(token, date_str):
             v = q['v']
             ltp_val = float(v.get('lp', 0))
             open_p, prev_c = float(v.get('open_price', 0)), float(v.get('prev_close_price', 0))
-            
             open_status = "NA" if open_p == 0 or prev_c == 0 else "Gap Up 🔼" if open_p > prev_c else "Gap Down 🔽" if open_p < prev_c else "Same ➖"
 
             if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
@@ -214,9 +210,9 @@ def run_master_scan(token, date_str):
                     'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
                 })
 
+                # 🚀 CHART LOGIC EXCLUSIVE LOCK: File me data sirf 9:15 se 3:30 tak hi add hoga!
                 if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
                     new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
-
             else:
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
@@ -267,11 +263,11 @@ def save_eod_data():
                 for i, cell in enumerate(clist): cell.value = chunks[i]
                 sheet.update_cells(clist)
                 return True
-        except Exception as e: st.sidebar.error(f"GSheet Error: {e}")
+        except: pass
     return False
 
 if st.sidebar.button("Manual Save 3:30 PM Data"):
-    if save_eod_data(): st.sidebar.success("✅ EOD Data Saved PERMANENTLY!")
+    if save_eod_data(): st.sidebar.success("Permanent EOD Save Success!")
 
 # ==========================================
 # 6. APP RENDERING & MAGIC VIEWER
@@ -297,7 +293,6 @@ if auth_code:
             if last_save != today_str:
                 if save_eod_data(): open(AUTO_SAVE_FILE, "w").write(today_str)
     else:
-        st.warning("⚠️ Fyers API Data Wait... Retrying in 1 min.")
         if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
     if len(st.session_state.cached_data) > 0:
@@ -323,7 +318,8 @@ if auth_code:
             {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
         ]
 
-        tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "🌐 NiftyTrader Web", "📈 DITTO OI Liner"])
+        # 🚀 TABS FIXED BACK TO 'TREND CHART'
+        tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "🌐 NiftyTrader Web", "📈 TREND CHART"])
         
         with tab1:
             col1, col2 = st.columns([3, 1])
@@ -358,67 +354,73 @@ if auth_code:
             st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
 
         with tab3:
-            st.markdown("### 📈 Professional OI Liner Analyzer")
+            st.markdown("### 📈 SIR TREND CHART")
             col_c1, col_c2 = st.columns([2, 2])
             with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
             with col_c2: 
-                chart_mode = st.radio("Switch Chart View:", ["Vol CPR", "Option PCR"], horizontal=True)
+                chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True)
 
             if os.path.exists(HISTORY_FILE):
                 try:
                     hist_df = pd.read_csv(HISTORY_FILE)
-                    df_sym = hist_df[(hist_df['Date'] == today_str) & (hist_df['Symbol'] == sel_stock)].copy()
                     
-                    if not df_sym.empty:
-                        df_sym = df_sym.sort_values(by='Time')
-                        df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
+                    if not hist_df.empty and 'Date' in hist_df.columns:
+                        df_sym = hist_df[(hist_df['Date'] == today_str) & (hist_df['Symbol'] == sel_stock)].copy()
                         
-                        target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
-                        line_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF" 
-                        
-                        fig = make_subplots(specs=[[{"secondary_y": True}]])
-                        
-                        fig.add_trace(go.Scatter(
-                            x=df_sym['Datetime'], y=df_sym[target_col], name=f"{chart_mode}", 
-                            line=dict(color=line_color, width=3, shape="spline"), mode="lines"
-                        ), secondary_y=False)
-                        
-                        fig.add_trace(go.Scatter(
-                            x=df_sym['Datetime'], y=df_sym['LTP'], name="Stock LTP", 
-                            line=dict(color="#00CC66", width=3, shape="spline"), mode="lines"
-                        ), secondary_y=True)
+                        if not df_sym.empty:
+                            df_sym = df_sym.sort_values(by='Time')
+                            df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
+                            
+                            target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
+                            line_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF" 
+                            
+                            fig = make_subplots(specs=[[{"secondary_y": True}]])
+                            
+                            fig.add_trace(go.Scatter(
+                                x=df_sym['Datetime'], y=df_sym[target_col], name=f"{chart_mode}", 
+                                line=dict(color=line_color, width=3, shape="spline"), mode="lines"
+                            ), secondary_y=False)
+                            
+                            fig.add_trace(go.Scatter(
+                                x=df_sym['Datetime'], y=df_sym['LTP'], name="Stock LTP", 
+                                line=dict(color="#00CC66", width=3, shape="spline"), mode="lines"
+                            ), secondary_y=True)
 
-                        market_open_time = pd.to_datetime(f"{today_str} 09:15:00")
-                        actual_first_data_time = df_sym['Datetime'].min()
-                        dynamic_start_time = max(actual_first_data_time, market_open_time)
-                        fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
+                            market_open_time = pd.to_datetime(f"{today_str} 09:15:00")
+                            actual_first_data_time = df_sym['Datetime'].min()
+                            dynamic_start_time = max(actual_first_data_time, market_open_time)
+                            fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
 
-                        # 🚀 NAYA FIX: 'titlefont' ki jagah modern 'title=dict(font=...)' ka use!
-                        fig.update_layout(
-                            template="plotly_dark",
-                            hovermode="x unified",
-                            height=600,
-                            plot_bgcolor="#111111", paper_bgcolor="#111111",
-                            xaxis=dict(
-                                rangeslider_visible=True, 
-                                type="date", 
-                                range=[dynamic_start_time, fixed_end_time], 
-                                gridcolor="#333"
-                            ),
-                            yaxis=dict(
-                                title=dict(text=f"{chart_mode} Scale", font=dict(color=line_color)), 
-                                tickfont=dict(color=line_color), 
-                                gridcolor="#333"
-                            ),
-                            yaxis2=dict(
-                                title=dict(text="LTP Price Scale", font=dict(color="#00CC66")), 
-                                tickfont=dict(color="#00CC66"), 
-                                showgrid=False
-                            ),
-                            legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
-                        )
-                        st.plotly_chart(fig, use_container_width=True)
-                    else: st.info(f"⏳ Waiting for Market Data for {sel_stock}...")
+                            # 🚀 FIXED PURE WHITE BACKGROUND + AUTOSCALE + NO DUPLICATE CHART IN SLIDER
+                            fig.update_layout(
+                                template="plotly_white", 
+                                hovermode="x unified",
+                                height=600,
+                                plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF", 
+                                xaxis=dict(
+                                    rangeslider=dict(visible=False), 
+                                    type="date", 
+                                    range=[dynamic_start_time, fixed_end_time], 
+                                    gridcolor="#E5E5E5", 
+                                    color="black"
+                                ),
+                                yaxis=dict(
+                                    title=dict(text=f"{chart_mode} Scale", font=dict(color=line_color)), 
+                                    tickfont=dict(color=line_color), 
+                                    gridcolor="#E5E5E5",
+                                    autorange=True 
+                                ),
+                                yaxis2=dict(
+                                    title=dict(text="LTP Price Scale", font=dict(color="#00CC66")), 
+                                    tickfont=dict(color="#00CC66"), 
+                                    showgrid=False,
+                                    autorange=True 
+                                ),
+                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="black"))
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                        else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
+                    else: st.info("⏳ Market data hasn't started logging yet today.")
                 except Exception as e:
                     st.error(f"Chart Load Error: {e}")
             else:
