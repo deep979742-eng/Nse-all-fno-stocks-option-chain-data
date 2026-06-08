@@ -22,23 +22,25 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-st.markdown("""
-    <style>
-        [data-testid="stAppViewContainer"], [data-testid="stAppViewBlockContainer"], 
-        [data-testid="stHeader"], [data-testid="stSidebar"], .stApp, .stApp > div { 
-            opacity: 1 !important; filter: none !important; transition: none !important; 
-        }
-        [data-testid="stDataFrame"], [data-testid="stTabs"] { 
-            opacity: 1 !important; filter: none !important; transition: none !important; 
-        }
-        [data-testid="stStatusWidget"] { visibility: hidden !important; display: none !important; }
-        .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; }
-        [data-testid="stDataFrameTable"] > thead > tr { background-color: darkblue !important; }
-        [data-testid="stDataFrameTable"] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; }
-        th { background-color: darkblue !important; color: white !important; }
-        * { cursor: default !important; }
-    </style>
-""", unsafe_allow_html=True)
+# 🚀 COPY-PASTE ERROR FIXED: No multi-line strings, completely safe format!
+st.markdown(
+    "<style>\n"
+    "[data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'],\n"
+    "[data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div {\n"
+    "opacity: 1 !important; filter: none !important; transition: none !important;\n"
+    "}\n"
+    "[data-testid='stDataFrame'], [data-testid='stTabs'] {\n"
+    "opacity: 1 !important; filter: none !important; transition: none !important;\n"
+    "}\n"
+    "[data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; }\n"
+    ".block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; }\n"
+    "[data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; }\n"
+    "[data-testid='stDataFrameTable'] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; }\n"
+    "th { background-color: darkblue !important; color: white !important; }\n"
+    "* { cursor: default !important; }\n"
+    "</style>",
+    unsafe_allow_html=True
+)
 
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 now_ist = datetime.datetime.now(IST)
@@ -361,4 +363,121 @@ if auth_code:
 
         header_styles = [
             {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
-            {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')
+            {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
+        ]
+
+        tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "🌐 NiftyTrader Web", "📈 TREND CHART"])
+        
+        with tab1:
+            col1, col2 = st.columns([3, 1])
+            with col1: search_query = st.text_input("🔍 Search Stock:", "").upper()
+            with col2: st.write(""); show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
+            
+            checker_fmt = '{:+.1f}%' if show_pct else '{:+.2f}'
+            format_dict = {'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 'LTP': '{:.2f}', 'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 'VOL CHECKER': checker_fmt, 'PCR CHECKER': checker_fmt, 'CE_CONTRACT': '{:+.1f}%', 'PE_CONTRACT': '{:+.1f}%'}
+            
+            df = pd.DataFrame(st.session_state.cached_data)
+            if search_query: df = df[df['SYMS'].str.contains(search_query, na=False)]
+            
+            if not df.empty:
+                df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
+                df = df.sort_values(by='Conv_Rank', ascending=False).drop(columns=['Conv_Rank']) 
+                df['VOL CHECKER'] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
+                df['PCR CHECKER'] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
+                df = df.drop(columns=['VOL_ABS', 'PCR_ABS', 'VOL_PCT', 'PCR_PCT'])
+                df = df.rename(columns={'SYMS': 'SYMBOL', 'OPEN_STATUS': 'OPENING', 'V_PCR': 'VOL PCR', 'O_PCR': 'OPTION PCR', 'V_CPR': 'VOL CPR', 'LTP_CH': 'LTP CHANGE', 'CHG_%': 'CHANGE%', 'LTP': 'LTP', 'CE_CON': 'CE_CONTRACT', 'PE_CON': 'PE_CONTRACT'})
+
+                styled_df = (df.style.set_properties(**{'text-align': 'center'}).format(format_dict).set_table_styles(header_styles)
+                             .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
+                             .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
+
+                st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
+
+        with tab2:
+            st.markdown("### 🌐 NiftyTrader Live Options Chart")
+            selected_nt_stock = st.selectbox("Select Stock for Chart:", raw_symbols, index=0, key="nt_stock")
+            nt_url = f"https://www.niftytrader.in/stock-options-chart/{selected_nt_stock.lower()}"
+            st.markdown("<br>", unsafe_allow_html=True)
+            st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
+
+        with tab3:
+            st.markdown("### 📈 TREND CHART")
+            col_c1, col_c2 = st.columns([2, 2])
+            with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
+            with col_c2: 
+                chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True)
+
+            if os.path.exists(HISTORY_FILE):
+                try:
+                    hist_df = pd.read_csv(HISTORY_FILE)
+                    
+                    if not hist_df.empty and 'Date' in hist_df.columns:
+                        df_sym = hist_df[(hist_df['Date'] == today_str) & (hist_df['Symbol'] == sel_stock)].copy()
+                        
+                        if not df_sym.empty:
+                            df_sym = df_sym.sort_values(by='Time')
+                            df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
+                            
+                            target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
+                            line_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF" 
+                            
+                            fig = make_subplots(specs=[[{"secondary_y": True}]])
+                            
+                            fig.add_trace(go.Scatter(
+                                x=df_sym['Datetime'], y=df_sym[target_col], name=f"{chart_mode}", 
+                                line=dict(color=line_color, width=3, shape="spline"), mode="lines"
+                            ), secondary_y=False)
+                            
+                            fig.add_trace(go.Scatter(
+                                x=df_sym['Datetime'], y=df_sym['LTP'], name="Stock LTP", 
+                                line=dict(color="#00CC66", width=3, shape="spline"), mode="lines"
+                            ), secondary_y=True)
+
+                            market_open_time = pd.to_datetime(f"{today_str} 09:15:00")
+                            actual_first_data_time = df_sym['Datetime'].min()
+                            dynamic_start_time = max(actual_first_data_time, market_open_time)
+                            fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
+
+                            fig.update_layout(
+                                template="plotly_white", 
+                                hovermode="x unified",
+                                height=600,
+                                plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF", 
+                                xaxis=dict(
+                                    rangeslider=dict(visible=True, thickness=0.04), 
+                                    type="date", 
+                                    range=[dynamic_start_time, fixed_end_time], 
+                                    gridcolor="#E5E5E5", 
+                                    color="black"
+                                ),
+                                yaxis=dict(
+                                    title=dict(text=f"{chart_mode} Scale", font=dict(color=line_color)), 
+                                    tickfont=dict(color=line_color), 
+                                    gridcolor="#E5E5E5",
+                                    autorange=True 
+                                ),
+                                yaxis2=dict(
+                                    title=dict(text="LTP Price Scale", font=dict(color="#00CC66")), 
+                                    tickfont=dict(color="#00CC66"), 
+                                    showgrid=False,
+                                    autorange=True 
+                                ),
+                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="black"))
+                            )
+                            st.plotly_chart(fig, use_container_width=True)
+                        else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
+                    else: st.info("⏳ Market data hasn't started logging yet today.")
+                except Exception as e:
+                    st.error(f"Chart Load Error: {e}")
+            else:
+                st.info("⏳ Chart History file is being prepared... Data will appear during market hours (9:15 AM - 3:30 PM).")
+
+    if 'last_api_call' in st.session_state:
+        time_diff = (datetime.datetime.now(IST) - st.session_state.last_api_call).total_seconds()
+        if time_diff < 290:
+            time.sleep(290 - time_diff)
+        else:
+            time.sleep(60) 
+        st.rerun()
+else:
+    st.info("👈 Please enter Auth Code in sidebar.")
