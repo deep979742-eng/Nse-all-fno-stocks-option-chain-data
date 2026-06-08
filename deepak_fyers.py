@@ -40,7 +40,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-(IST) = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
+IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 now_ist = datetime.datetime.now(IST)
 today_str = now_ist.strftime("%Y-%m-%d")
 
@@ -49,6 +49,7 @@ SNAPSHOT_FILE = "snapshot_950.json"
 TOKEN_STORE_FILE = "fyers_token_store.json"
 AUTO_SAVE_FILE = "auto_save_tracker.txt"
 STRIKE_MEM_FILE = "intraday_strike_memory.json"
+EOD_PRICES_FILE = "today_eod_prices.json"
 
 # ==========================================
 # 2. GOOGLE SHEETS & MEMORY MANAGEMENT
@@ -121,7 +122,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. 🚀 MASTER SCANNER (FAST & STALL-FREE) 🚀
+# 4. 🚀 MASTER SCANNER (MICRO-RETRY BALANCED) 🚀
 # ==========================================
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
@@ -133,6 +134,8 @@ def run_master_scan(token, date_str):
     except: strike_mem = {}
     try: snap_950 = json.load(open(SNAPSHOT_FILE)).get("data", {})
     except: snap_950 = {}
+
+    today_eod_prices = {}
 
     all_quotes = []
     for i in range(0, len(raw_symbols), 50):
@@ -147,14 +150,18 @@ def run_master_scan(token, date_str):
     final_list = []
     new_csv_rows = []
 
-    # 🚀 SPEED FIX: Removed heavy retry sleeps to prevent night stalls
+    # 🚀 SMART FIX: 3 Fast attempts with a 0.2s micro-sleep to prevent rate limits without stalling
     def fetch_option_chain_fast_local(q):
         sym = q['n']
-        time.sleep(0.1) 
-        try:
-            oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
-            return q, oc
-        except: return q, None
+        for attempt in range(3):
+            try:
+                oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
+                if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
+                    return q, oc
+                time.sleep(0.2)
+            except:
+                time.sleep(0.2)
+        return q, None
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         results = executor.map(fetch_option_chain_fast_local, all_quotes)
@@ -173,6 +180,10 @@ def run_master_scan(token, date_str):
                 p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('option_type') == 'PE')
                 o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
                 
+                for s in chain:
+                    sym_str, lp_str = str(s.get('symbol', '')), float(s.get('ltp', 0))
+                    if lp_str > 0: today_eod_prices[sym_str] = lp_str
+
                 target_time = datetime.time(9, 50)
                 if scan_time_ist.time() < target_time: pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
@@ -196,8 +207,7 @@ def run_master_scan(token, date_str):
                         diff = lp - strike_mem[sym]
                         if diff > 0: tot_p += 1 
                         elif diff < 0: tot_m += 1 
-                        if scan_time_ist.time() >= datetime.time(15, 30):
-                            strike_mem[sym] = lp
+
                     act = tot_p + tot_m
                     if act == 0: return 0.0
                     return round((tot_p / act) * 100, 1) if tot_p >= tot_m else -round((tot_m / act) * 100, 1)
@@ -210,7 +220,6 @@ def run_master_scan(token, date_str):
                     'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
                 })
 
-                # 🚀 CHART LOGIC EXCLUSIVE LOCK: File me data sirf 9:15 se 3:30 tak hi add hoga!
                 if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
                     new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
             else:
@@ -220,7 +229,10 @@ def run_master_scan(token, date_str):
     except: pass
     try: json.dump({"date": date_str, "data": snap_950}, open(SNAPSHOT_FILE, "w"))
     except: pass
-    
+    if today_eod_prices:
+        try: json.dump(today_eod_prices, open(EOD_PRICES_FILE, "w"))
+        except: pass
+
     if new_csv_rows:
         new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
         if not os.path.isfile(HISTORY_FILE): new_df.to_csv(HISTORY_FILE, index=False)
@@ -252,9 +264,9 @@ st.sidebar.markdown("---")
 st.sidebar.header("💾 End Of Day (EOD) Save")
 
 def save_eod_data():
-    if os.path.exists(STRIKE_MEM_FILE) and sheet is not None:
+    if os.path.exists(EOD_PRICES_FILE) and sheet is not None:
         try:
-            mem_data = json.load(open(STRIKE_MEM_FILE)).get("data", {})
+            mem_data = json.load(open(EOD_PRICES_FILE))
             if mem_data:
                 json_str = json.dumps(mem_data)
                 chunks = [json_str[i:i+40000] for i in range(0, len(json_str), 40000)]
@@ -318,7 +330,6 @@ if auth_code:
             {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
         ]
 
-        # 🚀 TABS FIXED BACK TO 'TREND CHART'
         tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "🌐 NiftyTrader Web", "📈 TREND CHART"])
         
         with tab1:
@@ -391,7 +402,6 @@ if auth_code:
                             dynamic_start_time = max(actual_first_data_time, market_open_time)
                             fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
 
-                            # 🚀 FIXED PURE WHITE BACKGROUND + AUTOSCALE + NO DUPLICATE CHART IN SLIDER
                             fig.update_layout(
                                 template="plotly_white", 
                                 hovermode="x unified",
@@ -427,15 +437,11 @@ if auth_code:
                 st.info("⏳ Chart History file is being prepared... Data will appear during market hours (9:15 AM - 3:30 PM).")
 
     if 'last_api_call' in st.session_state:
-        st.write(f"🔄 Next master scan in ~5 mins... Last updated: {st.session_state.last_api_call.strftime('%H:%M:%S')}")
         time_diff = (datetime.datetime.now(IST) - st.session_state.last_api_call).total_seconds()
-        
         if time_diff < 290:
             time.sleep(290 - time_diff)
         else:
             time.sleep(60) 
-            
         st.rerun()
-
 else:
     st.info("👈 Please enter Auth Code in sidebar.")
