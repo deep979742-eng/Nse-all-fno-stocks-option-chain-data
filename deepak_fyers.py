@@ -11,6 +11,9 @@ import concurrent.futures
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
+# ==========================================
+# 1. FYERS CREDENTIALS & GLOBAL SETUP
+# ==========================================
 CLIENT_ID = "YD02909"
 APP_ID = "I0QMW3KFAW-100"
 SECRET_ID = "T63F5XCUSH"
@@ -18,19 +21,8 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# 🚀 100% ERROR-FREE CSS FORMAT: No multi-line strings, impossible to get IndentationError!
-css_str = (
-    "<style>"
-    "[data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } "
-    "[data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } "
-    "[data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } "
-    ".block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } "
-    "[data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } "
-    "[data-testid='stDataFrameTable'] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; } "
-    "th { background-color: darkblue !important; color: white !important; } "
-    "* { cursor: default !important; }"
-    "</style>"
-)
+# CSS - NO INDENTATION ERRORS
+css_str = "<style>[data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } [data-testid='stDataFrameTable'] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; } th { background-color: darkblue !important; color: white !important; } * { cursor: default !important; }</style>"
 st.markdown(css_str, unsafe_allow_html=True)
 
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
@@ -42,8 +34,13 @@ SNAPSHOT_FILE = "snapshot_950.json"
 TOKEN_STORE_FILE = "fyers_token_store.json"
 AUTO_SAVE_FILE = "auto_save_tracker.txt"
 STRIKE_MEM_FILE = "intraday_strike_memory.json"
-TODAY_BASELINE_FILE = "today_baseline_fallback.json"
 
+if 'session_baseline' not in st.session_state:
+    st.session_state.session_baseline = {}
+
+# ==========================================
+# 2. GOOGLE SHEETS & SMART ROLLING MANAGEMENT
+# ==========================================
 if os.path.exists(HISTORY_FILE):
     try:
         hist_check = pd.read_csv(HISTORY_FILE)
@@ -70,7 +67,7 @@ if os.path.exists(STRIKE_MEM_FILE):
     try:
         loaded_db = json.load(open(STRIKE_MEM_FILE))
         if "data" in loaded_db and "history" not in loaded_db:
-            old_date = loaded_db.get("date", (now_ist - datetime.timedelta(days=1)).strftime("%Y-%m-%d"))
+            old_date = (now_ist - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
             global_history = {old_date: loaded_db["data"]}
         else:
             global_history = loaded_db.get("history", {})
@@ -97,6 +94,9 @@ def get_previous_market_baseline(history_db, today_date_str):
     past_dates = sorted([d for d in history_db.keys() if d < today_date_str])
     return history_db[past_dates[-1]] if past_dates else {}
 
+# ==========================================
+# 3. STOCK LIST & FORMULAS
+# ==========================================
 raw_symbols = [
     "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
     "ADANIPORTS", "ADANIPOWER", "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP", "ASHOKLEY", "ASIANPAINT", 
@@ -130,6 +130,9 @@ def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
+# ==========================================
+# 4. 🚀 GLOBAL CACHE LOCK (MASTER SCANNER) 🚀
+# ==========================================
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
     fyers = fyersModel.FyersModel(client_id=APP_ID, is_async=False, token=token, log_path="")
@@ -143,17 +146,10 @@ def run_master_scan(token, date_str):
         hist_db = {}
 
     baseline_prices = get_previous_market_baseline(hist_db, date_str)
-    
-    if date_str not in hist_db:
-        hist_db[date_str] = {}
+    if date_str not in hist_db: hist_db[date_str] = {}
         
     try: snap_950 = json.load(open(SNAPSHOT_FILE)).get("data", {})
     except: snap_950 = {}
-
-    try: today_baseline = json.load(open(TODAY_BASELINE_FILE))
-    except: today_baseline = {}
-    if today_baseline.get("date") != date_str:
-        today_baseline = {"date": date_str, "prices": {}}
 
     all_quotes = []
     for i in range(0, len(raw_symbols), 50):
@@ -200,8 +196,9 @@ def run_master_scan(token, date_str):
                     sym_str, lp_str = str(s.get('symbol', '')), float(s.get('ltp', 0))
                     if lp_str > 0: 
                         hist_db[date_str][sym_str] = lp_str
-                        if sym_str not in today_baseline["prices"]:
-                            today_baseline["prices"][sym_str] = lp_str
+                        # Memory lock logic
+                        if sym_str not in st.session_state.session_baseline:
+                            st.session_state.session_baseline[sym_str] = lp_str
 
                 target_time = datetime.time(9, 50)
                 if scan_time_ist.time() < target_time: pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
@@ -215,6 +212,7 @@ def run_master_scan(token, date_str):
                         pcr_pct = ((v_pcr - base['pcr']) / base['pcr']) * 100 if base['pcr'] != 0 else 0.0
                         vol_pct = ((v_cpr - base['vol_cpr']) / base['vol_cpr']) * 100 if base['vol_cpr'] != 0 else 0.0
 
+                # 🚀 ULTIMATE BULLETPROOF FIX: Native API Change + Session Memory
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
@@ -222,11 +220,20 @@ def run_master_scan(token, date_str):
                         sym, lp = str(s.get('symbol', '')), float(s.get('ltp', 0))
                         if lp == 0: continue
                         
-                        base_p = baseline_prices.get(sym)
-                        if not base_p:
-                            base_p = today_baseline["prices"].get(sym, lp)
+                        diff = 0.0
+                        # 1. First priority: Direct change metric from Fyers API
+                        if 'ch' in s and s['ch'] != 0:
+                            diff = float(s['ch'])
+                        elif 'prev_close_price' in s and float(s['prev_close_price']) > 0:
+                            diff = lp - float(s['prev_close_price'])
+                        else:
+                            # 2. Second priority: Yesterday's Database
+                            base_p = baseline_prices.get(sym)
+                            if not base_p:
+                                # 3. Third priority: Start of Session Logic (if Yesterday's data deleted)
+                                base_p = st.session_state.session_baseline.get(sym, lp)
+                            diff = lp - base_p
                             
-                        diff = lp - base_p
                         if diff > 0: tot_p += 1 
                         elif diff < 0: tot_m += 1 
 
@@ -247,6 +254,7 @@ def run_master_scan(token, date_str):
             else:
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
+    # Purge old memory
     all_saved_dates = sorted(list(hist_db.keys()))
     while len(all_saved_dates) > 3:
         oldest_date = all_saved_dates.pop(0)
@@ -256,8 +264,6 @@ def run_master_scan(token, date_str):
     except: pass
     try: json.dump({"date": date_str, "data": snap_950}, open(SNAPSHOT_FILE, "w"))
     except: pass
-    try: json.dump(today_baseline, open(TODAY_BASELINE_FILE, "w"))
-    except: pass
 
     if new_csv_rows:
         new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
@@ -266,6 +272,9 @@ def run_master_scan(token, date_str):
 
     return final_list, scan_time_ist.timestamp()
 
+# ==========================================
+# 5. SIDEBAR LOGIN & EOD SAVE
+# ==========================================
 st.sidebar.header("🔑 Fyers Quick Login")
 
 saved_token = None
@@ -310,6 +319,9 @@ def save_eod_data():
 if st.sidebar.button("Manual Save 3:30 PM Data"):
     if save_eod_data(): st.sidebar.success("Permanent EOD Save Success!")
 
+# ==========================================
+# 6. APP RENDERING & MAGIC VIEWER
+# ==========================================
 if auth_code:
     if auth_code != "AUTO_LOGGED_IN":
         session = fyersModel.SessionModel(client_id=APP_ID, secret_key=SECRET_ID, redirect_uri=REDIRECT_URI, response_type="code", grant_type="authorization_code")
@@ -391,7 +403,7 @@ if auth_code:
             st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
 
         with tab3:
-            st.markdown("### 📈 SIR TREND CHART")
+            st.markdown("### 📈 TREND CHART")
             col_c1, col_c2 = st.columns([2, 2])
             with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
             with col_c2: 
