@@ -21,8 +21,8 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# 🚀 CLEAN CSS (One-line format to prevent Indentation/Syntax Errors)
-st.markdown("<style>[data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } [data-testid='stDataFrameTable'] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; } th { background-color: darkblue !important; color: white !important; } * { cursor: default !important; }</style>", unsafe_allow_html=True)
+# CSS - Fully Indentation-Proof
+st.markdown("<style>[data-testid='stAppViewContainer']{opacity:1!important} .block-container{padding-top:1rem!important} th{background-color:darkblue!important;color:white!important;text-align:center!important}</style>", unsafe_allow_html=True)
 
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 now_ist = datetime.datetime.now(IST)
@@ -35,7 +35,7 @@ AUTO_SAVE_FILE = "auto_save_tracker.txt"
 STRIKE_MEM_FILE = "intraday_strike_memory.json"
 
 # ==========================================
-# 2. GOOGLE SHEETS & 2-DAY ROLLING MANAGEMENT
+# 2. GOOGLE SHEETS & SMART DATA MIGRATION
 # ==========================================
 if os.path.exists(HISTORY_FILE):
     try:
@@ -57,32 +57,39 @@ def get_gsheet():
     return None
 
 sheet = get_gsheet()
-
-# Load rolling memory block
 global_history = {}
+
+# 🚀 FIX: Auto-Migrate Old Data Format to New Rolling Format
 if os.path.exists(STRIKE_MEM_FILE):
     try:
         loaded_db = json.load(open(STRIKE_MEM_FILE))
-        global_history = loaded_db.get("history", {})
+        if "data" in loaded_db and "history" not in loaded_db:
+            old_date = loaded_db.get("date", (now_ist - datetime.timedelta(days=1)).strftime("%Y-%m-%d"))
+            global_history = {old_date: loaded_db["data"]}
+        else:
+            global_history = loaded_db.get("history", {})
     except: pass
 
 if not global_history and sheet is not None:
     try:
         col_values = sheet.col_values(1)
         if col_values: 
-            global_history = json.loads("".join(col_values))
+            raw_gsheet = json.loads("".join(col_values))
+            if raw_gsheet:
+                first_key = list(raw_gsheet.keys())[0]
+                if first_key.startswith("NSE:"):
+                    old_date = (now_ist - datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+                    global_history = {old_date: raw_gsheet}
+                else:
+                    global_history = raw_gsheet
     except: pass
 
 with open(STRIKE_MEM_FILE, "w") as f:
     json.dump({"date": today_str, "history": global_history}, f)
 
-# Helper function to find the exact previous session close baseline
 def get_previous_market_baseline(history_db, today_date_str):
-    past_dates = [d for d in history_db.keys() if d < today_date_str]
-    if past_dates:
-        latest_past_date = max(past_dates)
-        return history_db[latest_past_date]
-    return {}
+    past_dates = sorted([d for d in history_db.keys() if d < today_date_str])
+    return history_db[past_dates[-1]] if past_dates else {}
 
 # ==========================================
 # 3. STOCK LIST & FORMULAS
@@ -121,7 +128,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. 🚀 GLOBAL CACHE LOCK (MASTER SCANNER) 🚀
+# 4. 🚀 MASTER SCANNER (STABLE 2.0s TIMER)
 # ==========================================
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
@@ -129,13 +136,7 @@ def run_master_scan(token, date_str):
     scan_time_ist = datetime.datetime.now(IST)
     time_str = scan_time_ist.strftime('%H:%M')
     
-    try:
-        db_content = json.load(open(STRIKE_MEM_FILE))
-        hist_db = db_content.get("history", {})
-    except:
-        hist_db = {}
-
-    # Get absolute baseline from previous market session close
+    hist_db = global_history
     baseline_prices = get_previous_market_baseline(hist_db, date_str)
     
     if date_str not in hist_db:
@@ -157,7 +158,6 @@ def run_master_scan(token, date_str):
     final_list = []
     new_csv_rows = []
 
-    # 🚀 ORIGINAL 2.0 SECONDS STABLE RETRY LOGIC MAINTAINED
     def fetch_option_chain_fast_local(q):
         sym = q['n']
         time.sleep(0.4) 
@@ -186,7 +186,6 @@ def run_master_scan(token, date_str):
                 p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('volume_type') == 'PE')
                 o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
                 
-                # Continuously push live strikes into today's folder segment
                 for s in chain:
                     sym_str, lp_str = str(s.get('symbol', '')), float(s.get('ltp', 0))
                     if lp_str > 0: 
@@ -204,7 +203,6 @@ def run_master_scan(token, date_str):
                         pcr_pct = ((v_pcr - base['pcr']) / base['pcr']) * 100 if base['pcr'] != 0 else 0.0
                         vol_pct = ((v_cpr - base['vol_cpr']) / base['vol_cpr']) * 100 if base['vol_cpr'] != 0 else 0.0
 
-                # 🚀 ABSOLUTE STABLE CONVICTION: Always measures against baseline_prices (Yesterday's close)
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
@@ -233,7 +231,6 @@ def run_master_scan(token, date_str):
             else:
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
-    # 🚀 DITTO 2-DAY CLEAN PURGE WINDOW: Retaining exactly max 2 days (Yesterday and Today)
     all_saved_dates = sorted(list(hist_db.keys()))
     while len(all_saved_dates) > 2:
         oldest_date = all_saved_dates.pop(0)
