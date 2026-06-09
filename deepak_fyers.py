@@ -8,7 +8,6 @@ from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
 import concurrent.futures
-# 🚀 ADVANCED CHARTING LIBRARIES
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -22,25 +21,8 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# 🚀 COPY-PASTE ERROR FIXED: No multi-line strings, completely safe format!
-st.markdown(
-    "<style>\n"
-    "[data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'],\n"
-    "[data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div {\n"
-    "opacity: 1 !important; filter: none !important; transition: none !important;\n"
-    "}\n"
-    "[data-testid='stDataFrame'], [data-testid='stTabs'] {\n"
-    "opacity: 1 !important; filter: none !important; transition: none !important;\n"
-    "}\n"
-    "[data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; }\n"
-    ".block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; }\n"
-    "[data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; }\n"
-    "[data-testid='stDataFrameTable'] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; }\n"
-    "th { background-color: darkblue !important; color: white !important; }\n"
-    "* { cursor: default !important; }\n"
-    "</style>",
-    unsafe_allow_html=True
-)
+# 🚀 CLEAN CSS (One-line format to prevent Indentation/Syntax Errors)
+st.markdown("<style>[data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } [data-testid='stDataFrameTable'] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; } th { background-color: darkblue !important; color: white !important; } * { cursor: default !important; }</style>", unsafe_allow_html=True)
 
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 now_ist = datetime.datetime.now(IST)
