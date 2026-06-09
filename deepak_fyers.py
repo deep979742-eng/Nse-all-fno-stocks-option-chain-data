@@ -8,6 +8,7 @@ from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
 import concurrent.futures
+# 🚀 ADVANCED CHARTING LIBRARIES
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -196,7 +197,6 @@ def run_master_scan(token, date_str):
                     sym_str, lp_str = str(s.get('symbol', '')), float(s.get('ltp', 0))
                     if lp_str > 0: 
                         hist_db[date_str][sym_str] = lp_str
-                        # Memory lock logic
                         if sym_str not in st.session_state.session_baseline:
                             st.session_state.session_baseline[sym_str] = lp_str
 
@@ -212,7 +212,7 @@ def run_master_scan(token, date_str):
                         pcr_pct = ((v_pcr - base['pcr']) / base['pcr']) * 100 if base['pcr'] != 0 else 0.0
                         vol_pct = ((v_cpr - base['vol_cpr']) / base['vol_cpr']) * 100 if base['vol_cpr'] != 0 else 0.0
 
-                # 🚀 ULTIMATE BULLETPROOF FIX: Native API Change + Session Memory
+                # 🚀 NO SHORTCUTS FIX: Purely uses Google Sheet baseline to avoid night reset issue
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
@@ -220,20 +220,11 @@ def run_master_scan(token, date_str):
                         sym, lp = str(s.get('symbol', '')), float(s.get('ltp', 0))
                         if lp == 0: continue
                         
-                        diff = 0.0
-                        # 1. First priority: Direct change metric from Fyers API
-                        if 'ch' in s and s['ch'] != 0:
-                            diff = float(s['ch'])
-                        elif 'prev_close_price' in s and float(s['prev_close_price']) > 0:
-                            diff = lp - float(s['prev_close_price'])
-                        else:
-                            # 2. Second priority: Yesterday's Database
-                            base_p = baseline_prices.get(sym)
-                            if not base_p:
-                                # 3. Third priority: Start of Session Logic (if Yesterday's data deleted)
-                                base_p = st.session_state.session_baseline.get(sym, lp)
-                            diff = lp - base_p
+                        base_p = baseline_prices.get(sym)
+                        if not base_p:
+                            base_p = st.session_state.session_baseline.get(sym, lp)
                             
+                        diff = lp - base_p
                         if diff > 0: tot_p += 1 
                         elif diff < 0: tot_m += 1 
 
@@ -254,7 +245,6 @@ def run_master_scan(token, date_str):
             else:
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
-    # Purge old memory
     all_saved_dates = sorted(list(hist_db.keys()))
     while len(all_saved_dates) > 3:
         oldest_date = all_saved_dates.pop(0)
@@ -403,7 +393,7 @@ if auth_code:
             st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
 
         with tab3:
-            st.markdown("### 📈 TREND CHART")
+            st.markdown("### 📈 SIR TREND CHART")
             col_c1, col_c2 = st.columns([2, 2])
             with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
             with col_c2: 
