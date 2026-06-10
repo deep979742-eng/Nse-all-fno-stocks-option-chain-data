@@ -8,7 +8,6 @@ from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
 import concurrent.futures
-# 🚀 ADVANCED CHARTING LIBRARIES
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
@@ -22,7 +21,7 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# CSS - NO INDENTATION ERRORS
+# CSS - FULLY SAFE NO INDENTATION ERRORS
 css_str = "<style>[data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } [data-testid='stDataFrameTable'] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; } th { background-color: darkblue !important; color: white !important; } * { cursor: default !important; }</style>"
 st.markdown(css_str, unsafe_allow_html=True)
 
@@ -35,9 +34,6 @@ SNAPSHOT_FILE = "snapshot_950.json"
 TOKEN_STORE_FILE = "fyers_token_store.json"
 AUTO_SAVE_FILE = "auto_save_tracker.txt"
 STRIKE_MEM_FILE = "intraday_strike_memory.json"
-
-if 'session_baseline' not in st.session_state:
-    st.session_state.session_baseline = {}
 
 # ==========================================
 # 2. GOOGLE SHEETS & SMART ROLLING MANAGEMENT
@@ -193,12 +189,12 @@ def run_master_scan(token, date_str):
                 p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('volume_type') == 'PE')
                 o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
                 
+                # Yeh hissa har 5 minute mein sirf OVERWRITE karta hai, naya add nahi karta. 
+                # Isliye sham 3:30 baje sirf market ka closing price hi bachega.
                 for s in chain:
                     sym_str, lp_str = str(s.get('symbol', '')), float(s.get('ltp', 0))
                     if lp_str > 0: 
                         hist_db[date_str][sym_str] = lp_str
-                        if sym_str not in st.session_state.session_baseline:
-                            st.session_state.session_baseline[sym_str] = lp_str
 
                 target_time = datetime.time(9, 50)
                 if scan_time_ist.time() < target_time: pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
@@ -212,7 +208,7 @@ def run_master_scan(token, date_str):
                         pcr_pct = ((v_pcr - base['pcr']) / base['pcr']) * 100 if base['pcr'] != 0 else 0.0
                         vol_pct = ((v_cpr - base['vol_cpr']) / base['vol_cpr']) * 100 if base['vol_cpr'] != 0 else 0.0
 
-                # 🚀 NO SHORTCUTS FIX: Purely uses Google Sheet baseline to avoid night reset issue
+                # 🚀 THE TRIPLE-ENGINE LOGIC (NEVER RETURNS 0.0% IF DATA EXISTS)
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
@@ -220,11 +216,22 @@ def run_master_scan(token, date_str):
                         sym, lp = str(s.get('symbol', '')), float(s.get('ltp', 0))
                         if lp == 0: continue
                         
-                        base_p = baseline_prices.get(sym)
-                        if not base_p:
-                            base_p = st.session_state.session_baseline.get(sym, lp)
+                        diff = 0.0
+                        
+                        # Engine 1: Direct API Change
+                        ch = float(s.get('ch', 0))
+                        prev_c = float(s.get('prev_close_price', 0))
+                        
+                        # Check Google Sheets Baseline first
+                        if sym in baseline_prices:
+                            diff = lp - baseline_prices[sym]
+                        else:
+                            # Fallback to API if sheet data is missing/empty
+                            if ch != 0:
+                                diff = ch
+                            elif prev_c > 0 and lp != prev_c:
+                                diff = lp - prev_c
                             
-                        diff = lp - base_p
                         if diff > 0: tot_p += 1 
                         elif diff < 0: tot_m += 1 
 
@@ -245,6 +252,7 @@ def run_master_scan(token, date_str):
             else:
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
+    # Purge old history: Keeps exactly max 3 days of rolling window
     all_saved_dates = sorted(list(hist_db.keys()))
     while len(all_saved_dates) > 3:
         oldest_date = all_saved_dates.pop(0)
@@ -436,7 +444,7 @@ if auth_code:
                                 height=600,
                                 plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF", 
                                 xaxis=dict(
-                                    rangeslider=dict(visible=True, thickness=0.04), 
+                                    rangeslider=dict(visible=False), 
                                     type="date", 
                                     range=[dynamic_start_time, fixed_end_time], 
                                     gridcolor="#E5E5E5", 
