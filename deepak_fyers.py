@@ -34,31 +34,47 @@ SNAPSHOT_FILE = "snapshot_950.json"
 TOKEN_STORE_FILE = "fyers_token_store.json"
 AUTO_SAVE_FILE = "auto_save_tracker.txt"
 
-if 'live_base' not in st.session_state:
+# Reset session memory if date changes
+if 'live_base_date' not in st.session_state or st.session_state.live_base_date != today_str:
     st.session_state.live_base = {}
+    st.session_state.live_base_date = today_str
 
 # ==========================================
-# 2. GOOGLE SHEETS (DEEPAK BHAI'S 2-SECTION LOGIC)
+# 2. GOOGLE SHEETS (DEEPAK BHAI'S 2-TAB LOGIC)
 # ==========================================
 @st.cache_resource
-def get_gsheet():
+def get_gsheets():
     try:
         if "gcp_service_account" in st.secrets:
             scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
             creds_dict = dict(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
             client = gspread.authorize(creds)
-            return client.open("Fyers_EOD_Data").sheet1
+            ss = client.open("Fyers_EOD_Data")
+            
+            # Tab 1: For EOD Baseline (Pehla Tab)
+            ws1 = ss.get_worksheet(0) 
+            
+            # Tab 2: For Live Tracking (Dusra Tab - if user created it)
+            ws2 = None
+            try:
+                worksheets = ss.worksheets()
+                if len(worksheets) > 1:
+                    ws2 = ss.get_worksheet(1)
+            except Exception as e:
+                print("Tab 2 not found", e)
+                
+            return ws1, ws2
     except: pass
-    return None
+    return None, None
 
-sheet = get_gsheet()
+sheet_eod, sheet_live = get_gsheets()
 
-# Load EOD Base strictly from Row 1
+# Load EOD Base strictly from Tab 1
 baseline_prices = {}
-if sheet is not None:
+if sheet_eod is not None:
     try:
-        eod_val = sheet.cell(1, 1).value
+        eod_val = sheet_eod.cell(1, 1).value
         if eod_val: baseline_prices = json.loads(eod_val)
     except: pass
 
@@ -107,7 +123,12 @@ def run_master_scan(token, date_str):
     scan_time_ist = datetime.datetime.now(IST)
     time_str = scan_time_ist.strftime('%H:%M')
     
-    try: snap_950 = json.load(open(SNAPSHOT_FILE)).get("data", {})
+    try: 
+        snap_content = json.load(open(SNAPSHOT_FILE))
+        if snap_content.get("date") == date_str:
+            snap_950 = snap_content.get("data", {})
+        else:
+            snap_950 = {} 
     except: snap_950 = {}
 
     all_quotes = []
@@ -122,7 +143,7 @@ def run_master_scan(token, date_str):
         
     final_list = []
     new_csv_rows = []
-    live_ltp_data = {} # For saving live data
+    live_ltp_data = {} 
 
     def fetch_option_chain_fast_local(q):
         sym = q['n']
@@ -152,12 +173,10 @@ def run_master_scan(token, date_str):
                 p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('volume_type') == 'PE')
                 o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
                 
-                # Capture LIVE Data for Row 2
                 for s in chain:
                     sym_str, lp_str = str(s.get('symbol', '')), float(s.get('ltp', 0))
                     if lp_str > 0:
                         live_ltp_data[sym_str] = lp_str
-                        # Memory lock if EOD is empty
                         if sym_str not in st.session_state.live_base:
                             st.session_state.live_base[sym_str] = lp_str
 
@@ -173,7 +192,6 @@ def run_master_scan(token, date_str):
                         pcr_pct = ((v_pcr - base['pcr']) / base['pcr']) * 100 if base['pcr'] != 0 else 0.0
                         vol_pct = ((v_cpr - base['vol_cpr']) / base['vol_cpr']) * 100 if base['vol_cpr'] != 0 else 0.0
 
-                # 🚀 CLEAN 2-TAB LOGIC 
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
@@ -181,12 +199,10 @@ def run_master_scan(token, date_str):
                         sym, lp = str(s.get('symbol', '')), float(s.get('ltp', 0))
                         if lp == 0: continue
                         
-                        # Priority 1: EOD Data (Row 1 of Sheet)
                         if sym in baseline_prices:
                             base_p = baseline_prices[sym]
                         else:
-                            # Priority 2: Session Live Data (Row 2 equivalent)
-                            base_p = st.session_state.live_base[sym]
+                            base_p = st.session_state.live_base.get(sym, lp)
                             
                         diff = lp - base_p
                         if diff > 0: tot_p += 1 
@@ -212,7 +228,6 @@ def run_master_scan(token, date_str):
     try: json.dump({"date": date_str, "data": snap_950}, open(SNAPSHOT_FILE, "w"))
     except: pass
 
-    # Save LIVE DATA strictly for updating Row 2 later
     st.session_state.current_live_data = live_ltp_data
 
     if new_csv_rows:
@@ -246,23 +261,29 @@ st.sidebar.markdown("---")
 st.sidebar.header("💾 End Of Day (EOD) Save")
 
 def save_eod_data():
-    if sheet is not None and 'current_live_data' in st.session_state:
+    if sheet_eod is not None and 'current_live_data' in st.session_state:
         try:
             live_data = st.session_state.current_live_data
             if live_data:
-                sheet.clear()
-                # TAB 1: EOD CLOSE DATA -> Saves to Row 1
-                eod_str = json.dumps(live_data)
-                sheet.update_cell(1, 1, eod_str)
-                # TAB 2: CURRENT DATE HEADER -> Saves to Row 2
-                sheet.update_cell(2, 1, f"LAST_SAVED_DATE: {today_str}")
+                # UPDATE TAB 1 (EOD Baseline for tomorrow)
+                sheet_eod.clear()
+                sheet_eod.update_cell(1, 1, json.dumps(live_data))
+                
+                # UPDATE TAB 2 (Current Day Live Data Record)
+                if sheet_live is not None:
+                    sheet_live.clear()
+                    sheet_live.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
+                    sheet_live.update_cell(2, 1, json.dumps(live_data))
+                else:
+                    # Agar Tab 2 nahi bana hai toh user ko message dikhao
+                    st.sidebar.warning("⚠️ Tab 1 Saved. Google Sheet me '+' click karke naya Tab banayein jisse Tab 2 bhi save ho sake.")
                 return True
         except Exception as e:
             st.sidebar.error(f"Sheet Error: {e}")
     return False
 
 if st.sidebar.button("Manual Save 3:30 PM Data"):
-    if save_eod_data(): st.sidebar.success("✅ Permanent EOD Save Success (Row 1)!")
+    if save_eod_data(): st.sidebar.success("✅ Permanent EOD Save Success!")
 
 # ==========================================
 # 6. APP RENDERING & MAGIC VIEWER
