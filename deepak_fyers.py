@@ -40,43 +40,29 @@ if 'live_base_date' not in st.session_state or st.session_state.live_base_date !
     st.session_state.live_base_date = today_str
 
 # ==========================================
-# 2. GOOGLE SHEETS (DEEPAK BHAI'S 2-TAB LOGIC)
+# 2. GOOGLE SHEETS DYNAMIC CONNECTION
 # ==========================================
 @st.cache_resource
-def get_gsheets():
+def get_gspread_client():
     try:
         if "gcp_service_account" in st.secrets:
             scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
             creds_dict = dict(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-            client = gspread.authorize(creds)
-            ss = client.open("Fyers_EOD_Data")
-            
-            # Tab 1: For EOD Baseline (Pehla Tab)
-            ws1 = ss.get_worksheet(0) 
-            
-            # Tab 2: For Live Tracking (Dusra Tab - if user created it)
-            ws2 = None
-            try:
-                worksheets = ss.worksheets()
-                if len(worksheets) > 1:
-                    ws2 = ss.get_worksheet(1)
-            except Exception as e:
-                print("Tab 2 not found", e)
-                
-            return ws1, ws2
+            return gspread.authorize(creds)
     except: pass
-    return None, None
+    return None
 
-sheet_eod, sheet_live = get_gsheets()
-
-# Load EOD Base strictly from Tab 1
+# Load EOD Base directly before scanning
 baseline_prices = {}
-if sheet_eod is not None:
-    try:
-        eod_val = sheet_eod.cell(1, 1).value
+try:
+    client = get_gspread_client()
+    if client:
+        ss = client.open("Fyers_EOD_Data")
+        ws1 = ss.get_worksheet(0)
+        eod_val = ws1.cell(1, 1).value
         if eod_val: baseline_prices = json.loads(eod_val)
-    except: pass
+except: pass
 
 # ==========================================
 # 3. STOCK LIST
@@ -261,29 +247,39 @@ st.sidebar.markdown("---")
 st.sidebar.header("💾 End Of Day (EOD) Save")
 
 def save_eod_data():
-    if sheet_eod is not None and 'current_live_data' in st.session_state:
+    if 'current_live_data' in st.session_state:
         try:
             live_data = st.session_state.current_live_data
             if live_data:
-                # UPDATE TAB 1 (EOD Baseline for tomorrow)
-                sheet_eod.clear()
-                sheet_eod.update_cell(1, 1, json.dumps(live_data))
+                client = get_gspread_client()
+                if not client:
+                    st.sidebar.error("Google Sheets Connection Failed!")
+                    return False
                 
-                # UPDATE TAB 2 (Current Day Live Data Record)
-                if sheet_live is not None:
-                    sheet_live.clear()
-                    sheet_live.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
-                    sheet_live.update_cell(2, 1, json.dumps(live_data))
+                ss = client.open("Fyers_EOD_Data")
+                ws1 = ss.get_worksheet(0)
+                
+                # Tab 1: EOD Baseline Update
+                ws1.clear()
+                ws1.update_cell(1, 1, json.dumps(live_data))
+                
+                # Tab 2: Live record Update (Fresh Fetch to bypass cache)
+                worksheets = ss.worksheets()
+                if len(worksheets) > 1:
+                    ws2 = ss.get_worksheet(1)
+                    ws2.clear()
+                    ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
+                    ws2.update_cell(2, 1, json.dumps(live_data))
+                    st.sidebar.success("✅ Tab 1 & Tab 2 Dono Save Ho Gaye!")
                 else:
-                    # Agar Tab 2 nahi bana hai toh user ko message dikhao
-                    st.sidebar.warning("⚠️ Tab 1 Saved. Google Sheet me '+' click karke naya Tab banayein jisse Tab 2 bhi save ho sake.")
+                    st.sidebar.warning("⚠️ Tab 1 Saved! (Google sheet me '+' click karke naya Tab banayein jisse Tab 2 bhi save ho sake)")
                 return True
         except Exception as e:
             st.sidebar.error(f"Sheet Error: {e}")
     return False
 
 if st.sidebar.button("Manual Save 3:30 PM Data"):
-    if save_eod_data(): st.sidebar.success("✅ Permanent EOD Save Success!")
+    save_eod_data()
 
 # ==========================================
 # 6. APP RENDERING & MAGIC VIEWER
