@@ -50,18 +50,22 @@ def get_gspread_client():
             creds_dict = dict(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
             return gspread.authorize(creds)
-    except: pass
+    except Exception as e: 
+        print(e)
     return None
 
-# Load EOD Base directly before scanning
+# Load EOD Base directly before scanning (Joining Chunks if any)
 baseline_prices = {}
 try:
     client = get_gspread_client()
     if client:
         ss = client.open("Fyers_EOD_Data")
         ws1 = ss.get_worksheet(0)
-        eod_val = ws1.cell(1, 1).value
-        if eod_val: baseline_prices = json.loads(eod_val)
+        col_vals = ws1.col_values(1)
+        if col_vals:
+            full_str = "".join(col_vals)
+            if full_str: 
+                baseline_prices = json.loads(full_str)
 except: pass
 
 # ==========================================
@@ -224,7 +228,7 @@ def run_master_scan(token, date_str):
     return final_list, scan_time_ist.timestamp()
 
 # ==========================================
-# 5. SIDEBAR LOGIN & EOD SAVE
+# 5. SIDEBAR LOGIN & EOD SAVE (WITH ERROR TRACKING)
 # ==========================================
 st.sidebar.header("🔑 Fyers Quick Login")
 
@@ -247,35 +251,55 @@ st.sidebar.markdown("---")
 st.sidebar.header("💾 End Of Day (EOD) Save")
 
 def save_eod_data():
-    if 'current_live_data' in st.session_state:
+    # ERROR TRACKING 1: Data Check
+    if 'current_live_data' not in st.session_state:
+        st.sidebar.error("❌ Save Failed: System mein live data nahi hai! Dashboard load hone dein.")
+        return False
+        
+    live_data = st.session_state.current_live_data
+    if not live_data:
+        st.sidebar.error("❌ Save Failed: Fyers API se 0 strikes ka data aaya hai!")
+        return False
+
+    try:
+        client = get_gspread_client()
+        if not client:
+            st.sidebar.error("❌ Save Failed: Google Sheets se connection nahi ho pa raha (API Key error).")
+            return False
+            
+        ss = client.open("Fyers_EOD_Data")
+        
+        json_str = json.dumps(live_data)
+        chunks = [json_str[i:i+40000] for i in range(0, len(json_str), 40000)]
+        
+        # UPDATE TAB 1
         try:
-            live_data = st.session_state.current_live_data
-            if live_data:
-                client = get_gspread_client()
-                if not client:
-                    st.sidebar.error("Google Sheets Connection Failed!")
-                    return False
-                
-                ss = client.open("Fyers_EOD_Data")
-                ws1 = ss.get_worksheet(0)
-                
-                # Tab 1: EOD Baseline Update
-                ws1.clear()
-                ws1.update_cell(1, 1, json.dumps(live_data))
-                
-                # Tab 2: Live record Update (Fresh Fetch to bypass cache)
-                worksheets = ss.worksheets()
-                if len(worksheets) > 1:
-                    ws2 = ss.get_worksheet(1)
-                    ws2.clear()
-                    ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
-                    ws2.update_cell(2, 1, json.dumps(live_data))
-                    st.sidebar.success("✅ Tab 1 & Tab 2 Dono Save Ho Gaye!")
-                else:
-                    st.sidebar.warning("⚠️ Tab 1 Saved! (Google sheet me '+' click karke naya Tab banayein jisse Tab 2 bhi save ho sake)")
-                return True
-        except Exception as e:
-            st.sidebar.error(f"Sheet Error: {e}")
+            ws1 = ss.get_worksheet(0)
+            ws1.clear()
+            clist1 = ws1.range(f'A1:A{len(chunks)}')
+            for i, cell in enumerate(clist1): cell.value = chunks[i]
+            ws1.update_cells(clist1)
+        except Exception as e1:
+            st.sidebar.error(f"❌ Tab 1 Save Error: {str(e1)}")
+            return False
+            
+        # UPDATE TAB 2
+        try:
+            ws2 = ss.worksheet("Sheet2") # Strictly looking for name 'Sheet2'
+            ws2.clear()
+            ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
+            clist2 = ws2.range(f'A2:A{len(chunks)+1}')
+            for i, cell in enumerate(clist2): cell.value = chunks[i]
+            ws2.update_cells(clist2)
+            st.sidebar.success("✅ SUCCESS! Tab 1 & Tab 2 dono save ho gaye!")
+            return True
+        except Exception as e2:
+            st.sidebar.warning(f"⚠️ Tab 1 Save ho gaya, par Tab 2 fail hua. Error: {str(e2)}. Google Sheet me tab ka naam 'Sheet2' hona chahiye.")
+            return True
+            
+    except Exception as e:
+        st.sidebar.error(f"❌ Core Save Error: {str(e)}")
+        
     return False
 
 if st.sidebar.button("Manual Save 3:30 PM Data"):
