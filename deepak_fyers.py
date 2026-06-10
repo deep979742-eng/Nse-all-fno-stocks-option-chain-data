@@ -34,6 +34,7 @@ SNAPSHOT_FILE = "snapshot_950.json"
 TOKEN_STORE_FILE = "fyers_token_store.json"
 AUTO_SAVE_FILE = "auto_save_tracker.txt"
 STRIKE_MEM_FILE = "intraday_strike_memory.json"
+TODAY_BASELINE_FILE = "today_baseline_fallback.json"
 
 # ==========================================
 # 2. GOOGLE SHEETS & SMART ROLLING MANAGEMENT
@@ -148,6 +149,13 @@ def run_master_scan(token, date_str):
     try: snap_950 = json.load(open(SNAPSHOT_FILE)).get("data", {})
     except: snap_950 = {}
 
+    # 🚀 LOCAL MEMORY FALLBACK
+    try: today_baseline = json.load(open(TODAY_BASELINE_FILE))
+    except: today_baseline = {"date": date_str, "prices": {}}
+    
+    if today_baseline.get("date") != date_str:
+        today_baseline = {"date": date_str, "prices": {}}
+
     all_quotes = []
     for i in range(0, len(raw_symbols), 50):
         batch = raw_symbols[i:i+50]
@@ -189,12 +197,14 @@ def run_master_scan(token, date_str):
                 p_v = sum(float(x.get('volume', 0)) for x in chain if str(x.get('symbol', '')).endswith('PE') or x.get('volume_type') == 'PE')
                 o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
                 
-                # Yeh hissa har 5 minute mein sirf OVERWRITE karta hai, naya add nahi karta. 
-                # Isliye sham 3:30 baje sirf market ka closing price hi bachega.
                 for s in chain:
                     sym_str, lp_str = str(s.get('symbol', '')), float(s.get('ltp', 0))
                     if lp_str > 0: 
+                        # Continuously overwrite latest price for 3:30 PM save
                         hist_db[date_str][sym_str] = lp_str
+                        # 🚀 IF NO YESTERDAY DATA, LOCK TODAY'S FIRST PRICE
+                        if sym_str not in today_baseline["prices"]:
+                            today_baseline["prices"][sym_str] = lp_str
 
                 target_time = datetime.time(9, 50)
                 if scan_time_ist.time() < target_time: pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
@@ -208,7 +218,7 @@ def run_master_scan(token, date_str):
                         pcr_pct = ((v_pcr - base['pcr']) / base['pcr']) * 100 if base['pcr'] != 0 else 0.0
                         vol_pct = ((v_cpr - base['vol_cpr']) / base['vol_cpr']) * 100 if base['vol_cpr'] != 0 else 0.0
 
-                # 🚀 THE TRIPLE-ENGINE LOGIC (NEVER RETURNS 0.0% IF DATA EXISTS)
+                # 🚀 NO MORE ZEROES: Compare with Sheet OR our locked today's first price
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
@@ -216,22 +226,12 @@ def run_master_scan(token, date_str):
                         sym, lp = str(s.get('symbol', '')), float(s.get('ltp', 0))
                         if lp == 0: continue
                         
-                        diff = 0.0
-                        
-                        # Engine 1: Direct API Change
-                        ch = float(s.get('ch', 0))
-                        prev_c = float(s.get('prev_close_price', 0))
-                        
-                        # Check Google Sheets Baseline first
-                        if sym in baseline_prices:
-                            diff = lp - baseline_prices[sym]
-                        else:
-                            # Fallback to API if sheet data is missing/empty
-                            if ch != 0:
-                                diff = ch
-                            elif prev_c > 0 and lp != prev_c:
-                                diff = lp - prev_c
+                        base_p = baseline_prices.get(sym)
+                        # IF SHEET DATA IS EMPTY, USE OUR LOCAL LOCKED MEMORY
+                        if not base_p:
+                            base_p = today_baseline["prices"].get(sym, lp)
                             
+                        diff = lp - base_p
                         if diff > 0: tot_p += 1 
                         elif diff < 0: tot_m += 1 
 
@@ -252,7 +252,6 @@ def run_master_scan(token, date_str):
             else:
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
-    # Purge old history: Keeps exactly max 3 days of rolling window
     all_saved_dates = sorted(list(hist_db.keys()))
     while len(all_saved_dates) > 3:
         oldest_date = all_saved_dates.pop(0)
@@ -261,6 +260,8 @@ def run_master_scan(token, date_str):
     try: json.dump({"date": date_str, "history": hist_db}, open(STRIKE_MEM_FILE, "w"))
     except: pass
     try: json.dump({"date": date_str, "data": snap_950}, open(SNAPSHOT_FILE, "w"))
+    except: pass
+    try: json.dump(today_baseline, open(TODAY_BASELINE_FILE, "w"))
     except: pass
 
     if new_csv_rows:
