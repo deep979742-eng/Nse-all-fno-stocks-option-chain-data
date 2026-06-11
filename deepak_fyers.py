@@ -35,7 +35,6 @@ SNAPSHOT_FILE = "snapshot_950.json"
 TOKEN_STORE_FILE = "fyers_token_store.json"
 AUTO_SAVE_FILE = "auto_save_tracker.txt"
 
-# Reset session memory if date changes
 if 'live_base_date' not in st.session_state or st.session_state.live_base_date != today_str:
     st.session_state.live_base = {}
     st.session_state.live_base_date = today_str
@@ -51,28 +50,8 @@ def get_gspread_client():
             creds_dict = dict(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
             return gspread.authorize(creds)
-    except Exception as e: 
-        print(e)
+    except: pass
     return None
-
-# Load EOD Base directly from Sheet Tab 1
-baseline_prices = {}
-try:
-    client = get_gspread_client()
-    if client:
-        ss = client.open("Fyers_EOD_Data")
-        ws1 = ss.get_worksheet(0)
-        col_vals = ws1.col_values(1)
-        if col_vals:
-            full_str = "".join(col_vals)
-            if full_str:
-                try:
-                    decoded_str = base64.b64decode(full_str).decode('utf-8')
-                    baseline_prices = json.loads(decoded_str)
-                except:
-                    try: baseline_prices = json.loads(full_str)
-                    except: pass
-except: pass
 
 # ==========================================
 # 3. STOCK LIST
@@ -111,7 +90,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. MASTER SCANNER
+# 4. MASTER SCANNER (WITH AUTO-ROLLOVER)
 # ==========================================
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
@@ -119,13 +98,57 @@ def run_master_scan(token, date_str):
     scan_time_ist = datetime.datetime.now(IST)
     time_str = scan_time_ist.strftime('%H:%M')
     
-    try: 
-        snap_content = json.load(open(SNAPSHOT_FILE))
-        if snap_content.get("date") == date_str:
-            snap_950 = snap_content.get("data", {})
-        else:
-            snap_950 = {} 
-    except: snap_950 = {}
+    baseline_prices = {}
+    snap_950 = {}
+    snapshot_changed = False
+    
+    client = get_gspread_client()
+    if client:
+        try:
+            ss = client.open("Fyers_EOD_Data")
+            ws1 = ss.get_worksheet(0) # Tab 1 (Yesterday Baseline)
+            ws2 = ss.worksheet("Sheet2") # Tab 2 (Today Close/Snapshot)
+            
+            # 🚀 A. NEXT MORNING AUTO-ROLLOVER LOGIC
+            try:
+                tab2_date_row = ws2.cell(1, 1).value
+                if tab2_date_row and "LAST_SAVED_DATE:" in tab2_date_row:
+                    saved_date = tab2_date_row.replace("LAST_SAVED_DATE:", "").strip()
+                    if saved_date and saved_date != date_str:
+                        # Tab 2 ke puraane data ko Tab 1 me shift karein
+                        tab2_col_vals = ws2.col_values(1)[1:] # Skip row 1
+                        full_b64 = "".join(tab2_col_vals)
+                        if full_b64:
+                            ws1.clear()
+                            chunks = [full_b64[i:i+40000] for i in range(0, len(full_b64), 40000)]
+                            clist1 = ws1.range(f'A1:A{len(chunks)}')
+                            for i, cell in enumerate(clist1): cell.value = chunks[i]
+                            ws1.update_cells(clist1)
+                            
+                            # Tab 2 ko aaj ke liye saaf aur tayaar karein
+                            ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
+                            ws2.batch_clear(["A2:A100"])
+            except: pass
+
+            # 🚀 B. LOAD BASELINE FROM TAB 1
+            try:
+                col_vals = ws1.col_values(1)
+                if col_vals:
+                    full_str = "".join(col_vals)
+                    decoded_str = base64.b64decode(full_str).decode('utf-8')
+                    baseline_prices = json.loads(decoded_str)
+            except: pass
+
+            # 🚀 C. LOAD 9:50 AM SNAPSHOT FROM TAB 2 (CELL B1)
+            try:
+                snap_val = ws2.cell(1, 2).value
+                if snap_val:
+                    snap_950 = json.loads(snap_val)
+            except: pass
+        except: pass
+
+    st.session_state.baseline_count = len(baseline_prices)
+    st.session_state.has_snapshot = bool(snap_950)
 
     all_quotes = []
     for i in range(0, len(raw_symbols), 50):
@@ -176,19 +199,22 @@ def run_master_scan(token, date_str):
                         if sym_str not in st.session_state.live_base:
                             st.session_state.live_base[sym_str] = lp_str
 
-                target_time = datetime.time(9, 50)
-                if scan_time_ist.time() < target_time: pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
+                # Vol & PCR Ratio Calculation
+                if scan_time_ist.time() < datetime.time(9, 50):
+                    pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
                     if s_name not in snap_950:
                         snap_950[s_name] = {'pcr': v_pcr, 'vol_cpr': v_cpr}
+                        snapshot_changed = True
                         pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                     else:
                         base = snap_950[s_name]
-                        pcr_abs, vol_abs = v_pcr - base['pcr'], v_cpr - base['vol_cpr']
-                        pcr_pct = ((v_pcr - base['pcr']) / base['pcr']) * 100 if base['pcr'] != 0 else 0.0
-                        vol_pct = ((v_cpr - base['vol_cpr']) / base['vol_cpr']) * 100 if base['vol_cpr'] != 0 else 0.0
+                        pcr_abs = v_pcr - base['pcr']
+                        vol_abs = v_cpr - base['vol_cpr']
+                        pcr_pct = pcr_abs * 100 
+                        vol_pct = vol_abs * 100 
 
-                # 🚀 DEEPAK BHAI'S LOGIC: STRICTLY GOOGLE SHEET EOD BASE (NO API 'ch' JUNK)
+                # 🚀 ACCURATE CE/PE LOGIC: Strictly measures against Yesterday close from Tab 1
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
@@ -196,10 +222,8 @@ def run_master_scan(token, date_str):
                         sym, lp = str(s.get('symbol', '')), float(s.get('ltp', 0))
                         if lp == 0: continue
                         
-                        # Priority 1: EOD Google Sheet Baseline
                         if sym in baseline_prices:
                             diff = lp - baseline_prices[sym]
-                        # Priority 2: Session Fallback (If new strike added today)
                         else:
                             diff = lp - st.session_state.live_base.get(sym, lp)
                             
@@ -223,8 +247,13 @@ def run_master_scan(token, date_str):
             else:
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
-    try: json.dump({"date": date_str, "data": snap_950}, open(SNAPSHOT_FILE, "w"))
-    except: pass
+    # Save Snapshot to Tab 2 Cell B1 if newly generated
+    if snapshot_changed and client:
+        try:
+            ss = client.open("Fyers_EOD_Data")
+            ws2 = ss.worksheet("Sheet2")
+            ws2.update_cell(1, 2, json.dumps(snap_950))
+        except: pass
 
     st.session_state.current_live_data = live_ltp_data
 
@@ -258,62 +287,46 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.header("💾 End Of Day (EOD) Save")
 
-if baseline_prices:
-    st.sidebar.success(f"✅ EOD Sheet Loaded: {len(baseline_prices)} Strikes")
+# Sidebar Live Status Indicators
+b_count = st.session_state.get("baseline_count", 0)
+if b_count > 0:
+    st.sidebar.success(f"✅ Baseline Active: {b_count} Strikes")
 else:
-    st.sidebar.warning("⚠️ EOD Sheet Empty (Using Live Market Data)")
+    st.sidebar.warning("⚠️ Baseline Empty (Comparing to morning open)")
+
+if st.session_state.get("has_snapshot", False):
+    st.sidebar.success("✅ 9:50 AM Snapshot Loaded")
+else:
+    st.sidebar.info("⏳ Waiting for 9:50 AM Snapshot...")
 
 def save_eod_data():
-    if 'current_live_data' not in st.session_state:
-        st.sidebar.error("❌ Save Failed: System mein live data nahi hai!")
-        return False
-        
-    live_data = st.session_state.current_live_data
-    if not live_data:
-        st.sidebar.error("❌ Save Failed: Fyers API se 0 strikes aayi hain!")
-        return False
-
-    try:
-        client = get_gspread_client()
-        if not client:
-            st.sidebar.error("❌ Save Failed: Google Sheets connection error.")
-            return False
-            
-        ss = client.open("Fyers_EOD_Data")
-        
-        # 🚀 Base64 Encoding for 100% Data Safety
-        json_str = json.dumps(live_data)
-        b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
-        chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
-        
-        # UPDATE TAB 1
+    if 'current_live_data' in st.session_state:
         try:
-            ws1 = ss.get_worksheet(0)
-            ws1.clear()
-            clist1 = ws1.range(f'A1:A{len(chunks)}')
-            for i, cell in enumerate(clist1): cell.value = chunks[i]
-            ws1.update_cells(clist1)
-        except Exception as e1:
-            st.sidebar.error(f"❌ Tab 1 Error: {str(e1)}")
-            return False
-            
-        # UPDATE TAB 2
-        try:
-            ws2 = ss.worksheet("Sheet2")
-            ws2.clear()
-            ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
-            clist2 = ws2.range(f'A2:A{len(chunks)+1}')
-            for i, cell in enumerate(clist2): cell.value = chunks[i]
-            ws2.update_cells(clist2)
-            st.sidebar.success("✅ SUCCESS! Tab 1 & Tab 2 dono save ho gaye!")
-            return True
-        except Exception as e2:
-            st.sidebar.warning(f"⚠️ Tab 1 Saved, but Tab 2 failed. Name must be 'Sheet2'.")
-            return True
-            
-    except Exception as e:
-        st.sidebar.error(f"❌ Core Error: {str(e)}")
-        
+            live_data = st.session_state.current_live_data
+            if live_data:
+                client = get_gspread_client()
+                if not client:
+                    st.sidebar.error("❌ Connection Failed!")
+                    return False
+                
+                ss = client.open("Fyers_EOD_Data")
+                ws2 = ss.worksheet("Sheet2")
+                
+                json_str = json.dumps(live_data)
+                b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+                chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
+                
+                # Sheet 2 me Row 2 se chunk save karein (Row 1 me Snapshot aur Date surakshit rahegi)
+                ws2.batch_clear(["A2:A100"])
+                clist2 = ws2.range(f'A2:A{len(chunks)+1}')
+                for i, cell in enumerate(clist2): cell.value = chunks[i]
+                
+                ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
+                ws2.update_cells(clist2)
+                st.sidebar.success("✅ Today's Close Saved to Tab 2!")
+                return True
+        except Exception as e:
+            st.sidebar.error(f"Sheet Error: {e}")
     return False
 
 if st.sidebar.button("Manual Save 3:30 PM Data"):
@@ -472,10 +485,10 @@ if auth_code:
                 except Exception as e:
                     st.error(f"Chart Load Error: {e}")
             else:
-                st.info("⏳ Chart History file is being prepared... Market hours mein data yahan dikhega.")
+                st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
 
     if 'last_api_call' in st.session_state:
-        time_diff = (datetime.datetime.now(IST) - st.session_state.last_api_call).total_seconds()
+        time_diff = (datetime.timedelta(hours=5, minutes=30) - st.session_state.last_api_call).total_seconds()
         if time_diff < 290:
             time.sleep(290 - time_diff)
         else:
