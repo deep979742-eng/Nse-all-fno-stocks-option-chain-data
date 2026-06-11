@@ -115,8 +115,7 @@ def run_master_scan(token, date_str):
                 if tab2_date_row and "LAST_SAVED_DATE:" in tab2_date_row:
                     saved_date = tab2_date_row.replace("LAST_SAVED_DATE:", "").strip()
                     if saved_date and saved_date != date_str:
-                        # Tab 2 ke puraane data ko Tab 1 me shift karein
-                        tab2_col_vals = ws2.col_values(1)[1:] # Skip row 1
+                        tab2_col_vals = ws2.col_values(1)[1:] 
                         full_b64 = "".join(tab2_col_vals)
                         if full_b64:
                             ws1.clear()
@@ -125,7 +124,6 @@ def run_master_scan(token, date_str):
                             for i, cell in enumerate(clist1): cell.value = chunks[i]
                             ws1.update_cells(clist1)
                             
-                            # Tab 2 ko aaj ke liye saaf aur tayaar karein
                             ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
                             ws2.batch_clear(["A2:A100"])
             except: pass
@@ -181,8 +179,8 @@ def run_master_scan(token, date_str):
             s_name = get_raw_symbol(q['n'])
             v = q['v']
             ltp_val = float(v.get('lp', 0))
-            open_p, prev_c = float(v.get('open_price', 0)), float(v.get('prev_close_price', 0))
-            open_status = "NA" if open_p == 0 or prev_c == 0 else "Gap Up 🔼" if open_p > prev_c else "Gap Down 🔽" if open_p < prev_c else "Same ➖"
+            open_p, float_c = float(v.get('open_price', 0)), float(v.get('prev_close_price', 0))
+            open_status = "NA" if open_p == 0 or float_c == 0 else "Gap Up 🔼" if open_p > float_c else "Gap Down 🔽" if open_p < float_c else "Same ➖"
 
             if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
                 chain = oc['data']['optionsChain']
@@ -199,7 +197,7 @@ def run_master_scan(token, date_str):
                         if sym_str not in st.session_state.live_base:
                             st.session_state.live_base[sym_str] = lp_str
 
-                # Vol & PCR Ratio Calculation
+                # 🚀 FINAL FIX: SLN ACADEMY RATIO MATH (ABSOLUTE POINT CHANGE * 100)
                 if scan_time_ist.time() < datetime.time(9, 50):
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
@@ -211,10 +209,10 @@ def run_master_scan(token, date_str):
                         base = snap_950[s_name]
                         pcr_abs = v_pcr - base['pcr']
                         vol_abs = v_cpr - base['vol_cpr']
+                        # SLN Style: Direct point shift multiplied by 100
                         pcr_pct = pcr_abs * 100 
                         vol_pct = vol_abs * 100 
 
-                # 🚀 ACCURATE CE/PE LOGIC: Strictly measures against Yesterday close from Tab 1
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
@@ -247,7 +245,6 @@ def run_master_scan(token, date_str):
             else:
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
-    # Save Snapshot to Tab 2 Cell B1 if newly generated
     if snapshot_changed and client:
         try:
             ss = client.open("Fyers_EOD_Data")
@@ -287,7 +284,6 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.header("💾 End Of Day (EOD) Save")
 
-# Sidebar Live Status Indicators
 b_count = st.session_state.get("baseline_count", 0)
 if b_count > 0:
     st.sidebar.success(f"✅ Baseline Active: {b_count} Strikes")
@@ -316,7 +312,6 @@ def save_eod_data():
                 b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
                 chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
                 
-                # Sheet 2 me Row 2 se chunk save karein (Row 1 me Snapshot aur Date surakshit rahegi)
                 ws2.batch_clear(["A2:A100"])
                 clist2 = ws2.range(f'A2:A{len(chunks)+1}')
                 for i, cell in enumerate(clist2): cell.value = chunks[i]
@@ -488,7 +483,7 @@ if auth_code:
                 st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
 
     if 'last_api_call' in st.session_state:
-        time_diff = (datetime.timedelta(hours=5, minutes=30) - st.session_state.last_api_call).total_seconds()
+        time_diff = (datetime.datetime.now(IST) - st.session_state.last_api_call).total_seconds()
         if time_diff < 290:
             time.sleep(290 - time_diff)
         else:
