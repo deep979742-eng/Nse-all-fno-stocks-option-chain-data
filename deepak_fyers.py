@@ -4,6 +4,7 @@ import datetime
 import time
 import os
 import json
+import base64
 from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
@@ -54,7 +55,7 @@ def get_gspread_client():
         print(e)
     return None
 
-# Load EOD Base directly before scanning (Joining Chunks if any)
+# Load EOD Base directly from Sheet Tab 1
 baseline_prices = {}
 try:
     client = get_gspread_client()
@@ -64,8 +65,13 @@ try:
         col_vals = ws1.col_values(1)
         if col_vals:
             full_str = "".join(col_vals)
-            if full_str: 
-                baseline_prices = json.loads(full_str)
+            if full_str:
+                try:
+                    decoded_str = base64.b64decode(full_str).decode('utf-8')
+                    baseline_prices = json.loads(decoded_str)
+                except:
+                    try: baseline_prices = json.loads(full_str)
+                    except: pass
 except: pass
 
 # ==========================================
@@ -182,6 +188,7 @@ def run_master_scan(token, date_str):
                         pcr_pct = ((v_pcr - base['pcr']) / base['pcr']) * 100 if base['pcr'] != 0 else 0.0
                         vol_pct = ((v_cpr - base['vol_cpr']) / base['vol_cpr']) * 100 if base['vol_cpr'] != 0 else 0.0
 
+                # 🚀 DEEPAK BHAI'S LOGIC: STRICTLY GOOGLE SHEET EOD BASE (NO API 'ch' JUNK)
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
@@ -189,12 +196,13 @@ def run_master_scan(token, date_str):
                         sym, lp = str(s.get('symbol', '')), float(s.get('ltp', 0))
                         if lp == 0: continue
                         
+                        # Priority 1: EOD Google Sheet Baseline
                         if sym in baseline_prices:
-                            base_p = baseline_prices[sym]
+                            diff = lp - baseline_prices[sym]
+                        # Priority 2: Session Fallback (If new strike added today)
                         else:
-                            base_p = st.session_state.live_base.get(sym, lp)
+                            diff = lp - st.session_state.live_base.get(sym, lp)
                             
-                        diff = lp - base_p
                         if diff > 0: tot_p += 1 
                         elif diff < 0: tot_m += 1 
 
@@ -228,7 +236,7 @@ def run_master_scan(token, date_str):
     return final_list, scan_time_ist.timestamp()
 
 # ==========================================
-# 5. SIDEBAR LOGIN & EOD SAVE (WITH ERROR TRACKING)
+# 5. SIDEBAR LOGIN & EOD SAVE
 # ==========================================
 st.sidebar.header("🔑 Fyers Quick Login")
 
@@ -250,27 +258,33 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.header("💾 End Of Day (EOD) Save")
 
+if baseline_prices:
+    st.sidebar.success(f"✅ EOD Sheet Loaded: {len(baseline_prices)} Strikes")
+else:
+    st.sidebar.warning("⚠️ EOD Sheet Empty (Using Live Market Data)")
+
 def save_eod_data():
-    # ERROR TRACKING 1: Data Check
     if 'current_live_data' not in st.session_state:
-        st.sidebar.error("❌ Save Failed: System mein live data nahi hai! Dashboard load hone dein.")
+        st.sidebar.error("❌ Save Failed: System mein live data nahi hai!")
         return False
         
     live_data = st.session_state.current_live_data
     if not live_data:
-        st.sidebar.error("❌ Save Failed: Fyers API se 0 strikes ka data aaya hai!")
+        st.sidebar.error("❌ Save Failed: Fyers API se 0 strikes aayi hain!")
         return False
 
     try:
         client = get_gspread_client()
         if not client:
-            st.sidebar.error("❌ Save Failed: Google Sheets se connection nahi ho pa raha (API Key error).")
+            st.sidebar.error("❌ Save Failed: Google Sheets connection error.")
             return False
             
         ss = client.open("Fyers_EOD_Data")
         
+        # 🚀 Base64 Encoding for 100% Data Safety
         json_str = json.dumps(live_data)
-        chunks = [json_str[i:i+40000] for i in range(0, len(json_str), 40000)]
+        b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+        chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
         
         # UPDATE TAB 1
         try:
@@ -280,12 +294,12 @@ def save_eod_data():
             for i, cell in enumerate(clist1): cell.value = chunks[i]
             ws1.update_cells(clist1)
         except Exception as e1:
-            st.sidebar.error(f"❌ Tab 1 Save Error: {str(e1)}")
+            st.sidebar.error(f"❌ Tab 1 Error: {str(e1)}")
             return False
             
         # UPDATE TAB 2
         try:
-            ws2 = ss.worksheet("Sheet2") # Strictly looking for name 'Sheet2'
+            ws2 = ss.worksheet("Sheet2")
             ws2.clear()
             ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
             clist2 = ws2.range(f'A2:A{len(chunks)+1}')
@@ -294,11 +308,11 @@ def save_eod_data():
             st.sidebar.success("✅ SUCCESS! Tab 1 & Tab 2 dono save ho gaye!")
             return True
         except Exception as e2:
-            st.sidebar.warning(f"⚠️ Tab 1 Save ho gaya, par Tab 2 fail hua. Error: {str(e2)}. Google Sheet me tab ka naam 'Sheet2' hona chahiye.")
+            st.sidebar.warning(f"⚠️ Tab 1 Saved, but Tab 2 failed. Name must be 'Sheet2'.")
             return True
             
     except Exception as e:
-        st.sidebar.error(f"❌ Core Save Error: {str(e)}")
+        st.sidebar.error(f"❌ Core Error: {str(e)}")
         
     return False
 
@@ -458,7 +472,7 @@ if auth_code:
                 except Exception as e:
                     st.error(f"Chart Load Error: {e}")
             else:
-                st.info("⏳ Chart History file is being prepared... Data will appear during market hours (9:15 AM - 3:30 PM).")
+                st.info("⏳ Chart History file is being prepared... Market hours mein data yahan dikhega.")
 
     if 'last_api_call' in st.session_state:
         time_diff = (datetime.datetime.now(IST) - st.session_state.last_api_call).total_seconds()
