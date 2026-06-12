@@ -22,8 +22,8 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# CSS - SAFE ONE LINE
-css_str = "<style>[data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } [data-testid='stDataFrameTable'] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; } th { background-color: darkblue !important; color: white !important; } * { cursor: default !important; }</style>"
+# CSS - FULLY MOBILE RESPONSIVE
+css_str = "<style>[data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } [data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } [data-testid='stDataFrameTable'] > thead > tr > th { background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; } th { background-color: darkblue !important; color: white !important; } * { cursor: default !important; } @media (max-width: 768px) { .block-container { padding-top: 1rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } [data-testid='stDataFrameTable'] th, [data-testid='stDataFrameTable'] td { font-size: 10px !important; padding: 4px 2px !important; } }</style>"
 st.markdown(css_str, unsafe_allow_html=True)
 
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
@@ -197,7 +197,7 @@ def run_master_scan(token, date_str):
                         if sym_str not in st.session_state.live_base:
                             st.session_state.live_base[sym_str] = lp_str
 
-                # 🚀 FINAL FIX: SLN ACADEMY RATIO MATH (ABSOLUTE POINT CHANGE * 100)
+                # 🚀 DEEPAK BHAI'S SLN RATIO FORMULA UPDATE 🚀
                 if scan_time_ist.time() < datetime.time(9, 50):
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
