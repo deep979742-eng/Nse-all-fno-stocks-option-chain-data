@@ -22,7 +22,7 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# CSS - FULLY MOBILE RESPONSIVE & VERTICAL HEADERS
+# CSS - FULLY MOBILE RESPONSIVE & ALL VERTICAL HEADERS
 css_str = """<style>
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
@@ -30,7 +30,7 @@ css_str = """<style>
 .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
-/* Make All Headers Vertical to Save Space */
+/* ALL Headers Vertical (Including SYMBOL) to Save Maximum Space */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
     background-color: darkblue !important; 
     color: white !important; 
@@ -42,15 +42,6 @@ css_str = """<style>
     padding: 8px 4px !important;
     height: 120px !important;
 } 
-
-/* Keep the FIRST column (SYMBOL) normal and horizontal */
-[data-testid='stDataFrameTable'] > thead > tr > th:nth-child(1) { 
-    writing-mode: horizontal-tb !important; 
-    transform: none !important; 
-    height: auto !important; 
-    vertical-align: bottom !important;
-    padding-bottom: 10px !important;
-}
 
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
@@ -128,7 +119,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. MASTER SCANNER (100% STRIKE COVERAGE & PRECISION LOCK)
+# 4. MASTER SCANNER (WITH AUTO-ROLLOVER)
 # ==========================================
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
@@ -144,8 +135,8 @@ def run_master_scan(token, date_str):
     if client:
         try:
             ss = client.open("Fyers_EOD_Data")
-            ws1 = ss.get_worksheet(0) 
-            ws2 = ss.worksheet("Sheet2") 
+            ws1 = ss.get_worksheet(0) # Tab 1 (Yesterday Baseline)
+            ws2 = ss.worksheet("Sheet2") # Tab 2 (Today Close/Snapshot)
             
             # 🚀 A. NEXT MORNING AUTO-ROLLOVER LOGIC
             try:
@@ -172,16 +163,14 @@ def run_master_scan(token, date_str):
                 if col_vals:
                     full_str = "".join(col_vals)
                     decoded_str = base64.b64decode(full_str).decode('utf-8')
-                    # Pre-lock baseline values to 2 decimals
-                    loaded_prices = json.loads(decoded_str)
-                    for k, v in loaded_prices.items():
-                        baseline_prices[k] = round(float(v), 2)
+                    baseline_prices = json.loads(decoded_str)
             except: pass
 
-            # 🚀 C. LOAD 9:50 AM SNAPSHOT
+            # 🚀 C. LOAD 9:50 AM SNAPSHOT FROM TAB 2 (CELL B1)
             try:
                 snap_val = ws2.cell(1, 2).value
-                if snap_val: snap_950 = json.loads(snap_val)
+                if snap_val:
+                    snap_950 = json.loads(snap_val)
             except: pass
         except: pass
 
@@ -218,7 +207,7 @@ def run_master_scan(token, date_str):
         for q, oc in results:
             s_name = get_raw_symbol(q['n'])
             v = q['v']
-            spot_ltp = float(v.get('lp', 0)) 
+            ltp_val = float(v.get('lp', 0))
             open_p, float_c = float(v.get('open_price', 0)), float(v.get('prev_close_price', 0))
             open_status = "NA" if open_p == 0 or float_c == 0 else "Gap Up 🔼" if open_p > float_c else "Gap Down 🔽" if open_p < float_c else "Same ➖"
 
@@ -231,9 +220,13 @@ def run_master_scan(token, date_str):
                 o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
                 
                 for s in chain:
-                    sym_str, lp_str = str(s.get('symbol', '')), round(float(s.get('ltp', 0)), 2)
-                    if lp_str > 0: live_ltp_data[sym_str] = lp_str
+                    sym_str, lp_str = str(s.get('symbol', '')), float(s.get('ltp', 0))
+                    if lp_str > 0:
+                        live_ltp_data[sym_str] = lp_str
+                        if sym_str not in st.session_state.live_base:
+                            st.session_state.live_base[sym_str] = lp_str
 
+                # 🚀 DEEPAK BHAI'S SLN RATIO FORMULA UPDATE 🚀
                 if scan_time_ist.time() < datetime.time(9, 50):
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
@@ -245,30 +238,24 @@ def run_master_scan(token, date_str):
                         base = snap_950[s_name]
                         pcr_abs = v_pcr - base['pcr']
                         vol_abs = v_cpr - base['vol_cpr']
+                        # SLN Style: Direct point shift multiplied by 100
                         pcr_pct = pcr_abs * 100 
                         vol_pct = vol_abs * 100 
 
-                # 🚀 FINAL ACCURACY LOGIC: 100% Strike Scan with Strict Precision Lock
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
                     for s in strikes:
-                        sym = str(s.get('symbol', ''))
-                        # Lock Live LTP to 2 decimals
-                        lp = round(float(s.get('ltp', 0)), 2) 
+                        sym, lp = str(s.get('symbol', '')), float(s.get('ltp', 0))
+                        if lp == 0: continue
                         
-                        # FILTER 1: Reject strictly dead strikes
-                        if lp == 0 or sym not in baseline_prices: 
-                            continue
+                        if sym in baseline_prices:
+                            diff = lp - baseline_prices[sym]
+                        else:
+                            diff = lp - st.session_state.live_base.get(sym, lp)
                             
-                        # Pure Math: Live Price - Sheet Price
-                        base_p = baseline_prices[sym]
-                        diff = round(lp - base_p, 2)
-                        
-                        # 🚀 THE MAGIC BULLET: Only count if the price ACTUALLY moved (> 0.00)
-                        if diff > 0.00: tot_p += 1 
-                        elif diff < 0.00: tot_m += 1 
-                        # If diff is exactly 0.00, it's ignored! (Removes all illiquid garbage)
+                        if diff > 0: tot_p += 1 
+                        elif diff < 0: tot_m += 1 
 
                     act = tot_p + tot_m
                     if act == 0: return 0.0
@@ -276,16 +263,16 @@ def run_master_scan(token, date_str):
                 
                 final_list.append({
                     'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
-                    'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp,
+                    'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val,
                     'VOL_ABS': round(vol_abs, 2), 'PCR_ABS': round(pcr_abs, 2), 
                     'VOL_PCT': round(vol_pct, 1), 'PCR_PCT': round(pcr_pct, 1),
                     'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
                 })
 
                 if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
-                    new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': spot_ltp, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
+                    new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
             else:
-                final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
+                final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
     if snapshot_changed and client:
         try:
@@ -330,7 +317,7 @@ b_count = st.session_state.get("baseline_count", 0)
 if b_count > 0:
     st.sidebar.success(f"✅ Baseline Active: {b_count} Strikes")
 else:
-    st.sidebar.warning("⚠️ Baseline Empty (CE/PE will be 0 today)")
+    st.sidebar.warning("⚠️ Baseline Empty (Comparing to morning open)")
 
 if st.session_state.get("has_snapshot", False):
     st.sidebar.success("✅ 9:50 AM Snapshot Loaded")
@@ -350,10 +337,7 @@ def save_eod_data():
                 ss = client.open("Fyers_EOD_Data")
                 ws2 = ss.worksheet("Sheet2")
                 
-                # Pre-lock data to 2 decimals before saving
-                locked_live_data = {k: round(float(v), 2) for k, v in live_data.items()}
-                
-                json_str = json.dumps(locked_live_data)
+                json_str = json.dumps(live_data)
                 b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
                 chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
                 
