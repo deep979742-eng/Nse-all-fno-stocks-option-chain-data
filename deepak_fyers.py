@@ -30,7 +30,7 @@ css_str = """<style>
 .block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
-/* ALL Headers Vertical (Including SYMBOL) to Save Maximum Space */
+/* ALL Headers Vertical (Including SYMBOL) to Save Maximum Space on Mobile */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
     background-color: darkblue !important; 
     color: white !important; 
@@ -119,7 +119,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. MASTER SCANNER (WITH AUTO-ROLLOVER)
+# 4. MASTER SCANNER (WITH AUTO-ROLLOVER & SLN FORMULA)
 # ==========================================
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
@@ -135,10 +135,9 @@ def run_master_scan(token, date_str):
     if client:
         try:
             ss = client.open("Fyers_EOD_Data")
-            ws1 = ss.get_worksheet(0) # Tab 1 (Yesterday Baseline)
-            ws2 = ss.worksheet("Sheet2") # Tab 2 (Today Close/Snapshot)
+            ws1 = ss.get_worksheet(0) 
+            ws2 = ss.worksheet("Sheet2") 
             
-            # 🚀 A. NEXT MORNING AUTO-ROLLOVER LOGIC
             try:
                 tab2_date_row = ws2.cell(1, 1).value
                 if tab2_date_row and "LAST_SAVED_DATE:" in tab2_date_row:
@@ -157,20 +156,19 @@ def run_master_scan(token, date_str):
                             ws2.batch_clear(["A2:A100"])
             except: pass
 
-            # 🚀 B. LOAD BASELINE FROM TAB 1
             try:
                 col_vals = ws1.col_values(1)
                 if col_vals:
                     full_str = "".join(col_vals)
                     decoded_str = base64.b64decode(full_str).decode('utf-8')
-                    baseline_prices = json.loads(decoded_str)
+                    loaded_prices = json.loads(decoded_str)
+                    for k, v in loaded_prices.items():
+                        baseline_prices[k] = round(float(v), 2)
             except: pass
 
-            # 🚀 C. LOAD 9:50 AM SNAPSHOT FROM TAB 2 (CELL B1)
             try:
                 snap_val = ws2.cell(1, 2).value
-                if snap_val:
-                    snap_950 = json.loads(snap_val)
+                if snap_val: snap_950 = json.loads(snap_val)
             except: pass
         except: pass
 
@@ -207,7 +205,7 @@ def run_master_scan(token, date_str):
         for q, oc in results:
             s_name = get_raw_symbol(q['n'])
             v = q['v']
-            ltp_val = float(v.get('lp', 0))
+            spot_ltp = float(v.get('lp', 0)) 
             open_p, float_c = float(v.get('open_price', 0)), float(v.get('prev_close_price', 0))
             open_status = "NA" if open_p == 0 or float_c == 0 else "Gap Up 🔼" if open_p > float_c else "Gap Down 🔽" if open_p < float_c else "Same ➖"
 
@@ -220,13 +218,10 @@ def run_master_scan(token, date_str):
                 o_pcr, v_cpr, v_pcr = calc_opt_pcr(c_oi, p_oi), calc_vol_cpr(c_v, p_v), calc_vol_pcr(c_v, p_v)
                 
                 for s in chain:
-                    sym_str, lp_str = str(s.get('symbol', '')), float(s.get('ltp', 0))
-                    if lp_str > 0:
-                        live_ltp_data[sym_str] = lp_str
-                        if sym_str not in st.session_state.live_base:
-                            st.session_state.live_base[sym_str] = lp_str
+                    sym_str, lp_str = str(s.get('symbol', '')), round(float(s.get('ltp', 0)), 2)
+                    if lp_str > 0: live_ltp_data[sym_str] = lp_str
 
-                # 🚀 DEEPAK BHAI'S SLN RATIO FORMULA UPDATE 🚀
+                # 🚀 DEEPAK BHAI'S SLN ACADEMY PERCENTAGE FORMULA 🚀
                 if scan_time_ist.time() < datetime.time(9, 50):
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
@@ -238,24 +233,28 @@ def run_master_scan(token, date_str):
                         base = snap_950[s_name]
                         pcr_abs = v_pcr - base['pcr']
                         vol_abs = v_cpr - base['vol_cpr']
-                        # SLN Style: Direct point shift multiplied by 100
-                        pcr_pct = pcr_abs * 100 
-                        vol_pct = vol_abs * 100 
+                        
+                        # SLN Style: Convert Ratio to Bounded Percentage (0 to 100) then find difference
+                        def ratio_to_pct(r): return (r / (r + 1.0)) * 100.0 if r > 0 else 0.0
+                        
+                        pcr_pct = ratio_to_pct(v_pcr) - ratio_to_pct(base['pcr'])
+                        vol_pct = ratio_to_pct(v_cpr) - ratio_to_pct(base['vol_cpr'])
 
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
                     for s in strikes:
-                        sym, lp = str(s.get('symbol', '')), float(s.get('ltp', 0))
-                        if lp == 0: continue
+                        sym = str(s.get('symbol', ''))
+                        lp = round(float(s.get('ltp', 0)), 2) 
                         
-                        if sym in baseline_prices:
-                            diff = lp - baseline_prices[sym]
-                        else:
-                            diff = lp - st.session_state.live_base.get(sym, lp)
+                        if lp == 0 or sym not in baseline_prices: 
+                            continue
                             
-                        if diff > 0: tot_p += 1 
-                        elif diff < 0: tot_m += 1 
+                        base_p = baseline_prices[sym]
+                        diff = round(lp - base_p, 2)
+                        
+                        if diff > 0.00: tot_p += 1 
+                        elif diff < 0.00: tot_m += 1 
 
                     act = tot_p + tot_m
                     if act == 0: return 0.0
@@ -263,16 +262,16 @@ def run_master_scan(token, date_str):
                 
                 final_list.append({
                     'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
-                    'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val,
+                    'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp,
                     'VOL_ABS': round(vol_abs, 2), 'PCR_ABS': round(pcr_abs, 2), 
                     'VOL_PCT': round(vol_pct, 1), 'PCR_PCT': round(pcr_pct, 1),
                     'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
                 })
 
                 if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
-                    new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': ltp_val, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
+                    new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': spot_ltp, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
             else:
-                final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': ltp_val, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
+                final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
     if snapshot_changed and client:
         try:
@@ -317,7 +316,7 @@ b_count = st.session_state.get("baseline_count", 0)
 if b_count > 0:
     st.sidebar.success(f"✅ Baseline Active: {b_count} Strikes")
 else:
-    st.sidebar.warning("⚠️ Baseline Empty (Comparing to morning open)")
+    st.sidebar.warning("⚠️ Baseline Empty (CE/PE will be 0 today)")
 
 if st.session_state.get("has_snapshot", False):
     st.sidebar.success("✅ 9:50 AM Snapshot Loaded")
@@ -337,7 +336,9 @@ def save_eod_data():
                 ss = client.open("Fyers_EOD_Data")
                 ws2 = ss.worksheet("Sheet2")
                 
-                json_str = json.dumps(live_data)
+                locked_live_data = {k: round(float(v), 2) for k, v in live_data.items()}
+                
+                json_str = json.dumps(locked_live_data)
                 b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
                 chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
                 
@@ -511,12 +512,19 @@ if auth_code:
             else:
                 st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
 
-    if 'last_api_call' in st.session_state:
-        time_diff = (datetime.datetime.now(IST) - st.session_state.last_api_call).total_seconds()
-        if time_diff < 290:
-            time.sleep(290 - time_diff)
-        else:
-            time.sleep(60) 
-        st.rerun()
+    # 🚀 2. FIXED CLOCK BOUNDARY AUTO-UPDATE LOOP (9:15, 9:20, 9:25...)
+    now_refresh = datetime.datetime.now(IST)
+    current_min = now_refresh.minute
+    current_sec = now_refresh.second
+
+    next_mult_5 = ((current_min // 5) + 1) * 5
+    mins_wait = next_mult_5 - current_min
+    secs_wait = (mins_wait * 60) - current_sec + 5
+
+    if secs_wait <= 0 or secs_wait > 305:
+        secs_wait = 300
+
+    time.sleep(secs_wait)
+    st.rerun()
 else:
     st.info("👈 Please enter Auth Code in sidebar.")
