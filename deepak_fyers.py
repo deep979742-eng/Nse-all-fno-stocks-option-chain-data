@@ -138,6 +138,7 @@ def run_master_scan(token, date_str):
             ws1 = ss.get_worksheet(0) 
             ws2 = ss.worksheet("Sheet2") 
             
+            # 🚀 A. NEXT MORNING AUTO-ROLLOVER LOGIC
             try:
                 tab2_date_row = ws2.cell(1, 1).value
                 if tab2_date_row and "LAST_SAVED_DATE:" in tab2_date_row:
@@ -156,6 +157,7 @@ def run_master_scan(token, date_str):
                             ws2.batch_clear(["A2:A100"])
             except: pass
 
+            # 🚀 B. LOAD BASELINE FROM TAB 1
             try:
                 col_vals = ws1.col_values(1)
                 if col_vals:
@@ -166,6 +168,7 @@ def run_master_scan(token, date_str):
                         baseline_prices[k] = round(float(v), 2)
             except: pass
 
+            # 🚀 C. LOAD 9:50 AM SNAPSHOT
             try:
                 snap_val = ws2.cell(1, 2).value
                 if snap_val: snap_950 = json.loads(snap_val)
@@ -234,12 +237,12 @@ def run_master_scan(token, date_str):
                         pcr_abs = v_pcr - base['pcr']
                         vol_abs = v_cpr - base['vol_cpr']
                         
-                        # SLN Style: Convert Ratio to Bounded Percentage (0 to 100) then find difference
                         def ratio_to_pct(r): return (r / (r + 1.0)) * 100.0 if r > 0 else 0.0
                         
                         pcr_pct = ratio_to_pct(v_pcr) - ratio_to_pct(base['pcr'])
                         vol_pct = ratio_to_pct(v_cpr) - ratio_to_pct(base['vol_cpr'])
 
+                # 🚀 ACCURATE CE/PE LOGIC: Scan 100% Strikes & Lock 2 Decimals (No Filters)
                 def get_conv(opt_type):
                     strikes = [s for s in chain if s.get('option_type') == opt_type.upper() or str(s.get('symbol', '')).endswith(opt_type.upper())]
                     tot_p, tot_m = 0, 0
@@ -280,7 +283,7 @@ def run_master_scan(token, date_str):
             ws2.update_cell(1, 2, json.dumps(snap_950))
         except: pass
 
-    st.session_state.current_live_data = live_ltp_data
+    st.session_state.get_live_dump = live_ltp_data
 
     if new_csv_rows:
         new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
@@ -312,32 +315,18 @@ else:
 st.sidebar.markdown("---")
 st.sidebar.header("💾 End Of Day (EOD) Save")
 
-b_count = st.session_state.get("baseline_count", 0)
-if b_count > 0:
-    st.sidebar.success(f"✅ Baseline Active: {b_count} Strikes")
-else:
-    st.sidebar.warning("⚠️ Baseline Empty (CE/PE will be 0 today)")
-
-if st.session_state.get("has_snapshot", False):
-    st.sidebar.success("✅ 9:50 AM Snapshot Loaded")
-else:
-    st.sidebar.info("⏳ Waiting for 9:50 AM Snapshot...")
-
 def save_eod_data():
-    if 'current_live_data' in st.session_state:
+    if 'get_live_dump' in st.session_state:
         try:
-            live_data = st.session_state.current_live_data
+            live_data = st.session_state.get_live_dump
             if live_data:
                 client = get_gspread_client()
-                if not client:
-                    st.sidebar.error("❌ Connection Failed!")
-                    return False
+                if not client: return False
                 
                 ss = client.open("Fyers_EOD_Data")
                 ws2 = ss.worksheet("Sheet2")
                 
                 locked_live_data = {k: round(float(v), 2) for k, v in live_data.items()}
-                
                 json_str = json.dumps(locked_live_data)
                 b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
                 chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
@@ -348,14 +337,12 @@ def save_eod_data():
                 
                 ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
                 ws2.update_cells(clist2)
-                st.sidebar.success("✅ Today's Close Saved to Tab 2!")
                 return True
-        except Exception as e:
-            st.sidebar.error(f"Sheet Error: {e}")
+        except: pass
     return False
 
-if st.sidebar.button("Manual Save 3:30 PM Data"):
-    save_eod_data()
+if st.sidebar.button("Manual Save Data"):
+    if save_eod_data(): st.sidebar.success("Sheet Saved Successfully!")
 
 # ==========================================
 # 6. APP RENDERING & MAGIC VIEWER
@@ -376,7 +363,9 @@ if auth_code:
         st.session_state.cached_data = cached_result
         st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
         
-        if now_ist.time() >= datetime.time(15, 30):
+        # 🚀 DEEPAK BHAI'S 8:00 AM TO 9:15 AM AUTO-LOCK BRAHMASTRA 🚀
+        # Records official adjusted NSE Bhavcopy from server before market opens
+        if datetime.time(8, 0) <= now_ist.time() < datetime.time(9, 15):
             last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
             if last_save != today_str:
                 if save_eod_data(): open(AUTO_SAVE_FILE, "w").write(today_str)
