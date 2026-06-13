@@ -28,8 +28,8 @@ css_str = """<style>
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } 
 
-/* 🚀 DESKTOP SCREEN SETTING (No Scroll) - Top padding ekdum kam kar di hai */
-.block-container { padding-top: 1rem !important; padding-bottom: 0.5rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
+/* 🚀 DESKTOP SCREEN SETTING - Tabs clear dikhne ke liye padding-top 3.5rem hai, aur scroll rokne ke liye bottom 0 hai */
+.block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
 /* ALL Headers Vertical (Including SYMBOL) to Save Maximum Space on Mobile */
@@ -48,7 +48,7 @@ css_str = """<style>
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
 
-/* 🚀 MOBILE SCREEN SETTING - Mobile par tabs hide na ho isliye padding-top 4rem hai */
+/* 🚀 MOBILE SCREEN SETTING */
 @media (max-width: 768px) { 
     .block-container { padding-top: 4rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
     [data-testid='stDataFrameTable'] th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
@@ -459,7 +459,7 @@ if auth_code:
                 st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
         with tab2:
-            st.markdown("### 📈 TREND CHART") # SIR hata diya gaya hai
+            st.markdown("### 📈 TREND CHART") 
             col_c1, col_c2 = st.columns([2, 2])
             with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
             with col_c2: 
@@ -496,12 +496,11 @@ if auth_code:
                             dynamic_start_time = max(actual_first_data_time, market_open_time)
                             fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
 
-                            # 🚀 Chart ki height kam ki hai aur default whitespaces hata diye hain
                             fig.update_layout(
                                 template="plotly_white", 
                                 hovermode="x unified",
-                                height=380, # Chart ki height aur choti kar di 
-                                margin=dict(l=10, r=10, t=40, b=10), # Faltu margin hata diya gaya hai
+                                height=380, 
+                                margin=dict(l=10, r=10, t=40, b=10), 
                                 plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF", 
                                 xaxis=dict(
                                     rangeslider=dict(visible=False), 
