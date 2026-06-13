@@ -27,7 +27,6 @@ css_str = """<style>
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } 
-/* Desktop aur Mobile dono ke liye top padding thodi badha di hai taaki tabs header ke peeche na chupein */
 .block-container { padding-top: 4rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
@@ -49,7 +48,6 @@ th { background-color: darkblue !important; color: white !important; }
 
 /* Extreme Mobile Optimization */
 @media (max-width: 768px) { 
-    /* Yahan padding-top 4rem rakhi hai taaki phone screen par menu aur tabs overlap na karein */
     .block-container { padding-top: 4rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
     [data-testid='stDataFrameTable'] th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
     [data-testid='stDataFrameTable'] td { font-size: 10px !important; padding: 4px 2px !important; } 
@@ -85,7 +83,7 @@ def get_gspread_client():
     return None
 
 # ==========================================
-# 3. STOCK LIST
+# 3. STOCK LIST & HELPER FUNCTIONS
 # ==========================================
 raw_symbols = [
     "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
@@ -120,6 +118,26 @@ def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
+# 🚀 GENERIC STRIKE MATCHER (Expiry Mismatch Fix) 🚀
+def get_generic_key(sym):
+    try:
+        if ":" in sym:
+            base_sym = sym.split(":")[1]
+            if base_sym.endswith("CE") or base_sym.endswith("PE"):
+                opt_type = base_sym[-2:]
+                alpha_part = ""
+                for char in base_sym:
+                    if char.isalpha(): alpha_part += char
+                    else: break
+                strike_part = ""
+                for char in reversed(base_sym[:-2]):
+                    if char.isdigit() or char == '.': strike_part = char + strike_part
+                    else: break
+                if alpha_part and strike_part:
+                    return f"{alpha_part}_{strike_part}{opt_type}"
+    except: pass
+    return None
+
 # ==========================================
 # 4. MASTER SCANNER (WITH AUTO-ROLLOVER & SLN FORMULA)
 # ==========================================
@@ -130,6 +148,7 @@ def run_master_scan(token, date_str):
     time_str = scan_time_ist.strftime('%H:%M')
     
     baseline_prices = {}
+    baseline_generic = {} # Naya system Fyers ki change value na aane par
     snap_950 = {}
     snapshot_changed = False
     
@@ -140,7 +159,6 @@ def run_master_scan(token, date_str):
             ws1 = ss.get_worksheet(0) 
             ws2 = ss.worksheet("Sheet2") 
             
-            # A. NEXT MORNING AUTO-ROLLOVER LOGIC
             try:
                 tab2_date_row = ws2.cell(1, 1).value
                 if tab2_date_row and "LAST_SAVED_DATE:" in tab2_date_row:
@@ -159,7 +177,6 @@ def run_master_scan(token, date_str):
                             ws2.batch_clear(["A2:A100"])
             except: pass
 
-            # B. LOAD BASELINE FROM TAB 1
             try:
                 col_vals = ws1.col_values(1)
                 if col_vals:
@@ -168,9 +185,12 @@ def run_master_scan(token, date_str):
                     loaded_prices = json.loads(decoded_str)
                     for k, v in loaded_prices.items():
                         baseline_prices[k] = round(float(v), 2)
+                        # Create generic keys (e.g. NIFTY_24600CE) for Expiry fallback
+                        gen_key = get_generic_key(k)
+                        if gen_key:
+                            baseline_generic[gen_key] = round(float(v), 2)
             except: pass
 
-            # C. LOAD 9:50 AM SNAPSHOT
             try:
                 snap_val = ws2.cell(1, 2).value
                 if snap_val: snap_950 = json.loads(snap_val)
@@ -231,7 +251,6 @@ def run_master_scan(token, date_str):
                         p_oi += float(s.get('oi', 0))
                         p_v += float(s.get('volume', 0))
                         
-                    # Live LTP Recording
                     lp_str = round(float(s.get('ltp', 0)), 2)
                     if lp_str > 0: 
                         live_ltp_data[sym_str] = lp_str
@@ -240,7 +259,7 @@ def run_master_scan(token, date_str):
                 v_cpr = calc_vol_cpr(c_v, p_v)
                 v_pcr = calc_vol_pcr(c_v, p_v)
 
-                # DEEPAK BHAI'S SLN ACADEMY PERCENTAGE FORMULA
+                # 🚀 SLN 9:50 AM CHECKER FORMULA 🚀
                 if scan_time_ist.time() < datetime.time(9, 50):
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
@@ -258,20 +277,26 @@ def run_master_scan(token, date_str):
                         pcr_pct = ratio_to_pct(v_pcr) - ratio_to_pct(base['pcr'])
                         vol_pct = ratio_to_pct(v_cpr) - ratio_to_pct(base['vol_cpr'])
 
-                # ACCURATE CE/PE LOGIC
+                # 🚀 GOOGLE SHEET DEPENDENT CE/PE LOGIC (WITHOUT FYERS 'ch') 🚀
                 def get_conv(opt_type_val):
                     strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
                     tot_p, tot_m = 0, 0
                     for stk in strikes:
                         sym = str(stk.get('symbol', ''))
-                        lp = round(float(stk.get('ltp', 0)), 2) 
+                        lp = round(float(stk.get('ltp', 0)), 2)
+                        if lp == 0: continue
                         
-                        if lp == 0 or sym not in baseline_prices: 
-                            continue
-                            
-                        base_p = baseline_prices[sym]
-                        diff = round(lp - base_p, 2)
+                        diff = 0.0
                         
+                        # 1. Try Exact match from Google Sheet (Works 90% of the time)
+                        if sym in baseline_prices:
+                            diff = round(lp - baseline_prices[sym], 2)
+                        else:
+                            # 2. Try Generic Match (Works on Expiry Rollover days)
+                            gen_key = get_generic_key(sym)
+                            if gen_key and gen_key in baseline_generic:
+                                diff = round(lp - baseline_generic[gen_key], 2)
+                                
                         if diff > 0.00: tot_p += 1 
                         elif diff < 0.00: tot_m += 1 
 
@@ -410,11 +435,10 @@ if auth_code:
             {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
         ]
 
-        # 🚀 ONLY 2 TABS NOW 🚀
+        # TABS SETUP
         tab1, tab2 = st.tabs(["📊 Dashboard", "📈 TREND CHART"])
         
         with tab1:
-            # 🚀 ONLY TOGGLE LEFT (SEARCH BAR REMOVED) 🚀
             show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
             
             checker_fmt = '{:+.1f}%' if show_pct else '{:+.2f}'
@@ -508,7 +532,7 @@ if auth_code:
             else:
                 st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
 
-    # 🚀 FIXED CLOCK BOUNDARY AUTO-UPDATE LOOP 🚀
+    # AUTO-REFRESH LOOP
     now_refresh = datetime.datetime.now(IST)
     current_min = now_refresh.minute
     current_sec = now_refresh.second
