@@ -46,6 +46,9 @@ css_str = """<style>
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
 
+/* Radio Alignment Fix for Single Line Layout */
+div[role="radiogroup"] { margin-top: 5px !important; }
+
 /* Extreme Mobile Optimization */
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
@@ -364,7 +367,6 @@ if auth_code:
         st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
         
         # 🚀 DEEPAK BHAI'S 8:00 AM TO 9:15 AM AUTO-LOCK BRAHMASTRA 🚀
-        # Records official adjusted NSE Bhavcopy from server before market opens
         if datetime.time(8, 0) <= now_ist.time() < datetime.time(9, 15):
             last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
             if last_save != today_str:
@@ -395,13 +397,31 @@ if auth_code:
             {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
         ]
 
-        tab1, tab2, tab3 = st.tabs(["📊 Dashboard", "🌐 NiftyTrader Web", "📈 TREND CHART"])
+        # 🚀 NEW SINGLE-LINE HEADER LAYOUT 🚀
+        col_menu, col_search, col_toggle = st.columns([3.5, 2, 2.5], gap="small")
         
-        with tab1:
-            col1, col2 = st.columns([3, 1])
-            with col1: search_query = st.text_input("🔍 Search Stock:", "").upper()
-            with col2: st.write(""); show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
+        with col_menu:
+            selected_tab = st.radio(
+                "Menu",
+                ["📊 Dashboard", "🌐 NiftyTrader Web", "📈 TREND CHART"],
+                horizontal=True,
+                label_visibility="collapsed"
+            )
             
+        with col_search:
+            search_query = st.text_input(
+                "Search", 
+                placeholder="🔍 Search Stock...", 
+                label_visibility="collapsed"
+            ).upper()
+            
+        with col_toggle:
+            show_pct = st.toggle("📊 Show Checker Data in (%)", value=True)
+            
+        st.divider()
+
+        # 🚀 ROUTING LOGIC BASED ON SELECTED TAB 🚀
+        if selected_tab == "📊 Dashboard":
             checker_fmt = '{:+.1f}%' if show_pct else '{:+.2f}'
             format_dict = {'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 'LTP': '{:.2f}', 'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 'VOL CHECKER': checker_fmt, 'PCR CHECKER': checker_fmt, 'CE_CONTRACT': '{:+.1f}%', 'PE_CONTRACT': '{:+.1f}%'}
             
@@ -422,14 +442,14 @@ if auth_code:
 
                 st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
-        with tab2:
+        elif selected_tab == "🌐 NiftyTrader Web":
             st.markdown("### 🌐 NiftyTrader Live Options Chart")
             selected_nt_stock = st.selectbox("Select Stock for Chart:", raw_symbols, index=0, key="nt_stock")
             nt_url = f"https://www.niftytrader.in/stock-options-chart/{selected_nt_stock.lower()}"
             st.markdown("<br>", unsafe_allow_html=True)
             st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
 
-        with tab3:
+        elif selected_tab == "📈 TREND CHART":
             st.markdown("### 📈 SIR TREND CHART")
             col_c1, col_c2 = st.columns([2, 2])
             with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
