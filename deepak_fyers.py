@@ -27,7 +27,8 @@ css_str = """<style>
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } 
-.block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
+/* Desktop aur Mobile dono ke liye top padding thodi badha di hai taaki tabs header ke peeche na chupein */
+.block-container { padding-top: 4rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
 /* ALL Headers Vertical (Including SYMBOL) to Save Maximum Space on Mobile */
@@ -48,7 +49,8 @@ th { background-color: darkblue !important; color: white !important; }
 
 /* Extreme Mobile Optimization */
 @media (max-width: 768px) { 
-    .block-container { padding-top: 1rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
+    /* Yahan padding-top 4rem rakhi hai taaki phone screen par menu aur tabs overlap na karein */
+    .block-container { padding-top: 4rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
     [data-testid='stDataFrameTable'] th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
     [data-testid='stDataFrameTable'] td { font-size: 10px !important; padding: 4px 2px !important; } 
 }
@@ -216,7 +218,6 @@ def run_master_scan(token, date_str):
             if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
                 chain = oc['data']['optionsChain']
                 
-                # 🚀 OPTIMIZED AND ERROR-FREE OI/VOLUME LOGIC 🚀
                 c_oi, p_oi, c_v, p_v = 0.0, 0.0, 0.0, 0.0
                 
                 for s in chain:
