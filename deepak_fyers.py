@@ -46,9 +46,6 @@ css_str = """<style>
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
 
-/* Radio Alignment Fix for Single Line Layout */
-div[role="radiogroup"] { margin-top: 5px !important; }
-
 /* Extreme Mobile Optimization */
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
@@ -367,6 +364,7 @@ if auth_code:
         st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
         
         # 🚀 DEEPAK BHAI'S 8:00 AM TO 9:15 AM AUTO-LOCK BRAHMASTRA 🚀
+        # Records official adjusted NSE Bhavcopy from server before market opens
         if datetime.time(8, 0) <= now_ist.time() < datetime.time(9, 15):
             last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
             if last_save != today_str:
@@ -397,36 +395,17 @@ if auth_code:
             {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
         ]
 
-        # 🚀 NEW SINGLE-LINE HEADER LAYOUT 🚀
-        col_menu, col_search, col_toggle = st.columns([3.5, 2, 2.5], gap="small")
+        # 🚀 ONLY 2 TABS NOW 🚀
+        tab1, tab2 = st.tabs(["📊 Dashboard", "📈 TREND CHART"])
         
-        with col_menu:
-            selected_tab = st.radio(
-                "Menu",
-                ["📊 Dashboard", "🌐 NiftyTrader Web", "📈 TREND CHART"],
-                horizontal=True,
-                label_visibility="collapsed"
-            )
+        with tab1:
+            # 🚀 ONLY TOGGLE LEFT (SEARCH BAR REMOVED) 🚀
+            show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
             
-        with col_search:
-            search_query = st.text_input(
-                "Search", 
-                placeholder="🔍 Search Stock...", 
-                label_visibility="collapsed"
-            ).upper()
-            
-        with col_toggle:
-            show_pct = st.toggle("📊 Show Checker Data in (%)", value=True)
-            
-        st.divider()
-
-        # 🚀 ROUTING LOGIC BASED ON SELECTED TAB 🚀
-        if selected_tab == "📊 Dashboard":
             checker_fmt = '{:+.1f}%' if show_pct else '{:+.2f}'
             format_dict = {'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 'LTP': '{:.2f}', 'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 'VOL CHECKER': checker_fmt, 'PCR CHECKER': checker_fmt, 'CE_CONTRACT': '{:+.1f}%', 'PE_CONTRACT': '{:+.1f}%'}
             
             df = pd.DataFrame(st.session_state.cached_data)
-            if search_query: df = df[df['SYMS'].str.contains(search_query, na=False)]
             
             if not df.empty:
                 df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
@@ -442,14 +421,7 @@ if auth_code:
 
                 st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
-        elif selected_tab == "🌐 NiftyTrader Web":
-            st.markdown("### 🌐 NiftyTrader Live Options Chart")
-            selected_nt_stock = st.selectbox("Select Stock for Chart:", raw_symbols, index=0, key="nt_stock")
-            nt_url = f"https://www.niftytrader.in/stock-options-chart/{selected_nt_stock.lower()}"
-            st.markdown("<br>", unsafe_allow_html=True)
-            st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
-
-        elif selected_tab == "📈 TREND CHART":
+        with tab2:
             st.markdown("### 📈 SIR TREND CHART")
             col_c1, col_c2 = st.columns([2, 2])
             with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
@@ -505,35 +477,4 @@ if auth_code:
                                     gridcolor="#E5E5E5",
                                     autorange=True 
                                 ),
-                                yaxis2=dict(
-                                    title=dict(text="LTP Price Scale", font=dict(color="#00CC66")), 
-                                    tickfont=dict(color="#00CC66"), 
-                                    showgrid=False,
-                                    autorange=True 
-                                ),
-                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="black"))
-                            )
-                            st.plotly_chart(fig, use_container_width=True)
-                        else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
-                    else: st.info("⏳ Market data hasn't started logging yet today.")
-                except Exception as e:
-                    st.error(f"Chart Load Error: {e}")
-            else:
-                st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
-
-    # 🚀 2. FIXED CLOCK BOUNDARY AUTO-UPDATE LOOP (9:15, 9:20, 9:25...)
-    now_refresh = datetime.datetime.now(IST)
-    current_min = now_refresh.minute
-    current_sec = now_refresh.second
-
-    next_mult_5 = ((current_min // 5) + 1) * 5
-    mins_wait = next_mult_5 - current_min
-    secs_wait = (mins_wait * 60) - current_sec + 5
-
-    if secs_wait <= 0 or secs_wait > 305:
-        secs_wait = 300
-
-    time.sleep(secs_wait)
-    st.rerun()
-else:
-    st.info("👈 Please enter Auth Code in sidebar.")
+                                y
