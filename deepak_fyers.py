@@ -11,7 +11,7 @@ from google.oauth2.service_account import Credentials
 import concurrent.futures
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from streamlit_autorefresh import st_autorefresh  # 🚀 NAYI LIBRARY ADD KI HAI
+from streamlit_autorefresh import st_autorefresh
 
 # ==========================================
 # 1. FYERS CREDENTIALS & SETUP
@@ -261,22 +261,24 @@ def run_master_scan(token, date_str):
                 v_cpr = calc_vol_cpr(c_v, p_v)
                 v_pcr = calc_vol_pcr(c_v, p_v)
 
-                # 🚀 SLN 9:50 AM CHECKER FORMULA
+                # 🚀 SLN 9:50 AM CHECKER FORMULA (FIXED: OI and Volume Separate) 🚀
                 if scan_time_ist.time() < datetime.time(9, 50):
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
                     if s_name not in snap_950:
-                        snap_950[s_name] = {'pcr': v_pcr, 'vol_cpr': v_cpr}
+                        # 🚀 BUG FIX: v_pcr ki jagah o_pcr (Open Interest) set kiya
+                        snap_950[s_name] = {'pcr': o_pcr, 'vol_cpr': v_cpr}
                         snapshot_changed = True
                         pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                     else:
                         base = snap_950[s_name]
-                        pcr_abs = v_pcr - base['pcr']
+                        # 🚀 BUG FIX: Calculation mein bhi o_pcr (Open Interest) lagaya
+                        pcr_abs = o_pcr - base['pcr']
                         vol_abs = v_cpr - base['vol_cpr']
                         
                         def ratio_to_pct(r): return (r / (r + 1.0)) * 100.0 if r > 0 else 0.0
                         
-                        pcr_pct = ratio_to_pct(v_pcr) - ratio_to_pct(base['pcr'])
+                        pcr_pct = ratio_to_pct(o_pcr) - ratio_to_pct(base['pcr'])
                         vol_pct = ratio_to_pct(v_cpr) - ratio_to_pct(base['vol_cpr'])
 
                 # 🚀 GOOGLE SHEET DEPENDENT CE/PE LOGIC
@@ -546,7 +548,6 @@ if auth_code:
     if secs_wait <= 0 or secs_wait > 305:
         secs_wait = 300
 
-    # Frontend background timer jo UI ko hang nahi karega aur exact time par refresh trigger karega
     refresh_key = f"timer_refresh_{next_mult_5}"
     st_autorefresh(interval=secs_wait * 1000, key=refresh_key)
 
