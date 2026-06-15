@@ -11,6 +11,7 @@ from google.oauth2.service_account import Credentials
 import concurrent.futures
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from streamlit_autorefresh import st_autorefresh  # 🚀 NAYI LIBRARY ADD KI HAI
 
 # ==========================================
 # 1. FYERS CREDENTIALS & SETUP
@@ -531,7 +532,9 @@ if auth_code:
             else:
                 st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
 
-    # AUTO-REFRESH LOOP
+    # ==========================================
+    # 7. SMART AUTO-REFRESH LOGIC (NON-BLOCKING)
+    # ==========================================
     now_refresh = datetime.datetime.now(IST)
     current_min = now_refresh.minute
     current_sec = now_refresh.second
@@ -543,7 +546,9 @@ if auth_code:
     if secs_wait <= 0 or secs_wait > 305:
         secs_wait = 300
 
-    time.sleep(secs_wait)
-    st.rerun()
+    # Frontend background timer jo UI ko hang nahi karega aur exact time par refresh trigger karega
+    refresh_key = f"timer_refresh_{next_mult_5}"
+    st_autorefresh(interval=secs_wait * 1000, key=refresh_key)
+
 else:
     st.info("👈 Please enter Auth Code in sidebar.")
