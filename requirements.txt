@@ -4,3 +4,4 @@ plotly
 fyers-apiv3
 gspread
 google-auth
+streamlit-autorefresh
