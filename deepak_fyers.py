@@ -63,7 +63,7 @@ now_ist = datetime.datetime.now(IST)
 today_str = now_ist.strftime("%Y-%m-%d")
 
 HISTORY_FILE = "chart_history.csv"
-SNAPSHOT_FILE = "snapshot_920.json" 
+SNAPSHOT_FILE = "snapshot_950.json" 
 TOKEN_STORE_FILE = "fyers_token_store.json"
 AUTO_SAVE_FILE = "auto_save_tracker.txt"
 
@@ -152,7 +152,7 @@ def run_master_scan(token, date_str):
     
     baseline_prices = {}
     baseline_generic = {} 
-    snap_920 = {}
+    snap_950 = {}
     snapshot_changed = False
     
     client = get_gspread_client()
@@ -195,12 +195,12 @@ def run_master_scan(token, date_str):
 
             try:
                 snap_val = ws2.cell(1, 2).value
-                if snap_val: snap_920 = json.loads(snap_val)
+                if snap_val: snap_950 = json.loads(snap_val)
             except: pass
         except: pass
 
     st.session_state.baseline_count = len(baseline_prices)
-    st.session_state.has_snapshot = bool(snap_920)
+    st.session_state.has_snapshot = bool(snap_950)
 
     all_quotes = []
     for i in range(0, len(raw_symbols), 50):
@@ -261,20 +261,20 @@ def run_master_scan(token, date_str):
                 v_cpr = calc_vol_cpr(c_v, p_v)
                 v_pcr = calc_vol_pcr(c_v, p_v)
 
-                # 🚀 9:20 AM CHECKER (WITH STANDARD PERCENTAGE FORMULA) 🚀
-                if scan_time_ist.time() < datetime.time(9, 20):
+                # 🚀 STRICTLY 9:50 AM CHECKER LOGIC 🚀
+                if scan_time_ist.time() < datetime.time(9, 50):
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
-                    if s_name not in snap_920:
-                        snap_920[s_name] = {'pcr': o_pcr, 'vol_cpr': v_cpr}
+                    if s_name not in snap_950:
+                        snap_950[s_name] = {'pcr': o_pcr, 'vol_cpr': v_cpr}
                         snapshot_changed = True
                         pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                     else:
-                        base = snap_920[s_name]
+                        base = snap_950[s_name]
                         base_pcr_val = base['pcr']
                         base_vol_val = base['vol_cpr']
                         
-                        # Absolute Difference (Current - Base)
+                        # Absolute Difference
                         pcr_abs = o_pcr - base_pcr_val
                         vol_abs = v_cpr - base_vol_val
                         
@@ -287,7 +287,7 @@ def run_master_scan(token, date_str):
                         pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
                         vol_pct = get_standard_pct(v_cpr, base_vol_val)
 
-                # 🚀 GOOGLE SHEET DEPENDENT CE/PE LOGIC (2 DECIMAL PLACES FIX)
+                # 🚀 GOOGLE SHEET DEPENDENT CE/PE LOGIC
                 def get_conv(opt_type_val):
                     strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
                     tot_p, tot_m = 0, 0
@@ -309,7 +309,6 @@ def run_master_scan(token, date_str):
 
                     act = tot_p + tot_m
                     if act == 0: return 0.0
-                    # SLN ki tarah 2 decimal places round kiya hai (e.g. 91.67%)
                     return round((tot_p / act) * 100, 2) if tot_p >= tot_m else -round((tot_m / act) * 100, 2)
                 
                 final_list.append({
@@ -329,7 +328,7 @@ def run_master_scan(token, date_str):
         try:
             ss = client.open("Fyers_EOD_Data")
             ws2 = ss.worksheet("Sheet2")
-            ws2.update_cell(1, 2, json.dumps(snap_920))
+            ws2.update_cell(1, 2, json.dumps(snap_950))
         except: pass
 
     st.session_state.get_live_dump = live_ltp_data
@@ -449,7 +448,7 @@ if auth_code:
         with tab1:
             show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
             
-            # 🚀 DECIMAL FORMATTING FIX (Ab SLN ki tarah .2f yani 14.71% aayega) 🚀
+            # 🚀 DECIMAL FORMATTING FIX (SLN format: +14.71%)
             checker_fmt = '{:+.2f}%' if show_pct else '{:+.2f}'
             format_dict = {'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 'LTP': '{:.2f}', 'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 'VOL CHECKER': checker_fmt, 'PCR CHECKER': checker_fmt, 'CE_CONTRACT': '{:+.2f}%', 'PE_CONTRACT': '{:+.2f}%'}
             
