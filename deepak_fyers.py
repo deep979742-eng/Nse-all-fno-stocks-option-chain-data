@@ -63,7 +63,7 @@ now_ist = datetime.datetime.now(IST)
 today_str = now_ist.strftime("%Y-%m-%d")
 
 HISTORY_FILE = "chart_history.csv"
-SNAPSHOT_FILE = "snapshot_950.json"
+SNAPSHOT_FILE = "snapshot_920.json" 
 TOKEN_STORE_FILE = "fyers_token_store.json"
 AUTO_SAVE_FILE = "auto_save_tracker.txt"
 
@@ -152,7 +152,7 @@ def run_master_scan(token, date_str):
     
     baseline_prices = {}
     baseline_generic = {} 
-    snap_950 = {}
+    snap_920 = {}
     snapshot_changed = False
     
     client = get_gspread_client()
@@ -195,12 +195,12 @@ def run_master_scan(token, date_str):
 
             try:
                 snap_val = ws2.cell(1, 2).value
-                if snap_val: snap_950 = json.loads(snap_val)
+                if snap_val: snap_920 = json.loads(snap_val)
             except: pass
         except: pass
 
     st.session_state.baseline_count = len(baseline_prices)
-    st.session_state.has_snapshot = bool(snap_950)
+    st.session_state.has_snapshot = bool(snap_920)
 
     all_quotes = []
     for i in range(0, len(raw_symbols), 50):
@@ -261,27 +261,33 @@ def run_master_scan(token, date_str):
                 v_cpr = calc_vol_cpr(c_v, p_v)
                 v_pcr = calc_vol_pcr(c_v, p_v)
 
-                # 🚀 SLN 9:50 AM CHECKER FORMULA (FIXED: OI and Volume Separate) 🚀
-                if scan_time_ist.time() < datetime.time(9, 50):
+                # 🚀 9:20 AM CHECKER (WITH STANDARD PERCENTAGE FORMULA) 🚀
+                if scan_time_ist.time() < datetime.time(9, 20):
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
-                    if s_name not in snap_950:
-                        # 🚀 BUG FIX: v_pcr ki jagah o_pcr (Open Interest) set kiya
-                        snap_950[s_name] = {'pcr': o_pcr, 'vol_cpr': v_cpr}
+                    if s_name not in snap_920:
+                        snap_920[s_name] = {'pcr': o_pcr, 'vol_cpr': v_cpr}
                         snapshot_changed = True
                         pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                     else:
-                        base = snap_950[s_name]
-                        # 🚀 BUG FIX: Calculation mein bhi o_pcr (Open Interest) lagaya
-                        pcr_abs = o_pcr - base['pcr']
-                        vol_abs = v_cpr - base['vol_cpr']
+                        base = snap_920[s_name]
+                        base_pcr_val = base['pcr']
+                        base_vol_val = base['vol_cpr']
                         
-                        def ratio_to_pct(r): return (r / (r + 1.0)) * 100.0 if r > 0 else 0.0
+                        # Absolute Difference (Current - Base)
+                        pcr_abs = o_pcr - base_pcr_val
+                        vol_abs = v_cpr - base_vol_val
                         
-                        pcr_pct = ratio_to_pct(o_pcr) - ratio_to_pct(base['pcr'])
-                        vol_pct = ratio_to_pct(v_cpr) - ratio_to_pct(base['vol_cpr'])
+                        # 🚀 STANDARD SLN PERCENTAGE CHANGE FORMULA: ((Current - Base) / Base) * 100 🚀
+                        def get_standard_pct(current_val, base_val):
+                            if base_val == 0: 
+                                return 0.0
+                            return ((current_val - base_val) / base_val) * 100.0
+                            
+                        pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
+                        vol_pct = get_standard_pct(v_cpr, base_vol_val)
 
-                # 🚀 GOOGLE SHEET DEPENDENT CE/PE LOGIC
+                # 🚀 GOOGLE SHEET DEPENDENT CE/PE LOGIC (2 DECIMAL PLACES FIX)
                 def get_conv(opt_type_val):
                     strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
                     tot_p, tot_m = 0, 0
@@ -303,13 +309,14 @@ def run_master_scan(token, date_str):
 
                     act = tot_p + tot_m
                     if act == 0: return 0.0
-                    return round((tot_p / act) * 100, 1) if tot_p >= tot_m else -round((tot_m / act) * 100, 1)
+                    # SLN ki tarah 2 decimal places round kiya hai (e.g. 91.67%)
+                    return round((tot_p / act) * 100, 2) if tot_p >= tot_m else -round((tot_m / act) * 100, 2)
                 
                 final_list.append({
                     'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
                     'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp,
                     'VOL_ABS': round(vol_abs, 2), 'PCR_ABS': round(pcr_abs, 2), 
-                    'VOL_PCT': round(vol_pct, 1), 'PCR_PCT': round(pcr_pct, 1),
+                    'VOL_PCT': round(vol_pct, 2), 'PCR_PCT': round(pcr_pct, 2),
                     'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
                 })
 
@@ -322,7 +329,7 @@ def run_master_scan(token, date_str):
         try:
             ss = client.open("Fyers_EOD_Data")
             ws2 = ss.worksheet("Sheet2")
-            ws2.update_cell(1, 2, json.dumps(snap_950))
+            ws2.update_cell(1, 2, json.dumps(snap_920))
         except: pass
 
     st.session_state.get_live_dump = live_ltp_data
@@ -442,8 +449,9 @@ if auth_code:
         with tab1:
             show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
             
-            checker_fmt = '{:+.1f}%' if show_pct else '{:+.2f}'
-            format_dict = {'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 'LTP': '{:.2f}', 'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 'VOL CHECKER': checker_fmt, 'PCR CHECKER': checker_fmt, 'CE_CONTRACT': '{:+.1f}%', 'PE_CONTRACT': '{:+.1f}%'}
+            # 🚀 DECIMAL FORMATTING FIX (Ab SLN ki tarah .2f yani 14.71% aayega) 🚀
+            checker_fmt = '{:+.2f}%' if show_pct else '{:+.2f}'
+            format_dict = {'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 'LTP': '{:.2f}', 'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 'VOL CHECKER': checker_fmt, 'PCR CHECKER': checker_fmt, 'CE_CONTRACT': '{:+.2f}%', 'PE_CONTRACT': '{:+.2f}%'}
             
             df = pd.DataFrame(st.session_state.cached_data)
             
@@ -535,21 +543,25 @@ if auth_code:
                 st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
 
     # ==========================================
-    # 7. SMART AUTO-REFRESH LOGIC (NON-BLOCKING)
+    # 7. EXACT BOUNDARY AUTO-REFRESH LOGIC 🎯
     # ==========================================
     now_refresh = datetime.datetime.now(IST)
-    current_min = now_refresh.minute
-    current_sec = now_refresh.second
+    current_total_secs = now_refresh.minute * 60 + now_refresh.second
 
-    next_mult_5 = ((current_min // 5) + 1) * 5
-    mins_wait = next_mult_5 - current_min
-    secs_wait = (mins_wait * 60) - current_sec + 5
+    # Find the exact mathematical target for XX:05
+    targets = [(m * 60 + 5) for m in range(0, 65, 5)]
+    secs_wait = 300
+    
+    for t in targets:
+        if t > current_total_secs:
+            secs_wait = t - current_total_secs
+            break
 
-    if secs_wait <= 0 or secs_wait > 305:
-        secs_wait = 300
+    # Security check: Minimum 5 sec wait so it never spams/hangs
+    if secs_wait < 5:
+        secs_wait = 5
 
-    refresh_key = f"timer_refresh_{next_mult_5}"
-    st_autorefresh(interval=secs_wait * 1000, key=refresh_key)
+    st_autorefresh(interval=secs_wait * 1000, key="exact_boundary_timer")
 
 else:
     st.info("👈 Please enter Auth Code in sidebar.")
