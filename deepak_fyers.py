@@ -142,7 +142,7 @@ def get_generic_key(sym):
     return None
 
 # ==========================================
-# 4. MASTER SCANNER (WITH AUTO-ROLLOVER & SLN FORMULA)
+# 4. MASTER SCANNER
 # ==========================================
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
@@ -261,7 +261,7 @@ def run_master_scan(token, date_str):
                 v_cpr = calc_vol_cpr(c_v, p_v)
                 v_pcr = calc_vol_pcr(c_v, p_v)
 
-                # 🚀 STRICTLY 9:50 AM CHECKER LOGIC 🚀
+                # 🚀 9:50 AM CHECKER (WITH STANDARD PERCENTAGE FORMULA) 🚀
                 if scan_time_ist.time() < datetime.time(9, 50):
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
@@ -274,11 +274,9 @@ def run_master_scan(token, date_str):
                         base_pcr_val = base['pcr']
                         base_vol_val = base['vol_cpr']
                         
-                        # Absolute Difference
                         pcr_abs = o_pcr - base_pcr_val
                         vol_abs = v_cpr - base_vol_val
                         
-                        # 🚀 STANDARD SLN PERCENTAGE CHANGE FORMULA: ((Current - Base) / Base) * 100 🚀
                         def get_standard_pct(current_val, base_val):
                             if base_val == 0: 
                                 return 0.0
@@ -352,9 +350,17 @@ if os.path.exists(TOKEN_STORE_FILE):
         if td.get("date") == today_str: saved_token = td.get("token")
     except: pass
 
+# 🚀 NAYA FEATURE: Force Logout Button (Taaki Blank Screen Na Aaye) 🚀
 if saved_token:
     auth_code = "AUTO_LOGGED_IN"
     st.sidebar.success("🚀 Connected via Saved Token!")
+    
+    if st.sidebar.button("🔄 Force Logout / Clear Token"):
+        if os.path.exists(TOKEN_STORE_FILE):
+            os.remove(TOKEN_STORE_FILE)
+        if 'cached_data' in st.session_state:
+            del st.session_state['cached_data']
+        st.rerun()
 else:
     magic_url = f"https://api-t1.fyers.in/api/v3/generate-authcode?client_id={APP_ID}&redirect_uri={REDIRECT_URI}&response_type=code&state=deepak"
     st.sidebar.markdown(f"### [👉 Step 1: Click to Get Code]({magic_url})")
@@ -411,7 +417,6 @@ if auth_code:
         st.session_state.cached_data = cached_result
         st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
         
-        # BRAHMASTRA AUTO LOCK
         if datetime.time(8, 0) <= now_ist.time() < datetime.time(9, 15):
             last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
             if last_save != today_str:
@@ -419,6 +424,7 @@ if auth_code:
     else:
         if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
+    # 🚀 NAYA FEATURE: Error Message Agar Blank Screen Aaye 🚀
     if len(st.session_state.cached_data) > 0:
         
         def style_indicators(val):
@@ -442,13 +448,11 @@ if auth_code:
             {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
         ]
 
-        # TABS SETUP
         tab1, tab2 = st.tabs(["📊 Dashboard", "📈 TREND CHART"])
         
         with tab1:
             show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
             
-            # 🚀 DECIMAL FORMATTING FIX (SLN format: +14.71%)
             checker_fmt = '{:+.2f}%' if show_pct else '{:+.2f}'
             format_dict = {'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 'LTP': '{:.2f}', 'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 'VOL CHECKER': checker_fmt, 'PCR CHECKER': checker_fmt, 'CE_CONTRACT': '{:+.2f}%', 'PE_CONTRACT': '{:+.2f}%'}
             
@@ -478,10 +482,8 @@ if auth_code:
             if os.path.exists(HISTORY_FILE):
                 try:
                     hist_df = pd.read_csv(HISTORY_FILE)
-                    
                     if not hist_df.empty and 'Date' in hist_df.columns:
                         df_sym = hist_df[(hist_df['Date'] == today_str) & (hist_df['Symbol'] == sel_stock)].copy()
-                        
                         if not df_sym.empty:
                             df_sym = df_sym.sort_values(by='Time')
                             df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
@@ -490,16 +492,8 @@ if auth_code:
                             line_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF" 
                             
                             fig = make_subplots(specs=[[{"secondary_y": True}]])
-                            
-                            fig.add_trace(go.Scatter(
-                                x=df_sym['Datetime'], y=df_sym[target_col], name=f"{chart_mode}", 
-                                line=dict(color=line_color, width=3, shape="spline"), mode="lines"
-                            ), secondary_y=False)
-                            
-                            fig.add_trace(go.Scatter(
-                                x=df_sym['Datetime'], y=df_sym['LTP'], name="Stock LTP", 
-                                line=dict(color="#00CC66", width=3, shape="spline"), mode="lines"
-                            ), secondary_y=True)
+                            fig.add_trace(go.Scatter(x=df_sym['Datetime'], y=df_sym[target_col], name=f"{chart_mode}", line=dict(color=line_color, width=3, shape="spline"), mode="lines"), secondary_y=False)
+                            fig.add_trace(go.Scatter(x=df_sym['Datetime'], y=df_sym['LTP'], name="Stock LTP", line=dict(color="#00CC66", width=3, shape="spline"), mode="lines"), secondary_y=True)
 
                             market_open_time = pd.to_datetime(f"{today_str} 09:15:00")
                             actual_first_data_time = df_sym['Datetime'].min()
@@ -507,39 +501,21 @@ if auth_code:
                             fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
 
                             fig.update_layout(
-                                template="plotly_white", 
-                                hovermode="x unified",
-                                height=380, 
-                                margin=dict(l=10, r=10, t=40, b=10), 
+                                template="plotly_white", hovermode="x unified", height=380, margin=dict(l=10, r=10, t=40, b=10), 
                                 plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF", 
-                                xaxis=dict(
-                                    rangeslider=dict(visible=False), 
-                                    type="date", 
-                                    range=[dynamic_start_time, fixed_end_time], 
-                                    gridcolor="#E5E5E5", 
-                                    color="black"
-                                ),
-                                yaxis=dict(
-                                    title=dict(text=f"{chart_mode} Scale", font=dict(color=line_color)), 
-                                    tickfont=dict(color=line_color), 
-                                    gridcolor="#E5E5E5",
-                                    autorange=True 
-                                ),
-                                yaxis2=dict(
-                                    title=dict(text="LTP Price Scale", font=dict(color="#00CC66")), 
-                                    tickfont=dict(color="#00CC66"), 
-                                    showgrid=False,
-                                    autorange=True 
-                                ),
+                                xaxis=dict(rangeslider=dict(visible=False), type="date", range=[dynamic_start_time, fixed_end_time], gridcolor="#E5E5E5", color="black"),
+                                yaxis=dict(title=dict(text=f"{chart_mode} Scale", font=dict(color=line_color)), tickfont=dict(color=line_color), gridcolor="#E5E5E5", autorange=True),
+                                yaxis2=dict(title=dict(text="LTP Price Scale", font=dict(color="#00CC66")), tickfont=dict(color="#00CC66"), showgrid=False, autorange=True),
                                 legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="black"))
                             )
                             st.plotly_chart(fig, use_container_width=True)
                         else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                     else: st.info("⏳ Market data hasn't started logging yet today.")
-                except Exception as e:
-                    st.error(f"Chart Load Error: {e}")
-            else:
-                st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
+                except Exception as e: st.error(f"Chart Load Error: {e}")
+            else: st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
+    else:
+        # Blank screen aane par ab ye error message aayega!
+        st.error("⚠️ Data fetch nahi ho raha hai! Fyers ka Token expire ya invalid ho gaya hai. Kripya sidebar se 'Force Logout / Clear Token' button dabayein aur naya Auth Code generate karein.")
 
     # ==========================================
     # 7. EXACT BOUNDARY AUTO-REFRESH LOGIC 🎯
@@ -547,19 +523,14 @@ if auth_code:
     now_refresh = datetime.datetime.now(IST)
     current_total_secs = now_refresh.minute * 60 + now_refresh.second
 
-    # Find the exact mathematical target for XX:05
     targets = [(m * 60 + 5) for m in range(0, 65, 5)]
     secs_wait = 300
-    
     for t in targets:
         if t > current_total_secs:
             secs_wait = t - current_total_secs
             break
 
-    # Security check: Minimum 5 sec wait so it never spams/hangs
-    if secs_wait < 5:
-        secs_wait = 5
-
+    if secs_wait < 5: secs_wait = 5
     st_autorefresh(interval=secs_wait * 1000, key="exact_boundary_timer")
 
 else:
