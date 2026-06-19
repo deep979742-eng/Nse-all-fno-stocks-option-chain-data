@@ -216,16 +216,24 @@ def run_master_scan(token, date_str):
     new_csv_rows = []
     live_ltp_data = {} 
 
+    # 🚀 SMART RETRY & ANTI-RATE-LIMIT SYSTEM (To Prevent Skipping) 🚀
     def fetch_option_chain_fast_local(q):
         sym = q['n']
-        time.sleep(0.4) 
-        try:
-            oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
-            if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
-                time.sleep(2.0) 
+        for attempt in range(3): # 3 Baar try karega
+            if attempt == 0:
+                time.sleep(0.6) # Normal safe limit
+            else:
+                time.sleep(2.5) # Agar server ne speed breaker lagaya, toh 2.5 sec ruk kar wapas lega
+                
+            try:
                 oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
-            return q, oc
-        except: return q, None
+                # Check if data is valid and fetched correctly
+                if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
+                    return q, oc
+            except:
+                pass # Error aane par loop agle attempt me chala jayega
+                
+        return q, None # 3 Baar fail hone par hi NA return karega (Jaise Non-F&O stocks me)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         results = executor.map(fetch_option_chain_fast_local, all_quotes)
@@ -350,7 +358,6 @@ if os.path.exists(TOKEN_STORE_FILE):
         if td.get("date") == today_str: saved_token = td.get("token")
     except: pass
 
-# 🚀 NAYA FEATURE: Force Logout Button (Taaki Blank Screen Na Aaye) 🚀
 if saved_token:
     auth_code = "AUTO_LOGGED_IN"
     st.sidebar.success("🚀 Connected via Saved Token!")
@@ -424,7 +431,6 @@ if auth_code:
     else:
         if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
-    # 🚀 NAYA FEATURE: Error Message Agar Blank Screen Aaye 🚀
     if len(st.session_state.cached_data) > 0:
         
         def style_indicators(val):
@@ -514,7 +520,6 @@ if auth_code:
                 except Exception as e: st.error(f"Chart Load Error: {e}")
             else: st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
     else:
-        # Blank screen aane par ab ye error message aayega!
         st.error("⚠️ Data fetch nahi ho raha hai! Fyers ka Token expire ya invalid ho gaya hai. Kripya sidebar se 'Force Logout / Clear Token' button dabayein aur naya Auth Code generate karein.")
 
     # ==========================================
