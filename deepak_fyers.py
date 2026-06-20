@@ -121,7 +121,7 @@ def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
-# 🚀 GENERIC STRIKE MATCHER (Expiry Mismatch Fix) 🚀
+# 🚀 GENERIC STRIKE MATCHER 🚀
 def get_generic_key(sym):
     try:
         if ":" in sym:
@@ -216,24 +216,17 @@ def run_master_scan(token, date_str):
     new_csv_rows = []
     live_ltp_data = {} 
 
-    # 🚀 SMART RETRY & ANTI-RATE-LIMIT SYSTEM (To Prevent Skipping) 🚀
     def fetch_option_chain_fast_local(q):
         sym = q['n']
-        for attempt in range(3): # 3 Baar try karega
-            if attempt == 0:
-                time.sleep(0.6) # Normal safe limit
-            else:
-                time.sleep(2.5) # Agar server ne speed breaker lagaya, toh 2.5 sec ruk kar wapas lega
+        for attempt in range(3): 
+            if attempt == 0: time.sleep(0.6) 
+            else: time.sleep(2.5) 
                 
             try:
                 oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
-                # Check if data is valid and fetched correctly
-                if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
-                    return q, oc
-            except:
-                pass # Error aane par loop agle attempt me chala jayega
-                
-        return q, None # 3 Baar fail hone par hi NA return karega (Jaise Non-F&O stocks me)
+                if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']: return q, oc
+            except: pass 
+        return q, None 
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         results = executor.map(fetch_option_chain_fast_local, all_quotes)
@@ -269,29 +262,22 @@ def run_master_scan(token, date_str):
                 v_cpr = calc_vol_cpr(c_v, p_v)
                 v_pcr = calc_vol_pcr(c_v, p_v)
 
-                # 🚀 9:50 AM CHECKER (WITH STANDARD PERCENTAGE FORMULA) 🚀
+                # 🚀 9:50 AM CHECKER (TIME CHANGED BACK TO 9:50 AM AS REQUESTED) 🚀
                 if scan_time_ist.time() < datetime.time(9, 50):
-                    pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
+                    pcr_abs, vol_abs = 0.0, 0.0
                 else:
                     if s_name not in snap_950:
                         snap_950[s_name] = {'pcr': o_pcr, 'vol_cpr': v_cpr}
                         snapshot_changed = True
-                        pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
+                        pcr_abs, vol_abs = 0.0, 0.0
                     else:
                         base = snap_950[s_name]
                         base_pcr_val = base['pcr']
                         base_vol_val = base['vol_cpr']
                         
+                        # Only Absolute difference is used for Checkers! Not percentage!
                         pcr_abs = o_pcr - base_pcr_val
                         vol_abs = v_cpr - base_vol_val
-                        
-                        def get_standard_pct(current_val, base_val):
-                            if base_val == 0: 
-                                return 0.0
-                            return ((current_val - base_val) / base_val) * 100.0
-                            
-                        pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
-                        vol_pct = get_standard_pct(v_cpr, base_vol_val)
 
                 # 🚀 GOOGLE SHEET DEPENDENT CE/PE LOGIC
                 def get_conv(opt_type_val):
@@ -321,14 +307,13 @@ def run_master_scan(token, date_str):
                     'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
                     'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp,
                     'VOL_ABS': round(vol_abs, 2), 'PCR_ABS': round(pcr_abs, 2), 
-                    'VOL_PCT': round(vol_pct, 2), 'PCR_PCT': round(pcr_pct, 2),
                     'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
                 })
 
                 if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
                     new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': spot_ltp, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
             else:
-                final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
+                final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
     if snapshot_changed and client:
         try:
@@ -443,12 +428,6 @@ if auth_code:
             elif val < 0: return 'color: #FF0000; font-weight: bold; text-align: center;'
             return 'color: #888888; font-weight: bold; text-align: center;'
 
-        def style_pcr_columns(val):
-            if isinstance(val, (int, float)):
-                if val >= 1.0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-                elif val > 0 and val < 1.0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-            return 'text-align: center;'
-
         header_styles = [
             {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
             {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
@@ -459,24 +438,50 @@ if auth_code:
         with tab1:
             show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
             
-            checker_fmt = '{:+.2f}%' if show_pct else '{:+.2f}'
-            format_dict = {'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 'LTP': '{:.2f}', 'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 'VOL CHECKER': checker_fmt, 'PCR CHECKER': checker_fmt, 'CE_CONTRACT': '{:+.2f}%', 'PE_CONTRACT': '{:+.2f}%'}
+            # 🚀 UI FIX: SLN KI TARAH NAAM KO DO (2) LINE MEIN KIYA HAI 🚀
+            vol_col_name = 'VOL CHK<br>CPR'
+            pcr_col_name = 'PCR<br>CHK'
+            
+            format_dict = {
+                'VOLUME<br>CPR': '{:.2f}', 
+                'LTP': '{:.2f}', 
+                'LTP<br>CHANGE': '{:.2f}', 
+                'CHANGE<br>%': '{:+.2f}%', 
+                'CE<br>CONT %': '{:+.2f}%', 
+                'PE<br>CONT %': '{:+.2f}%',
+                pcr_col_name: '{:+.2f}', 
+                vol_col_name: '{:+.2f}'
+            }
             
             df = pd.DataFrame(st.session_state.cached_data)
             
             if not df.empty:
                 df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
-                df = df.sort_values(by='Conv_Rank', ascending=False).drop(columns=['Conv_Rank']) 
-                df['VOL CHECKER'] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
-                df['PCR CHECKER'] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
-                df = df.drop(columns=['VOL_ABS', 'PCR_ABS', 'VOL_PCT', 'PCR_PCT'])
-                df = df.rename(columns={'SYMS': 'SYMBOL', 'OPEN_STATUS': 'OPENING', 'V_PCR': 'VOL PCR', 'O_PCR': 'OPTION PCR', 'V_CPR': 'VOL CPR', 'LTP_CH': 'LTP CHANGE', 'CHG_%': 'CHANGE%', 'LTP': 'LTP', 'CE_CON': 'CE_CONTRACT', 'PE_CON': 'PE_CONTRACT'})
+                df = df.sort_values(by='Conv_Rank', ascending=False)
+                
+                # Checkers ab sirf Absolute Value dikhayenge! (Toggle ka effect in par nahi padega)
+                df[vol_col_name] = df['VOL_ABS']
+                df[pcr_col_name] = df['PCR_ABS']
+                
+                df = df[['SYMS', 'OPEN_STATUS', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', pcr_col_name, vol_col_name]]
+                
+                # Naye chote naam
+                df = df.rename(columns={
+                    'SYMS': 'SYMBOL', 
+                    'OPEN_STATUS': 'OPENING', 
+                    'V_CPR': 'VOLUME<br>CPR', 
+                    'LTP_CH': 'LTP<br>CHANGE', 
+                    'CHG_%': 'CHANGE<br>%', 
+                    'LTP': 'LTP', 
+                    'CE_CON': 'CE<br>CONT %', 
+                    'PE_CON': 'PE<br>CONT %'
+                })
 
                 styled_df = (df.style.set_properties(**{'text-align': 'center'}).format(format_dict).set_table_styles(header_styles)
-                             .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
-                             .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
+                             .map(style_indicators, subset=['OPENING', 'LTP<br>CHANGE', 'CHANGE<br>%', 'CE<br>CONT %', 'PE<br>CONT %', vol_col_name, pcr_col_name]))
 
-                st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
+                # 🚀 Use st.write to render HTML formatted columns correctly 🚀
+                st.write(styled_df.to_html(escape=False), unsafe_allow_html=True)
 
         with tab2:
             st.markdown("### 📈 TREND CHART") 
@@ -495,11 +500,12 @@ if auth_code:
                             df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
                             
                             target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
-                            line_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF" 
+                            line_color = "#2962FF" 
+                            ltp_color = "#FF5252"  
                             
                             fig = make_subplots(specs=[[{"secondary_y": True}]])
-                            fig.add_trace(go.Scatter(x=df_sym['Datetime'], y=df_sym[target_col], name=f"{chart_mode}", line=dict(color=line_color, width=3, shape="spline"), mode="lines"), secondary_y=False)
-                            fig.add_trace(go.Scatter(x=df_sym['Datetime'], y=df_sym['LTP'], name="Stock LTP", line=dict(color="#00CC66", width=3, shape="spline"), mode="lines"), secondary_y=True)
+                            fig.add_trace(go.Scatter(x=df_sym['Datetime'], y=df_sym[target_col], name=f"{chart_mode}", line=dict(color=line_color, width=2.5, shape="spline"), mode="lines"), secondary_y=False)
+                            fig.add_trace(go.Scatter(x=df_sym['Datetime'], y=df_sym['LTP'], name="Stock LTP", line=dict(color=ltp_color, width=2.5, shape="spline"), mode="lines"), secondary_y=True)
 
                             market_open_time = pd.to_datetime(f"{today_str} 09:15:00")
                             actual_first_data_time = df_sym['Datetime'].min()
@@ -507,12 +513,12 @@ if auth_code:
                             fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
 
                             fig.update_layout(
-                                template="plotly_white", hovermode="x unified", height=380, margin=dict(l=10, r=10, t=40, b=10), 
-                                plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF", 
-                                xaxis=dict(rangeslider=dict(visible=False), type="date", range=[dynamic_start_time, fixed_end_time], gridcolor="#E5E5E5", color="black"),
-                                yaxis=dict(title=dict(text=f"{chart_mode} Scale", font=dict(color=line_color)), tickfont=dict(color=line_color), gridcolor="#E5E5E5", autorange=True),
-                                yaxis2=dict(title=dict(text="LTP Price Scale", font=dict(color="#00CC66")), tickfont=dict(color="#00CC66"), showgrid=False, autorange=True),
-                                legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(color="black"))
+                                template="plotly_white", hovermode="x unified", height=400, margin=dict(l=0, r=0, t=50, b=10), 
+                                plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF", font=dict(color="#424242", family="Arial, sans-serif"),
+                                xaxis=dict(rangeslider=dict(visible=False), type="date", range=[dynamic_start_time, fixed_end_time], showgrid=False, zeroline=False, showline=True, linecolor="#E0E0E0", tickfont=dict(color="#9E9E9E")),
+                                yaxis=dict(title=dict(text=f"{chart_mode}", font=dict(color=line_color, size=12)), tickfont=dict(color=line_color), gridcolor="#F5F5F5", gridwidth=1, zeroline=False, autorange=True),
+                                yaxis2=dict(title=dict(text="LTP", font=dict(color=ltp_color, size=12)), tickfont=dict(color=ltp_color), showgrid=False, zeroline=False, autorange=True),
+                                legend=dict(orientation="h", yanchor="bottom", y=1.08, xanchor="center", x=0.5, font=dict(color="#424242", size=13), bgcolor="rgba(255,255,255,0)")
                             )
                             st.plotly_chart(fig, use_container_width=True)
                         else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
