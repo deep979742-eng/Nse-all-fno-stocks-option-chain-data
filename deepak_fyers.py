@@ -29,7 +29,7 @@ css_str = """<style>
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } 
 
-/* 🚀 DESKTOP SCREEN SETTING - Tabs clear dikhne ke liye padding-top 3.5rem hai, aur scroll rokne ke liye bottom 0 hai */
+/* 🚀 DESKTOP SCREEN SETTING */
 .block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
@@ -72,7 +72,7 @@ if 'live_base_date' not in st.session_state or st.session_state.live_base_date !
     st.session_state.live_base_date = today_str
 
 # ==========================================
-# 2. GOOGLE SHEETS DYNAMIC CONNECTION
+# 2. GOOGLE SHEETS CONNECTION
 # ==========================================
 @st.cache_resource
 def get_gspread_client():
@@ -86,7 +86,7 @@ def get_gspread_client():
     return None
 
 # ==========================================
-# 3. STOCK LIST & HELPER FUNCTIONS
+# 3. STOCK LIST
 # ==========================================
 raw_symbols = [
     "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
@@ -121,7 +121,6 @@ def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
-# 🚀 GENERIC STRIKE MATCHER 🚀
 def get_generic_key(sym):
     try:
         if ":" in sym:
@@ -262,7 +261,7 @@ def run_master_scan(token, date_str):
                 v_cpr = calc_vol_cpr(c_v, p_v)
                 v_pcr = calc_vol_pcr(c_v, p_v)
 
-                # 🚀 9:50 AM CHECKER (TIME CHANGED BACK TO 9:50 AM AS REQUESTED) 🚀
+                # 🚀 9:50 AM ABSOLUTE CHECKER 🚀
                 if scan_time_ist.time() < datetime.time(9, 50):
                     pcr_abs, vol_abs = 0.0, 0.0
                 else:
@@ -275,11 +274,10 @@ def run_master_scan(token, date_str):
                         base_pcr_val = base['pcr']
                         base_vol_val = base['vol_cpr']
                         
-                        # Only Absolute difference is used for Checkers! Not percentage!
+                        # Sirf Absolute difference, Percentage nahi.
                         pcr_abs = o_pcr - base_pcr_val
                         vol_abs = v_cpr - base_vol_val
 
-                # 🚀 GOOGLE SHEET DEPENDENT CE/PE LOGIC
                 def get_conv(opt_type_val):
                     strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
                     tot_p, tot_m = 0, 0
@@ -428,6 +426,12 @@ if auth_code:
             elif val < 0: return 'color: #FF0000; font-weight: bold; text-align: center;'
             return 'color: #888888; font-weight: bold; text-align: center;'
 
+        def style_pcr_columns(val):
+            if isinstance(val, (int, float)):
+                if val >= 1.0: return 'color: #00AA00; font-weight: bold; text-align: center;'
+                elif val > 0 and val < 1.0: return 'color: #FF0000; font-weight: bold; text-align: center;'
+            return 'text-align: center;'
+
         header_styles = [
             {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
             {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
@@ -438,19 +442,17 @@ if auth_code:
         with tab1:
             show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
             
-            # 🚀 UI FIX: SLN KI TARAH NAAM KO DO (2) LINE MEIN KIYA HAI 🚀
-            vol_col_name = 'VOL CHK<br>CPR'
-            pcr_col_name = 'PCR<br>CHK'
-            
             format_dict = {
-                'VOLUME<br>CPR': '{:.2f}', 
+                'VOL PCR': '{:.2f}', 
+                'OPT PCR': '{:.2f}', 
+                'VOL CPR': '{:.2f}', 
                 'LTP': '{:.2f}', 
-                'LTP<br>CHANGE': '{:.2f}', 
-                'CHANGE<br>%': '{:+.2f}%', 
-                'CE<br>CONT %': '{:+.2f}%', 
-                'PE<br>CONT %': '{:+.2f}%',
-                pcr_col_name: '{:+.2f}', 
-                vol_col_name: '{:+.2f}'
+                'LTP CHG': '{:.2f}', 
+                'CHG %': '{:+.2f}%', 
+                'CE CONT%': '{:+.2f}%', 
+                'PE CONT%': '{:+.2f}%',
+                'PCR CHK': '{:+.2f}', 
+                'VOL CHK': '{:+.2f}'
             }
             
             df = pd.DataFrame(st.session_state.cached_data)
@@ -459,29 +461,34 @@ if auth_code:
                 df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
                 df = df.sort_values(by='Conv_Rank', ascending=False)
                 
-                # Checkers ab sirf Absolute Value dikhayenge! (Toggle ka effect in par nahi padega)
-                df[vol_col_name] = df['VOL_ABS']
-                df[pcr_col_name] = df['PCR_ABS']
+                # Checkers
+                df['VOL CHK'] = df['VOL_ABS']
+                df['PCR CHK'] = df['PCR_ABS']
                 
-                df = df[['SYMS', 'OPEN_STATUS', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', pcr_col_name, vol_col_name]]
+                # SAARE COLUMNS WAPAS AAGAYE
+                df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHK', 'VOL CHK']]
                 
-                # Naye chote naam
                 df = df.rename(columns={
                     'SYMS': 'SYMBOL', 
-                    'OPEN_STATUS': 'OPENING', 
-                    'V_CPR': 'VOLUME<br>CPR', 
-                    'LTP_CH': 'LTP<br>CHANGE', 
-                    'CHG_%': 'CHANGE<br>%', 
+                    'OPEN_STATUS': 'OPENING',
+                    'V_PCR': 'VOL PCR',
+                    'O_PCR': 'OPT PCR',
+                    'V_CPR': 'VOL CPR', 
+                    'LTP_CH': 'LTP CHG', 
+                    'CHG_%': 'CHG %', 
                     'LTP': 'LTP', 
-                    'CE_CON': 'CE<br>CONT %', 
-                    'PE_CON': 'PE<br>CONT %'
+                    'CE_CON': 'CE CONT%', 
+                    'PE_CON': 'PE CONT%'
                 })
 
-                styled_df = (df.style.set_properties(**{'text-align': 'center'}).format(format_dict).set_table_styles(header_styles)
-                             .map(style_indicators, subset=['OPENING', 'LTP<br>CHANGE', 'CHANGE<br>%', 'CE<br>CONT %', 'PE<br>CONT %', vol_col_name, pcr_col_name]))
+                # 🚀 WAPAS ORIGINAL DATAFRAME PAR AAGAYE HAI (FILTER, SEARCH SAB WAPAS CHALEGA) 🚀
+                styled_df = (df.style.set_properties(**{'text-align': 'center'})
+                             .format(format_dict)
+                             .set_table_styles(header_styles)
+                             .map(style_indicators, subset=['OPENING', 'LTP CHG', 'CHG %', 'CE CONT%', 'PE CONT%', 'VOL CHK', 'PCR CHK'])
+                             .map(style_pcr_columns, subset=['VOL PCR', 'OPT PCR', 'VOL CPR']))
 
-                # 🚀 Use st.write to render HTML formatted columns correctly 🚀
-                st.write(styled_df.to_html(escape=False), unsafe_allow_html=True)
+                st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
         with tab2:
             st.markdown("### 📈 TREND CHART") 
@@ -514,7 +521,7 @@ if auth_code:
 
                             fig.update_layout(
                                 template="plotly_white", hovermode="x unified", height=400, margin=dict(l=0, r=0, t=50, b=10), 
-                                plot_bgcolor="#FFFFFF", paper_bgcolor="#FFFFFF", font=dict(color="#424242", family="Arial, sans-serif"),
+                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#424242", family="Arial, sans-serif"),
                                 xaxis=dict(rangeslider=dict(visible=False), type="date", range=[dynamic_start_time, fixed_end_time], showgrid=False, zeroline=False, showline=True, linecolor="#E0E0E0", tickfont=dict(color="#9E9E9E")),
                                 yaxis=dict(title=dict(text=f"{chart_mode}", font=dict(color=line_color, size=12)), tickfont=dict(color=line_color), gridcolor="#F5F5F5", gridwidth=1, zeroline=False, autorange=True),
                                 yaxis2=dict(title=dict(text="LTP", font=dict(color=ltp_color, size=12)), tickfont=dict(color=ltp_color), showgrid=False, zeroline=False, autorange=True),
