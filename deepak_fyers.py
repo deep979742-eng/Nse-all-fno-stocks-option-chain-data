@@ -33,17 +33,14 @@ css_str = """<style>
 .block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
-/* ALL Headers Vertical (Including SYMBOL) to Save Maximum Space on Mobile */
+/* 🚀 COLUMN COMPRESS CSS (white-space: pre-wrap se \\n kaam karega) */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
     background-color: darkblue !important; 
     color: white !important; 
     font-weight: bold !important; 
     text-align: center !important; 
-    writing-mode: vertical-rl !important; 
-    transform: rotate(180deg) !important; 
-    white-space: nowrap !important; 
+    white-space: pre-wrap !important; 
     padding: 8px 4px !important;
-    height: 120px !important;
 } 
 
 th { background-color: darkblue !important; color: white !important; } 
@@ -52,7 +49,7 @@ th { background-color: darkblue !important; color: white !important; }
 /* 🚀 MOBILE SCREEN SETTING */
 @media (max-width: 768px) { 
     .block-container { padding-top: 4rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
-    [data-testid='stDataFrameTable'] th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
+    [data-testid='stDataFrameTable'] th { font-size: 10px !important; padding: 4px 2px !important; } 
     [data-testid='stDataFrameTable'] td { font-size: 10px !important; padding: 4px 2px !important; } 
 }
 </style>"""
@@ -72,7 +69,7 @@ if 'live_base_date' not in st.session_state or st.session_state.live_base_date !
     st.session_state.live_base_date = today_str
 
 # ==========================================
-# 2. GOOGLE SHEETS CONNECTION
+# 2. GOOGLE SHEETS DYNAMIC CONNECTION
 # ==========================================
 @st.cache_resource
 def get_gspread_client():
@@ -86,7 +83,7 @@ def get_gspread_client():
     return None
 
 # ==========================================
-# 3. STOCK LIST
+# 3. STOCK LIST & HELPER FUNCTIONS
 # ==========================================
 raw_symbols = [
     "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
@@ -261,22 +258,30 @@ def run_master_scan(token, date_str):
                 v_cpr = calc_vol_cpr(c_v, p_v)
                 v_pcr = calc_vol_pcr(c_v, p_v)
 
-                # 🚀 9:50 AM ABSOLUTE CHECKER 🚀
+                # 🚀 TOGGLE FIX: ABSOLUTE AND PERCENTAGE BOTH CALCULATED HERE 🚀
                 if scan_time_ist.time() < datetime.time(9, 50):
-                    pcr_abs, vol_abs = 0.0, 0.0
+                    pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
                     if s_name not in snap_950:
                         snap_950[s_name] = {'pcr': o_pcr, 'vol_cpr': v_cpr}
                         snapshot_changed = True
-                        pcr_abs, vol_abs = 0.0, 0.0
+                        pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                     else:
                         base = snap_950[s_name]
                         base_pcr_val = base['pcr']
                         base_vol_val = base['vol_cpr']
                         
-                        # Sirf Absolute difference, Percentage nahi.
+                        # 1. Absolute Difference (For Value Mode)
                         pcr_abs = o_pcr - base_pcr_val
                         vol_abs = v_cpr - base_vol_val
+                        
+                        # 2. Percentage Change (For Percentage Mode)
+                        def get_standard_pct(current_val, base_val):
+                            if base_val == 0: return 0.0
+                            return ((current_val - base_val) / base_val) * 100.0
+                            
+                        pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
+                        vol_pct = get_standard_pct(v_cpr, base_vol_val)
 
                 def get_conv(opt_type_val):
                     strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
@@ -305,13 +310,14 @@ def run_master_scan(token, date_str):
                     'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
                     'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp,
                     'VOL_ABS': round(vol_abs, 2), 'PCR_ABS': round(pcr_abs, 2), 
+                    'VOL_PCT': round(vol_pct, 2), 'PCR_PCT': round(pcr_pct, 2),
                     'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
                 })
 
                 if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
                     new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': spot_ltp, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
             else:
-                final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
+                final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
     if snapshot_changed and client:
         try:
@@ -442,17 +448,23 @@ if auth_code:
         with tab1:
             show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
             
+            vol_col_name = 'VOL CHK\nCPR'
+            pcr_col_name = 'PCR\nCHK'
+            
+            # 🚀 TOGGLE FIX: Value off hone par bina % ke format hoga 🚀
+            checker_fmt = '{:+.2f}%' if show_pct else '{:+.2f}'
+            
             format_dict = {
                 'VOL PCR': '{:.2f}', 
-                'OPT PCR': '{:.2f}', 
-                'VOL CPR': '{:.2f}', 
+                'OPTION PCR': '{:.2f}',
+                'VOLUME\nCPR': '{:.2f}', 
                 'LTP': '{:.2f}', 
-                'LTP CHG': '{:.2f}', 
-                'CHG %': '{:+.2f}%', 
-                'CE CONT%': '{:+.2f}%', 
-                'PE CONT%': '{:+.2f}%',
-                'PCR CHK': '{:+.2f}', 
-                'VOL CHK': '{:+.2f}'
+                'LTP\nCHANGE': '{:.2f}', 
+                'CHANGE\n%': '{:+.2f}%', 
+                'CE\nCONT %': '{:+.2f}%', 
+                'PE\nCONT %': '{:+.2f}%',
+                pcr_col_name: checker_fmt, 
+                vol_col_name: checker_fmt
             }
             
             df = pd.DataFrame(st.session_state.cached_data)
@@ -461,32 +473,32 @@ if auth_code:
                 df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
                 df = df.sort_values(by='Conv_Rank', ascending=False)
                 
-                # Checkers
-                df['VOL CHK'] = df['VOL_ABS']
-                df['PCR CHK'] = df['PCR_ABS']
+                # 🚀 TOGGLE LOGIC: On pe Percentage, Off pe Value dikhayega 🚀
+                df[vol_col_name] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
+                df[pcr_col_name] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
                 
-                # SAARE COLUMNS WAPAS AAGAYE
-                df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHK', 'VOL CHK']]
+                df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', pcr_col_name, vol_col_name]]
                 
                 df = df.rename(columns={
                     'SYMS': 'SYMBOL', 
                     'OPEN_STATUS': 'OPENING',
                     'V_PCR': 'VOL PCR',
-                    'O_PCR': 'OPT PCR',
-                    'V_CPR': 'VOL CPR', 
-                    'LTP_CH': 'LTP CHG', 
-                    'CHG_%': 'CHG %', 
+                    'O_PCR': 'OPTION PCR',
+                    'V_CPR': 'VOLUME\nCPR', 
+                    'LTP_CH': 'LTP\nCHANGE', 
+                    'CHG_%': 'CHANGE\n%', 
                     'LTP': 'LTP', 
-                    'CE_CON': 'CE CONT%', 
-                    'PE_CON': 'PE CONT%'
+                    'CE_CON': 'CE\nCONT %', 
+                    'PE_CON': 'PE\nCONT %'
                 })
 
-                # 🚀 WAPAS ORIGINAL DATAFRAME PAR AAGAYE HAI (FILTER, SEARCH SAB WAPAS CHALEGA) 🚀
-                styled_df = (df.style.set_properties(**{'text-align': 'center'})
+                # 🚀 Normal DataFrame with HIDE INDEX and CSS Compression 🚀
+                styled_df = (df.style.hide(axis="index")
+                             .set_properties(**{'text-align': 'center'})
                              .format(format_dict)
                              .set_table_styles(header_styles)
-                             .map(style_indicators, subset=['OPENING', 'LTP CHG', 'CHG %', 'CE CONT%', 'PE CONT%', 'VOL CHK', 'PCR CHK'])
-                             .map(style_pcr_columns, subset=['VOL PCR', 'OPT PCR', 'VOL CPR']))
+                             .map(style_indicators, subset=['OPENING', 'LTP\nCHANGE', 'CHANGE\n%', 'CE\nCONT %', 'PE\nCONT %', vol_col_name, pcr_col_name])
+                             .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOLUME\nCPR']))
 
                 st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
@@ -506,7 +518,7 @@ if auth_code:
                             df_sym = df_sym.sort_values(by='Time')
                             df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
                             
-                            target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
+                            target_col = 'VOLUME\nCPR' if chart_mode == "Vol CPR" else 'OPTION PCR'
                             line_color = "#2962FF" 
                             ltp_color = "#FF5252"  
                             
