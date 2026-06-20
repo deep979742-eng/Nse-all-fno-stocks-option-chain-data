@@ -451,7 +451,6 @@ if auth_code:
             vol_col_name = 'VOL CHK\nCPR'
             pcr_col_name = 'PCR\nCHK'
             
-            # 🚀 TOGGLE FIX: Value off hone par bina % ke format hoga 🚀
             checker_fmt = '{:+.2f}%' if show_pct else '{:+.2f}'
             
             format_dict = {
@@ -473,7 +472,6 @@ if auth_code:
                 df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
                 df = df.sort_values(by='Conv_Rank', ascending=False)
                 
-                # 🚀 TOGGLE LOGIC: On pe Percentage, Off pe Value dikhayega 🚀
                 df[vol_col_name] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
                 df[pcr_col_name] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
                 
@@ -492,7 +490,6 @@ if auth_code:
                     'PE_CON': 'PE\nCONT %'
                 })
 
-                # 🚀 Normal DataFrame with HIDE INDEX and CSS Compression 🚀
                 styled_df = (df.style.hide(axis="index")
                              .set_properties(**{'text-align': 'center'})
                              .format(format_dict)
@@ -500,7 +497,7 @@ if auth_code:
                              .map(style_indicators, subset=['OPENING', 'LTP\nCHANGE', 'CHANGE\n%', 'CE\nCONT %', 'PE\nCONT %', vol_col_name, pcr_col_name])
                              .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOLUME\nCPR']))
 
-                st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
+                st.dataframe(styled_df, use_container_width=True, height=800)
 
         with tab2:
             st.markdown("### 📈 TREND CHART") 
@@ -518,7 +515,8 @@ if auth_code:
                             df_sym = df_sym.sort_values(by='Time')
                             df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
                             
-                            target_col = 'VOLUME\nCPR' if chart_mode == "Vol CPR" else 'OPTION PCR'
+                            # 🚀 BUG FIX: Ensure correct exact names from CSV match 🚀
+                            target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
                             line_color = "#2962FF" 
                             ltp_color = "#FF5252"  
                             
