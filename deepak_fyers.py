@@ -497,7 +497,26 @@ if auth_code:
                              .map(style_indicators, subset=['OPENING', 'LTP\nCHANGE', 'CHANGE\n%', 'CE\nCONT %', 'PE\nCONT %', vol_col_name, pcr_col_name])
                              .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOLUME\nCPR']))
 
-                st.dataframe(styled_df, use_container_width=True, height=800)
+                st.dataframe(
+                    styled_df, 
+                    use_container_width=False, 
+                    height=800, 
+                    hide_index=True,
+                    column_config={
+                        "SYMBOL": st.column_config.TextColumn(width="small"),
+                        "OPENING": st.column_config.TextColumn(width="small"),
+                        "VOL PCR": st.column_config.NumberColumn(width="small"),
+                        "OPTION PCR": st.column_config.NumberColumn(width="small"),
+                        "VOLUME\nCPR": st.column_config.NumberColumn(width="small"),
+                        "LTP\nCHANGE": st.column_config.NumberColumn(width="small"),
+                        "CHANGE\n%": st.column_config.NumberColumn(width="small"),
+                        "LTP": st.column_config.NumberColumn(width="small"),
+                        "CE\nCONT %": st.column_config.NumberColumn(width="small"),
+                        "PE\nCONT %": st.column_config.NumberColumn(width="small"),
+                        pcr_col_name: st.column_config.NumberColumn(width="small"),
+                        vol_col_name: st.column_config.NumberColumn(width="small")
+                    }
+                )
 
         with tab2:
             st.markdown("### 📈 TREND CHART") 
@@ -515,7 +534,7 @@ if auth_code:
                             df_sym = df_sym.sort_values(by='Time')
                             df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
                             
-                            # 🚀 BUG FIX: Ensure correct exact names from CSV match 🚀
+                            # 🚀 BUG FIX: Corrected target_col to read from CSV headers 🚀
                             target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
                             line_color = "#2962FF" 
                             ltp_color = "#FF5252"  
@@ -530,14 +549,39 @@ if auth_code:
                             fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
 
                             fig.update_layout(
-                                template="plotly_white", hovermode="x unified", height=400, margin=dict(l=0, r=0, t=50, b=10), 
-                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#424242", family="Arial, sans-serif"),
-                                xaxis=dict(rangeslider=dict(visible=False), type="date", range=[dynamic_start_time, fixed_end_time], showgrid=False, zeroline=False, showline=True, linecolor="#E0E0E0", tickfont=dict(color="#9E9E9E")),
-                                yaxis=dict(title=dict(text=f"{chart_mode}", font=dict(color=line_color, size=12)), tickfont=dict(color=line_color), gridcolor="#F5F5F5", gridwidth=1, zeroline=False, autorange=True),
-                                yaxis2=dict(title=dict(text="LTP", font=dict(color=ltp_color, size=12)), tickfont=dict(color=ltp_color), showgrid=False, zeroline=False, autorange=True),
+                                template="plotly_white", 
+                                hovermode="x unified", 
+                                dragmode="pan", # 🚀 Default Drag ab Pan (Scroll) Hoga 🚀
+                                height=400, 
+                                margin=dict(l=0, r=0, t=50, b=10), 
+                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", 
+                                font=dict(color="#424242", family="Arial, sans-serif"),
                                 legend=dict(orientation="h", yanchor="bottom", y=1.08, xanchor="center", x=0.5, font=dict(color="#424242", size=13), bgcolor="rgba(255,255,255,0)")
                             )
-                            st.plotly_chart(fig, use_container_width=True)
+                            
+                            # 🚀 TradingView jaisa Dotted Crosshair Configuration 🚀
+                            fig.update_xaxes(
+                                rangeslider=dict(visible=False), 
+                                type="date", 
+                                range=[dynamic_start_time, fixed_end_time], 
+                                showgrid=False, zeroline=False, showline=True, linecolor="#E0E0E0", tickfont=dict(color="#9E9E9E"),
+                                showspikes=True, spikecolor="#9E9E9E", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot"
+                            )
+                            fig.update_yaxes(
+                                title=dict(text=f"{chart_mode}", font=dict(color=line_color, size=12)), tickfont=dict(color=line_color), 
+                                gridcolor="#F5F5F5", gridwidth=1, zeroline=False, autorange=True,
+                                showspikes=True, spikecolor="#9E9E9E", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot",
+                                secondary_y=False
+                            )
+                            fig.update_yaxes(
+                                title=dict(text="LTP", font=dict(color=ltp_color, size=12)), tickfont=dict(color=ltp_color), 
+                                showgrid=False, zeroline=False, autorange=True,
+                                showspikes=True, spikecolor="#9E9E9E", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot",
+                                secondary_y=True
+                            )
+                            
+                            # 🚀 Config mein ScrollZoom ON aur Faltu menu bar buttons OFF kiye hain 🚀
+                            st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
                         else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                     else: st.info("⏳ Market data hasn't started logging yet today.")
                 except Exception as e: st.error(f"Chart Load Error: {e}")
