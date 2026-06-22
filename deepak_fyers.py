@@ -195,7 +195,6 @@ def run_master_scan(token, date_str):
     new_csv_rows = []
     live_ltp_data = {} 
 
-    # 🚀 JUGAAD FIX: Smart Traffic Controller (Missing Data aur Hang hone ke beech ka perfect balance) 🚀
     def fetch_option_chain_fast_local(q):
         sym = q['n']
         time.sleep(0.1) # Micro-pause: Rate Limit Bypass taaki Fyers sabhi stocks ka data bheje
@@ -209,8 +208,8 @@ def run_master_scan(token, date_str):
             except: pass 
         return q, None 
 
-    # 🚀 FIX: Balance set to 3 max_workers. Ab screen hang nahi hogi aur data pura aayega. 🚀
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+    # 🚀 FIX: Balance set to 4 max_workers. Aapke suggestion par perfect sweet spot trial. 🚀
+    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         results = executor.map(fetch_option_chain_fast_local, all_quotes)
         for q, oc in results:
             s_name = get_raw_symbol(q['n'])
