@@ -257,7 +257,6 @@ def run_master_scan(token, date_str):
                         pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
                         vol_pct = get_standard_pct(v_cpr, base_vol_val)
 
-                # 🚀 9:17 AM TO 9:20 AM CONTRACT HOLD & EXACT MATCH LOGIC 🚀
                 def get_conv(opt_type_val):
                     if scan_time_ist.time() < datetime.time(9, 20):
                         return 0.0
@@ -424,13 +423,9 @@ if auth_code:
         tab1, tab2 = st.tabs(["📊 Dashboard", "📈 TREND CHART"])
         
         with tab1:
+            # 🚀 OVERLAP FIX: Timer ab safely Toggle naam ke andar hai 🚀
             ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
-            
-            t_col1, t_col2 = st.columns([1, 1])
-            with t_col1:
-                show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
-            with t_col2:
-                st.markdown(f"<div style='text-align: right; color: #888888; font-size: 14px; font-weight: bold; margin-top: 10px;'>⏱️ Last Refresh: {ref_time}</div>", unsafe_allow_html=True)
+            show_pct = st.toggle(f"📊 Show Checker Data in Percentage (%) ㅤ|ㅤ ⏱️ Last Refresh: {ref_time}", value=True)
             
             vol_col_name = 'VOL CHK\nCPR'
             pcr_col_name = 'PCR\nCHK'
@@ -588,8 +583,8 @@ if auth_code:
 
     if secs_wait < 5: secs_wait = 5
     
-    # 🚀 BUG FIX: Dynamic Key lagayi taaki Streamlit purana timer yaad na rakhe 🚀
-    st_autorefresh(interval=secs_wait * 1000, key=f"exact_boundary_timer_{target_idx}")
+    # 🚀 FIX: limit=10000 added so Mobile Browser doesn't kill the loop 🚀
+    st_autorefresh(interval=secs_wait * 1000, limit=10000, key=f"timer_{target_idx}")
 
 else:
     st.info("👈 Please enter Auth Code in sidebar.")
