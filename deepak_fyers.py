@@ -33,7 +33,7 @@ css_str = """<style>
 .block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
-/* 🚀 COLUMN COMPRESS CSS */
+/* 🚀 COLUMN COMPRESS CSS (white-space: pre-wrap se \\n kaam karega) */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
     background-color: darkblue !important; 
     color: white !important; 
@@ -196,11 +196,9 @@ def run_master_scan(token, date_str):
     live_ltp_data = {} 
     missing_stock_names = []
 
-    # 🚀 ORIGINAL SAFE ENGINE RESTORED: 100% Data Accuracy 🚀
     def fetch_option_chain_fast_local(q):
         sym = q['n']
         for attempt in range(3): 
-            # 🚀 WAPAS WAHI AAPKE PURANE CODE WALA 0.6 SECONDS WALA JADU LAGA DIYA 🚀
             if attempt == 0: time.sleep(0.6) 
             else: time.sleep(2.5) 
                 
@@ -211,7 +209,6 @@ def run_master_scan(token, date_str):
             except: pass 
         return q, None 
 
-    # 🚀 WAPAS AAPKE PURANE ENGINE KI TARAH SIRF 2 THREADS (SLOW & SAFE) 🚀
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         results = executor.map(fetch_option_chain_fast_local, all_quotes)
         
@@ -341,13 +338,16 @@ if saved_token:
     if st.sidebar.button("🔄 Force Logout / Clear Token"):
         if os.path.exists(TOKEN_STORE_FILE):
             os.remove(TOKEN_STORE_FILE)
-        if 'cached_data' in st.session_state:
-            del st.session_state['cached_data']
+        # 🚀 CLEAN LOGOUT FIX: Box memory cleared 🚀
+        for k in ['cached_data', 'auth_box']: 
+            if k in st.session_state:
+                del st.session_state[k]
         st.rerun()
 else:
     magic_url = f"https://api-t1.fyers.in/api/v3/generate-authcode?client_id={APP_ID}&redirect_uri={REDIRECT_URI}&response_type=code&state=deepak"
     st.sidebar.markdown(f"### [👉 Step 1: Click to Get Code]({magic_url})")
-    auth_code = st.sidebar.text_input("Step 2: Paste Code Here:", type="password")
+    # 🚀 TEXT BOX MEMORY FIX: Key added 🚀
+    auth_code = st.sidebar.text_input("Step 2: Paste Code Here:", type="password", key="auth_box")
 
 st.sidebar.markdown("---")
 st.sidebar.header("💾 9:17 AM Intraday Baseline Save")
@@ -387,230 +387,242 @@ if st.sidebar.button("Manual 9:17 AM Save"):
 # 6. APP RENDERING & MAGIC VIEWER
 # ==========================================
 if auth_code:
+    token = None
     if auth_code != "AUTO_LOGGED_IN":
-        session = fyersModel.SessionModel(client_id=APP_ID, secret_key=SECRET_ID, redirect_uri=REDIRECT_URI, response_type="code", grant_type="authorization_code")
-        session.set_token(auth_code)
-        token = session.generate_token()['access_token']
-        json.dump({"date": today_str, "token": token}, open(TOKEN_STORE_FILE, 'w'))
-        st.sidebar.success("✅ Token Saved!")
+        # 🚀 CRASH FIX: Safe Token Generator 🚀
+        try:
+            session = fyersModel.SessionModel(client_id=APP_ID, secret_key=SECRET_ID, redirect_uri=REDIRECT_URI, response_type="code", grant_type="authorization_code")
+            session.set_token(auth_code)
+            response = session.generate_token()
+            
+            if isinstance(response, dict) and "access_token" in response:
+                token = response['access_token']
+                json.dump({"date": today_str, "token": token}, open(TOKEN_STORE_FILE, 'w'))
+                st.sidebar.success("✅ Token Saved! Page refreshing...")
+                time.sleep(1) # Smart Refresh wait
+                st.rerun() # Refresh karke old code hide kar dega
+            else:
+                st.sidebar.error(f"❌ Auth Code purana hai. Kripya naya code paste karein.")
+        except Exception as e:
+            st.sidebar.error(f"❌ Error: {e}")
     else:
         token = saved_token
 
-    cached_result, last_scan_timestamp = run_master_scan(token, today_str)
+    # Agar token safely mil gaya, tabhi aage ka data ayega
+    if token:
+        cached_result, last_scan_timestamp = run_master_scan(token, today_str)
 
-    if cached_result is not None:
-        st.session_state.cached_data = cached_result
-        st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
-        
-        if datetime.time(9, 17) <= now_ist.time() < datetime.time(9, 25):
-            last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
-            if last_save != today_str:
-                if save_eod_data(): 
-                    open(AUTO_SAVE_FILE, "w").write(today_str)
-                    run_master_scan.clear() 
-    else:
-        if 'cached_data' not in st.session_state: st.session_state.cached_data = []
+        if cached_result is not None:
+            st.session_state.cached_data = cached_result
+            st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
+            
+            if datetime.time(9, 17) <= now_ist.time() < datetime.time(9, 25):
+                last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
+                if last_save != today_str:
+                    if save_eod_data(): 
+                        open(AUTO_SAVE_FILE, "w").write(today_str)
+                        run_master_scan.clear() 
+        else:
+            if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
-    if len(st.session_state.cached_data) > 0:
-        
-        def style_indicators(val):
-            if isinstance(val, str): 
-                if "Gap Up" in val: return 'color: #00AA00; font-weight: bold; text-align: center;'
-                if "Gap Down" in val: return 'color: #FF0000; font-weight: bold; text-align: center;'
-                if "Same" in val: return 'color: #00BFFF; font-weight: bold; text-align: center;'
+        if len(st.session_state.cached_data) > 0:
+            
+            def style_indicators(val):
+                if isinstance(val, str): 
+                    if "Gap Up" in val: return 'color: #00AA00; font-weight: bold; text-align: center;'
+                    if "Gap Down" in val: return 'color: #FF0000; font-weight: bold; text-align: center;'
+                    if "Same" in val: return 'color: #00BFFF; font-weight: bold; text-align: center;'
+                    return 'text-align: center;'
+                if val > 0: return 'color: #00AA00; font-weight: bold; text-align: center;'
+                elif val < 0: return 'color: #FF0000; font-weight: bold; text-align: center;'
+                return 'color: #888888; font-weight: bold; text-align: center;'
+
+            def style_pcr_columns(val):
+                if isinstance(val, (int, float)):
+                    if val >= 1.0: return 'color: #00AA00; font-weight: bold; text-align: center;'
+                    elif val > 0 and val < 1.0: return 'color: #FF0000; font-weight: bold; text-align: center;'
                 return 'text-align: center;'
-            if val > 0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-            elif val < 0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-            return 'color: #888888; font-weight: bold; text-align: center;'
 
-        def style_pcr_columns(val):
-            if isinstance(val, (int, float)):
-                if val >= 1.0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-                elif val > 0 and val < 1.0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-            return 'text-align: center;'
+            header_styles = [
+                {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
+                {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
+            ]
 
-        header_styles = [
-            {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
-            {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
-        ]
+            tab1, tab2 = st.tabs(["📊 Dashboard", "📈 TREND CHART"])
+            
+            with tab1:
+                ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
+                
+                t_col1, t_col2 = st.columns([6, 4])
+                with t_col1:
+                    show_pct = st.toggle("📊 Show Checker in %", value=True)
+                with t_col2:
+                    st.markdown(f"<div style='text-align: right; color: #888888; font-size: 13px; font-weight: bold; margin-top: 10px;'>⏱️ Last: {ref_time}</div>", unsafe_allow_html=True)
+                
+                if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
+                    missing_str = ", ".join(st.session_state.missing_stocks_list)
+                    st.warning(f"⚠️ Fyers API ne in {len(st.session_state.missing_stocks_list)} stocks ka data nahi diya: **{missing_str}**. (Agar koi naya stock hamesha yahan aata hai, toh ho sakta hai usme F&O Options allow na ho)")
+                
+                vol_col_name = 'VOL CHK\nCPR'
+                pcr_col_name = 'PCR\nCHK'
+                
+                checker_fmt = '{:+.2f}%' if show_pct else '{:+.2f}'
+                
+                format_dict = {
+                    'VOL PCR': '{:.2f}', 
+                    'OPTION PCR': '{:.2f}',
+                    'VOLUME\nCPR': '{:.2f}', 
+                    'LTP': '{:.2f}', 
+                    'LTP\nCHANGE': '{:.2f}', 
+                    'CHANGE\n%': '{:+.2f}%', 
+                    'CE\nCONT %': '{:+.2f}%', 
+                    'PE\nCONT %': '{:+.2f}%',
+                    pcr_col_name: checker_fmt, 
+                    vol_col_name: checker_fmt
+                }
+                
+                df = pd.DataFrame(st.session_state.cached_data)
+                
+                if not df.empty:
+                    df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
+                    df = df.sort_values(by='Conv_Rank', ascending=False)
+                    
+                    df[vol_col_name] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
+                    df[pcr_col_name] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
+                    
+                    df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', pcr_col_name, vol_col_name]]
+                    
+                    df = df.rename(columns={
+                        'SYMS': 'SYMBOL', 
+                        'OPEN_STATUS': 'OPENING',
+                        'V_PCR': 'VOL PCR',
+                        'O_PCR': 'OPTION PCR',
+                        'V_CPR': 'VOLUME\nCPR', 
+                        'LTP_CH': 'LTP\nCHANGE', 
+                        'CHG_%': 'CHANGE\n%', 
+                        'LTP': 'LTP', 
+                        'CE_CON': 'CE\nCONT %', 
+                        'PE_CON': 'PE\nCONT %'
+                    })
 
-        tab1, tab2 = st.tabs(["📊 Dashboard", "📈 TREND CHART"])
+                    styled_df = (df.style.hide(axis="index")
+                                 .set_properties(**{'text-align': 'center'})
+                                 .format(format_dict)
+                                 .set_table_styles(header_styles)
+                                 .map(style_indicators, subset=['OPENING', 'LTP\nCHANGE', 'CHANGE\n%', 'CE\nCONT %', 'PE\nCONT %', vol_col_name, pcr_col_name])
+                                 .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOLUME\nCPR']))
+
+                    st.dataframe(
+                        styled_df, 
+                        use_container_width=False, 
+                        height=800, 
+                        hide_index=True,
+                        column_config={
+                            "SYMBOL": st.column_config.TextColumn(width="small"),
+                            "OPENING": st.column_config.TextColumn(width="small"),
+                            "VOL PCR": st.column_config.NumberColumn(width="small"),
+                            "OPTION PCR": st.column_config.NumberColumn(width="small"),
+                            "VOLUME\nCPR": st.column_config.NumberColumn(width="small"),
+                            "LTP\nCHANGE": st.column_config.NumberColumn(width="small"),
+                            "CHANGE\n%": st.column_config.NumberColumn(width="small"),
+                            "LTP": st.column_config.NumberColumn(width="small"),
+                            "CE\nCONT %": st.column_config.NumberColumn(width="small"),
+                            "PE\nCONT %": st.column_config.NumberColumn(width="small"),
+                            pcr_col_name: st.column_config.NumberColumn(width="small"),
+                            vol_col_name: st.column_config.NumberColumn(width="small")
+                        }
+                    )
+
+            with tab2:
+                st.markdown("### 📈 TREND CHART") 
+                
+                col_c1, col_c2 = st.columns([2, 2])
+                with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
+                with col_c2: 
+                    chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True)
+
+                if os.path.exists(HISTORY_FILE):
+                    try:
+                        hist_df = pd.read_csv(HISTORY_FILE)
+                        if not hist_df.empty and 'Date' in hist_df.columns:
+                            df_sym = hist_df[(hist_df['Date'] == today_str) & (hist_df['Symbol'] == sel_stock)].copy()
+                            if not df_sym.empty:
+                                df_sym = df_sym.sort_values(by='Time')
+                                df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
+                                
+                                target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
+                                line_color = "#2962FF" 
+                                ltp_color = "#FF5252"  
+                                
+                                fig = make_subplots(specs=[[{"secondary_y": True}]])
+                                fig.add_trace(go.Scatter(x=df_sym['Datetime'], y=df_sym[target_col], name=f"{chart_mode}", line=dict(color=line_color, width=2.5, shape="spline"), mode="lines"), secondary_y=False)
+                                fig.add_trace(go.Scatter(x=df_sym['Datetime'], y=df_sym['LTP'], name="Stock LTP", line=dict(color=ltp_color, width=2.5, shape="spline"), mode="lines"), secondary_y=True)
+
+                                market_open_time = pd.to_datetime(f"{today_str} 09:15:00")
+                                actual_first_data_time = df_sym['Datetime'].min()
+                                dynamic_start_time = max(actual_first_data_time, market_open_time)
+                                fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
+
+                                fig.update_layout(
+                                    template="plotly_white", 
+                                    hovermode="x unified", 
+                                    dragmode="pan", 
+                                    height=400, 
+                                    margin=dict(l=0, r=0, t=50, b=10), 
+                                    plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", 
+                                    font=dict(color="#424242", family="Arial, sans-serif"),
+                                    legend=dict(orientation="h", yanchor="bottom", y=1.08, xanchor="center", x=0.5, font=dict(color="#424242", size=13), bgcolor="rgba(255,255,255,0)")
+                                )
+                                
+                                fig.update_xaxes(
+                                    rangeslider=dict(visible=False), 
+                                    type="date", 
+                                    range=[dynamic_start_time, fixed_end_time], 
+                                    showgrid=False, zeroline=False, showline=True, linecolor="#E0E0E0", tickfont=dict(color="#9E9E9E"),
+                                    showspikes=True, spikecolor="#9E9E9E", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot"
+                                )
+                                fig.update_yaxes(
+                                    title=dict(text=f"{chart_mode}", font=dict(color=line_color, size=12)), tickfont=dict(color=line_color), 
+                                    gridcolor="#F5F5F5", gridwidth=1, zeroline=False, autorange=True,
+                                    showspikes=True, spikecolor="#9E9E9E", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot",
+                                    secondary_y=False
+                                )
+                                fig.update_yaxes(
+                                    title=dict(text="LTP", font=dict(color=ltp_color, size=12)), tickfont=dict(color=ltp_color), 
+                                    showgrid=False, zeroline=False, autorange=True,
+                                    showspikes=True, spikecolor="#9E9E9E", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot",
+                                    secondary_y=True
+                                )
+                                
+                                st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
+                            else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
+                        else: st.info("⏳ Market data hasn't started logging yet today.")
+                    except Exception as e: st.error(f"Chart Load Error: {e}")
+                else: st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
         
-        with tab1:
-            ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
-            
-            t_col1, t_col2 = st.columns([6, 4])
-            with t_col1:
-                show_pct = st.toggle("📊 Show Checker in %", value=True)
-            with t_col2:
-                st.markdown(f"<div style='text-align: right; color: #888888; font-size: 13px; font-weight: bold; margin-top: 10px;'>⏱️ Last: {ref_time}</div>", unsafe_allow_html=True)
-            
-            if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
-                missing_str = ", ".join(st.session_state.missing_stocks_list)
-                st.warning(f"⚠️ Fyers API ne in {len(st.session_state.missing_stocks_list)} stocks ka data nahi diya: **{missing_str}**. (Agar koi naya stock hamesha yahan aata hai, toh ho sakta hai usme F&O Options allow na ho)")
-            
-            vol_col_name = 'VOL CHK\nCPR'
-            pcr_col_name = 'PCR\nCHK'
-            
-            checker_fmt = '{:+.2f}%' if show_pct else '{:+.2f}'
-            
-            format_dict = {
-                'VOL PCR': '{:.2f}', 
-                'OPTION PCR': '{:.2f}',
-                'VOLUME\nCPR': '{:.2f}', 
-                'LTP': '{:.2f}', 
-                'LTP\nCHANGE': '{:.2f}', 
-                'CHANGE\n%': '{:+.2f}%', 
-                'CE\nCONT %': '{:+.2f}%', 
-                'PE\nCONT %': '{:+.2f}%',
-                pcr_col_name: checker_fmt, 
-                vol_col_name: checker_fmt
-            }
-            
-            df = pd.DataFrame(st.session_state.cached_data)
-            
-            if not df.empty:
-                df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
-                df = df.sort_values(by='Conv_Rank', ascending=False)
-                
-                df[vol_col_name] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
-                df[pcr_col_name] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
-                
-                df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', pcr_col_name, vol_col_name]]
-                
-                df = df.rename(columns={
-                    'SYMS': 'SYMBOL', 
-                    'OPEN_STATUS': 'OPENING',
-                    'V_PCR': 'VOL PCR',
-                    'O_PCR': 'OPTION PCR',
-                    'V_CPR': 'VOLUME\nCPR', 
-                    'LTP_CH': 'LTP\nCHANGE', 
-                    'CHG_%': 'CHANGE\n%', 
-                    'LTP': 'LTP', 
-                    'CE_CON': 'CE\nCONT %', 
-                    'PE_CON': 'PE\nCONT %'
-                })
+        # ==========================================
+        # 7. EXACT BOUNDARY AUTO-REFRESH LOGIC 🎯
+        # ==========================================
+        now_refresh = datetime.datetime.now(IST)
+        current_total_secs = now_refresh.minute * 60 + now_refresh.second
 
-                styled_df = (df.style.hide(axis="index")
-                             .set_properties(**{'text-align': 'center'})
-                             .format(format_dict)
-                             .set_table_styles(header_styles)
-                             .map(style_indicators, subset=['OPENING', 'LTP\nCHANGE', 'CHANGE\n%', 'CE\nCONT %', 'PE\nCONT %', vol_col_name, pcr_col_name])
-                             .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOLUME\nCPR']))
+        targets = [(m * 60 + 5) for m in range(0, 65, 5)]
+        secs_wait = 300
+        target_idx = 0
+        for i, t in enumerate(targets):
+            if t > current_total_secs:
+                secs_wait = t - current_total_secs
+                target_idx = i
+                break
 
-                st.dataframe(
-                    styled_df, 
-                    use_container_width=False, 
-                    height=800, 
-                    hide_index=True,
-                    column_config={
-                        "SYMBOL": st.column_config.TextColumn(width="small"),
-                        "OPENING": st.column_config.TextColumn(width="small"),
-                        "VOL PCR": st.column_config.NumberColumn(width="small"),
-                        "OPTION PCR": st.column_config.NumberColumn(width="small"),
-                        "VOLUME\nCPR": st.column_config.NumberColumn(width="small"),
-                        "LTP\nCHANGE": st.column_config.NumberColumn(width="small"),
-                        "CHANGE\n%": st.column_config.NumberColumn(width="small"),
-                        "LTP": st.column_config.NumberColumn(width="small"),
-                        "CE\nCONT %": st.column_config.NumberColumn(width="small"),
-                        "PE\nCONT %": st.column_config.NumberColumn(width="small"),
-                        pcr_col_name: st.column_config.NumberColumn(width="small"),
-                        vol_col_name: st.column_config.NumberColumn(width="small")
-                    }
-                )
+        if secs_wait < 5: secs_wait = 5
+        
+        if 'last_api_call' in st.session_state:
+            time_since_last = (now_refresh - st.session_state.last_api_call).total_seconds()
+            if time_since_last > 310: 
+                secs_wait = 2
 
-        with tab2:
-            st.markdown("### 📈 TREND CHART") 
-            
-            col_c1, col_c2 = st.columns([2, 2])
-            with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
-            with col_c2: 
-                chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True)
-
-            if os.path.exists(HISTORY_FILE):
-                try:
-                    hist_df = pd.read_csv(HISTORY_FILE)
-                    if not hist_df.empty and 'Date' in hist_df.columns:
-                        df_sym = hist_df[(hist_df['Date'] == today_str) & (hist_df['Symbol'] == sel_stock)].copy()
-                        if not df_sym.empty:
-                            df_sym = df_sym.sort_values(by='Time')
-                            df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
-                            
-                            target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
-                            line_color = "#2962FF" 
-                            ltp_color = "#FF5252"  
-                            
-                            fig = make_subplots(specs=[[{"secondary_y": True}]])
-                            fig.add_trace(go.Scatter(x=df_sym['Datetime'], y=df_sym[target_col], name=f"{chart_mode}", line=dict(color=line_color, width=2.5, shape="spline"), mode="lines"), secondary_y=False)
-                            fig.add_trace(go.Scatter(x=df_sym['Datetime'], y=df_sym['LTP'], name="Stock LTP", line=dict(color=ltp_color, width=2.5, shape="spline"), mode="lines"), secondary_y=True)
-
-                            market_open_time = pd.to_datetime(f"{today_str} 09:15:00")
-                            actual_first_data_time = df_sym['Datetime'].min()
-                            dynamic_start_time = max(actual_first_data_time, market_open_time)
-                            fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
-
-                            fig.update_layout(
-                                template="plotly_white", 
-                                hovermode="x unified", 
-                                dragmode="pan", 
-                                height=400, 
-                                margin=dict(l=0, r=0, t=50, b=10), 
-                                plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", 
-                                font=dict(color="#424242", family="Arial, sans-serif"),
-                                legend=dict(orientation="h", yanchor="bottom", y=1.08, xanchor="center", x=0.5, font=dict(color="#424242", size=13), bgcolor="rgba(255,255,255,0)")
-                            )
-                            
-                            fig.update_xaxes(
-                                rangeslider=dict(visible=False), 
-                                type="date", 
-                                range=[dynamic_start_time, fixed_end_time], 
-                                showgrid=False, zeroline=False, showline=True, linecolor="#E0E0E0", tickfont=dict(color="#9E9E9E"),
-                                showspikes=True, spikecolor="#9E9E9E", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot"
-                            )
-                            fig.update_yaxes(
-                                title=dict(text=f"{chart_mode}", font=dict(color=line_color, size=12)), tickfont=dict(color=line_color), 
-                                gridcolor="#F5F5F5", gridwidth=1, zeroline=False, autorange=True,
-                                showspikes=True, spikecolor="#9E9E9E", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot",
-                                secondary_y=False
-                            )
-                            fig.update_yaxes(
-                                title=dict(text="LTP", font=dict(color=ltp_color, size=12)), tickfont=dict(color=ltp_color), 
-                                showgrid=False, zeroline=False, autorange=True,
-                                showspikes=True, spikecolor="#9E9E9E", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot",
-                                secondary_y=True
-                            )
-                            
-                            st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
-                        else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
-                    else: st.info("⏳ Market data hasn't started logging yet today.")
-                except Exception as e: st.error(f"Chart Load Error: {e}")
-            else: st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
-    else:
-        st.error("⚠️ Data fetch nahi ho raha hai! Fyers ka Token expire ya invalid ho gaya hai. Kripya sidebar se 'Force Logout / Clear Token' button dabayein aur naya Auth Code generate karein.")
-
-    # ==========================================
-    # 7. EXACT BOUNDARY AUTO-REFRESH LOGIC 🎯
-    # ==========================================
-    now_refresh = datetime.datetime.now(IST)
-    current_total_secs = now_refresh.minute * 60 + now_refresh.second
-
-    targets = [(m * 60 + 5) for m in range(0, 65, 5)]
-    secs_wait = 300
-    target_idx = 0
-    for i, t in enumerate(targets):
-        if t > current_total_secs:
-            secs_wait = t - current_total_secs
-            target_idx = i
-            break
-
-    if secs_wait < 5: secs_wait = 5
-    
-    if 'last_api_call' in st.session_state:
-        time_since_last = (now_refresh - st.session_state.last_api_call).total_seconds()
-        if time_since_last > 310: 
-            secs_wait = 2
-
-    st_autorefresh(interval=secs_wait * 1000, limit=10000, key=f"timer_{target_idx}")
+        st_autorefresh(interval=secs_wait * 1000, limit=10000, key=f"timer_{target_idx}")
 
 else:
     st.info("👈 Please enter Auth Code in sidebar.")
