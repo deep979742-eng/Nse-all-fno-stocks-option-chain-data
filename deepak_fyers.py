@@ -12,6 +12,7 @@ import concurrent.futures
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from streamlit_autorefresh import st_autorefresh
+import streamlit.components.v1 as components  # 🚀 NAYA IMPORT FOR BROWSER CLOCK
 
 # ==========================================
 # 1. FYERS CREDENTIALS & SETUP
@@ -69,10 +70,6 @@ if 'live_base_date' not in st.session_state or st.session_state.live_base_date !
     st.session_state.live_base = {}
     st.session_state.live_base_date = today_str
 
-# Initialize session state for continuous 5:10 loop countdown tracking
-if 'timer_start_time' not in st.session_state:
-    st.session_state.timer_start_time = time.time()
-
 # ==========================================
 # 2. GOOGLE SHEETS DYNAMIC CONNECTION
 # ==========================================
@@ -123,11 +120,28 @@ def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
+
 # ==========================================
-# 4. MASTER SCANNER (Aapka Fast Purana Engine)
+# 4. MASTER ENGINE & TIMER DEFINITIONS 🚀
 # ==========================================
-@st.cache_data(ttl=290, show_spinner=False)
-def run_master_scan(token, date_str):
+st.sidebar.markdown("### 📱 APP MODE")
+app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
+st.sidebar.markdown("---")
+
+# 🚀 TARGET DEFINED: Exactly 5 mins 10 secs cycle logic 🚀
+if app_mode == "💻 Master (Data Fetcher)":
+    # 310000ms loop will increment 'refresh_count' every cycle
+    refresh_count = st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
+else:
+    refresh_count = st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
+
+
+# ==========================================
+# 5. DATA SCANNER (Triggered strictly by Auto-Refresh count)
+# ==========================================
+# 🚀 BUG FIX: NO TTL CACHE! Data refreshes EXACTLY when refresh_count changes 🚀
+@st.cache_data(show_spinner=False)
+def run_master_scan(token, date_str, cycle_trigger):
     fyers = fyersModel.FyersModel(client_id=APP_ID, is_async=False, token=token, log_path="")
     scan_time_ist = datetime.datetime.now(IST)
     time_str = scan_time_ist.strftime('%H:%M')
@@ -201,7 +215,7 @@ def run_master_scan(token, date_str):
     live_ltp_data = {} 
     missing_stock_names = []
 
-    # 🚀 AAPKA ORIGINAL SPEEDY DATA FETCH LOGIC (0.4s Wait Engine) 🚀
+    # 🚀 ORIGINAL 0.4 SEC DATA FETCH LOGIC (100% Safe Engine) 🚀
     def fetch_option_chain_fast_local(q):
         sym = q['n']
         time.sleep(0.4) 
@@ -325,12 +339,8 @@ def run_master_scan(token, date_str):
 
 
 # ==========================================
-# 5. THE SERVER / CLIENT ENGINE 🚀
+# 6. SIDEBAR SETUP & LOGIN
 # ==========================================
-st.sidebar.markdown("### 📱 APP MODE")
-app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
-st.sidebar.markdown("---")
-
 auth_code = None
 token = None
 cached_result = None
@@ -390,7 +400,7 @@ if app_mode == "💻 Master (Data Fetcher)":
     if st.sidebar.button("Manual 9:17 AM Save"):
         if save_eod_data(): 
             st.sidebar.success("Baseline Saved Successfully!")
-            run_master_scan.clear() 
+            st.cache_data.clear() # Force clear map
 
     # --- MASTER EXECUTION ---
     if auth_code:
@@ -411,14 +421,12 @@ if app_mode == "💻 Master (Data Fetcher)":
             token = saved_token
 
         if token:
-            cached_result, last_scan_timestamp = run_master_scan(token, today_str)
+            # Pass refresh_count to function so it 100% bypasses cache safely when timer triggers
+            cached_result, last_scan_timestamp = run_master_scan(token, today_str, refresh_count)
 
             if cached_result is not None:
                 st.session_state.cached_data = cached_result
                 st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
-                
-                # 🚀 RESET TIMER START TIME EXACTLY AFTER DATA FETCH COMPLETES 🚀
-                st.session_state.timer_start_time = time.time()
                 
                 try:
                     shared_pack = {"time": last_scan_timestamp, "data": cached_result, "missing": st.session_state.get('missing_stocks_list', [])}
@@ -430,7 +438,6 @@ if app_mode == "💻 Master (Data Fetcher)":
                     if last_save != today_str:
                         if save_eod_data(): 
                             open(AUTO_SAVE_FILE, "w").write(today_str)
-                            run_master_scan.clear() 
             else:
                 if 'cached_data' not in st.session_state: st.session_state.cached_data = []
     else:
@@ -453,7 +460,7 @@ elif app_mode == "📱 Viewer (Mobile Client)":
 
 
 # ==========================================
-# 6. APP RENDERING (Table & Charts)
+# 7. APP RENDERING (Table & Charts)
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
@@ -481,18 +488,36 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     tab1, tab2 = st.tabs(["📊 Dashboard", "📈 TREND CHART"])
     
     with tab1:
-        # Calculate dynamic remaining time for 5:10 countdown loop
-        elapsed_time = time.time() - st.session_state.timer_start_time
-        remaining_seconds = max(0, int(310 - elapsed_time))
-        mins, secs = divmod(remaining_seconds, 60)
-        countdown_str = f"{mins:02d}:{secs:02d}"
+        ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
         
         t_col1, t_col2 = st.columns([6, 4])
         with t_col1:
             show_pct = st.toggle("📊 Show Checker in %", value=True)
+            
         with t_col2:
-            # 🚀 TIMER MOVED EXACTLY TO BLACK PEN MARKED PLACE (Right side of toggle row) 🚀
-            st.markdown(f"<div style='text-align: right; color: #FF4D4D; font-size: 14px; font-weight: bold; margin-top: 10px;'>⏱️ Next Refresh In: {countdown_str}</div>", unsafe_allow_html=True)
+            if app_mode == "💻 Master (Data Fetcher)":
+                # 🚀 JAVASCRIPT BROWSER CLOCK FIX: Runs purely in browser, Zero Python Load 🚀
+                components.html("""
+                <div style="text-align: right; color: #FF4D4D; font-size: 14px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 8px;">
+                    ⏱️ Next Refresh In: <span id="clock">05:10</span>
+                </div>
+                <script>
+                    var timeLeft = 310;
+                    setInterval(function() {
+                        if(timeLeft <= 0) {
+                            document.getElementById('clock').innerHTML = "Fetching Data...";
+                        } else {
+                            timeLeft--;
+                            var m = Math.floor(timeLeft / 60);
+                            var s = timeLeft % 60;
+                            document.getElementById('clock').innerHTML = (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
+                        }
+                    }, 1000);
+                </script>
+                """, height=40)
+            else:
+                mode_text = "Viewer"
+                st.markdown(f"<div style='text-align: right; color: #888888; font-size: 13px; font-weight: bold; margin-top: 10px;'>⏱️ Last ({mode_text}): {ref_time}</div>", unsafe_allow_html=True)
         
         if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
             missing_str = ", ".join(st.session_state.missing_stocks_list)
@@ -634,13 +659,3 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
         else: st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
-
-
-# ==========================================
-# 7. CONTINUOUS COUNTDOWN TRIGGER LOGIC 🎯
-# ==========================================
-if app_mode == "💻 Master (Data Fetcher)":
-    # 🚀 1-Second browser pulse lagayi taaki right side ka countdown smoothly ghate (05:10, 05:09...)
-    st_autorefresh(interval=1000, limit=20000, key="sln_perfect_loop_countdown")
-else:
-    st_autorefresh(interval=30000, limit=10000, key="viewer_timer")
