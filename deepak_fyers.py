@@ -33,7 +33,7 @@ css_str = """<style>
 .block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
-/* 🚀 COLUMN COMPRESS CSS (white-space: pre-wrap se \\n kaam karega) */
+/* 🚀 COLUMN COMPRESS CSS */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
     background-color: darkblue !important; 
     color: white !important; 
@@ -163,6 +163,7 @@ def run_master_scan(token, date_str):
                     decoded_str = base64.b64decode(full_str).decode('utf-8')
                     loaded_prices = json.loads(decoded_str)
                     for k, v in loaded_prices.items():
+                        # 🚀 EXACT MATCH: Ab kisi 'Generic Key' ki zaroorat nahi hai 🚀
                         baseline_prices[k] = round(float(v), 2)
             except: pass
 
@@ -259,7 +260,7 @@ def run_master_scan(token, date_str):
 
                 # 🚀 9:17 AM TO 9:20 AM CONTRACT HOLD & EXACT MATCH LOGIC 🚀
                 def get_conv(opt_type_val):
-                    # Data 9:20 se pehle 0% rahega taaki dashboard kachra match na dikhaye
+                    # Data 9:20 se pehle 0% rahega taaki dashboard intraday setup hone tak clean rahe
                     if scan_time_ist.time() < datetime.time(9, 20):
                         return 0.0
                         
@@ -271,7 +272,7 @@ def run_master_scan(token, date_str):
                         if lp == 0: continue
                         
                         diff = 0.0
-                        # 🚀 EXACT MATCH: Ab koi rollover bug (Fake Green) nahi hoga! 🚀
+                        # 🚀 EXACT MATCH: Baseline data ab seedha 9:17 AM ka hai 🚀
                         if sym in baseline_prices:
                             diff = round(lp - baseline_prices[sym], 2)
                                 
