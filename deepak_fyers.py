@@ -130,6 +130,7 @@ def run_master_scan(token, date_str):
     baseline_prices = {}
     snap_950 = {}
     snapshot_changed = False
+    saved_date = None
     
     client = get_gspread_client()
     if client:
@@ -154,10 +155,15 @@ def run_master_scan(token, date_str):
                             
                             ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
                             ws2.batch_clear(["A2:A100"])
+                            saved_date = date_str
             except: pass
 
             try:
-                col_vals = ws1.col_values(1)
+                if saved_date == date_str:
+                    col_vals = ws2.col_values(1)[1:]
+                else:
+                    col_vals = ws1.col_values(1)
+                    
                 if col_vals:
                     full_str = "".join(col_vals)
                     decoded_str = base64.b64decode(full_str).decode('utf-8')
@@ -423,9 +429,14 @@ if auth_code:
         tab1, tab2 = st.tabs(["📊 Dashboard", "📈 TREND CHART"])
         
         with tab1:
-            # 🚀 OVERLAP FIX: Timer ab safely Toggle naam ke andar hai 🚀
             ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
-            show_pct = st.toggle(f"📊 Show Checker Data in Percentage (%) ㅤ|ㅤ ⏱️ Last Refresh: {ref_time}", value=True)
+            
+            # 🚀 UI FIX: Toggle button aur Timer alag-alag taaki overlap na ho 🚀
+            t_col1, t_col2 = st.columns([6, 4])
+            with t_col1:
+                show_pct = st.toggle("📊 Show Checker in %", value=True)
+            with t_col2:
+                st.markdown(f"<div style='text-align: right; color: #888888; font-size: 13px; font-weight: bold; margin-top: 10px;'>⏱️ Last: {ref_time}</div>", unsafe_allow_html=True)
             
             vol_col_name = 'VOL CHK\nCPR'
             pcr_col_name = 'PCR\nCHK'
@@ -583,7 +594,12 @@ if auth_code:
 
     if secs_wait < 5: secs_wait = 5
     
-    # 🚀 FIX: limit=10000 added so Mobile Browser doesn't kill the loop 🚀
+    # 🚀 STALE DATA WAKE-UP FIX: Agar data 5 min se purana hai (sleep mode ki wajah se), turant refresh karo! 🚀
+    if 'last_api_call' in st.session_state:
+        time_since_last = (now_refresh - st.session_state.last_api_call).total_seconds()
+        if time_since_last > 310: 
+            secs_wait = 2 # Force immediate refresh in 2 seconds
+
     st_autorefresh(interval=secs_wait * 1000, limit=10000, key=f"timer_{target_idx}")
 
 else:
