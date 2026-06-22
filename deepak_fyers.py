@@ -120,7 +120,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. MASTER SCANNER (Master Device ke liye)
+# 4. MASTER SCANNER (10-Days Old Safe Engine)
 # ==========================================
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
@@ -197,7 +197,7 @@ def run_master_scan(token, date_str):
     live_ltp_data = {} 
     missing_stock_names = []
 
-    # 🚀 AAPKA PURANA AUR PERFECT 0.4s DATA FETCH LOGIC YAHAN LAGA DIYA HAI 🚀
+    # 🚀 ORIGINAL 0.4 SEC DATA FETCH LOGIC FROM 10-DAYS OLD CODE 🚀
     def fetch_option_chain_fast_local(q):
         sym = q['n']
         time.sleep(0.4) 
@@ -209,7 +209,6 @@ def run_master_scan(token, date_str):
             return q, oc
         except: return q, None
 
-    # AAPKE PURANE CODE WALE 2 WORKERS
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         results = executor.map(fetch_option_chain_fast_local, all_quotes)
         
@@ -627,25 +626,12 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
 
 # ==========================================
-# 7. EXACT BOUNDARY AUTO-REFRESH LOGIC 🎯
+# 7. EXACT 5 MINUTE 10 SECONDS REPEAT LOOP LOGIC 🎯
 # ==========================================
 if app_mode == "💻 Master (Data Fetcher)":
-    now_refresh = datetime.datetime.now(IST)
-    current_total_secs = now_refresh.minute * 60 + now_refresh.second
-
-    targets = [(m * 60 + 5) for m in range(0, 65, 5)]
-    secs_wait = 300
-    target_idx = 0
-    for i, t in enumerate(targets):
-        if t > current_total_secs:
-            secs_wait = t - current_total_secs
-            target_idx = i
-            break
-
-    if secs_wait < 5: secs_wait = 5
-    
-    # 🚀 DYNAMIC JAVASCRIPT TIMER: Kabhi freeze ya loop mein nahi fasega 🚀
-    st_autorefresh(interval=secs_wait * 1000, limit=10000, key=f"fyers_master_{target_idx}")
+    # 🚀 TARGET DEFINED: Exactly 5 mins 10 secs (310,000 milliseconds) Continuous Loop Switch 🚀
+    st_autorefresh(interval=310000, limit=10000, key="sln_perfect_loop_timer")
     
 else:
+    # Viewer Mobile Client remains on a steady 30-sec pull interval
     st_autorefresh(interval=30000, limit=10000, key="viewer_timer")
