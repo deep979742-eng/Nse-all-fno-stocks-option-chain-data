@@ -69,6 +69,10 @@ if 'live_base_date' not in st.session_state or st.session_state.live_base_date !
     st.session_state.live_base = {}
     st.session_state.live_base_date = today_str
 
+# Initialize session state for continuous 5:10 loop countdown tracking
+if 'timer_start_time' not in st.session_state:
+    st.session_state.timer_start_time = time.time()
+
 # ==========================================
 # 2. GOOGLE SHEETS DYNAMIC CONNECTION
 # ==========================================
@@ -120,7 +124,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. MASTER SCANNER (10-Days Old Safe Engine)
+# 4. MASTER SCANNER (Aapka Fast Purana Engine)
 # ==========================================
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
@@ -197,7 +201,7 @@ def run_master_scan(token, date_str):
     live_ltp_data = {} 
     missing_stock_names = []
 
-    # 🚀 ORIGINAL 0.4 SEC DATA FETCH LOGIC FROM 10-DAYS OLD CODE 🚀
+    # 🚀 AAPKA ORIGINAL SPEEDY DATA FETCH LOGIC (0.4s Wait Engine) 🚀
     def fetch_option_chain_fast_local(q):
         sym = q['n']
         time.sleep(0.4) 
@@ -413,6 +417,9 @@ if app_mode == "💻 Master (Data Fetcher)":
                 st.session_state.cached_data = cached_result
                 st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
                 
+                # 🚀 RESET TIMER START TIME EXACTLY AFTER DATA FETCH COMPLETES 🚀
+                st.session_state.timer_start_time = time.time()
+                
                 try:
                     shared_pack = {"time": last_scan_timestamp, "data": cached_result, "missing": st.session_state.get('missing_stocks_list', [])}
                     json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
@@ -474,14 +481,18 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     tab1, tab2 = st.tabs(["📊 Dashboard", "📈 TREND CHART"])
     
     with tab1:
-        ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
+        # Calculate dynamic remaining time for 5:10 countdown loop
+        elapsed_time = time.time() - st.session_state.timer_start_time
+        remaining_seconds = max(0, int(310 - elapsed_time))
+        mins, secs = divmod(remaining_seconds, 60)
+        countdown_str = f"{mins:02d}:{secs:02d}"
         
         t_col1, t_col2 = st.columns([6, 4])
         with t_col1:
             show_pct = st.toggle("📊 Show Checker in %", value=True)
         with t_col2:
-            mode_text = "Master" if app_mode == "💻 Master (Data Fetcher)" else "Viewer"
-            st.markdown(f"<div style='text-align: right; color: #888888; font-size: 13px; font-weight: bold; margin-top: 10px;'>⏱️ Last ({mode_text}): {ref_time}</div>", unsafe_allow_html=True)
+            # 🚀 TIMER MOVED EXACTLY TO BLACK PEN MARKED PLACE (Right side of toggle row) 🚀
+            st.markdown(f"<div style='text-align: right; color: #FF4D4D; font-size: 14px; font-weight: bold; margin-top: 10px;'>⏱️ Next Refresh In: {countdown_str}</div>", unsafe_allow_html=True)
         
         if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
             missing_str = ", ".join(st.session_state.missing_stocks_list)
@@ -626,12 +637,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
 
 # ==========================================
-# 7. EXACT 5 MINUTE 10 SECONDS REPEAT LOOP LOGIC 🎯
+# 7. CONTINUOUS COUNTDOWN TRIGGER LOGIC 🎯
 # ==========================================
 if app_mode == "💻 Master (Data Fetcher)":
-    # 🚀 TARGET DEFINED: Exactly 5 mins 10 secs (310,000 milliseconds) Continuous Loop Switch 🚀
-    st_autorefresh(interval=310000, limit=10000, key="sln_perfect_loop_timer")
-    
+    # 🚀 1-Second browser pulse lagayi taaki right side ka countdown smoothly ghate (05:10, 05:09...)
+    st_autorefresh(interval=1000, limit=20000, key="sln_perfect_loop_countdown")
 else:
-    # Viewer Mobile Client remains on a steady 30-sec pull interval
     st_autorefresh(interval=30000, limit=10000, key="viewer_timer")
