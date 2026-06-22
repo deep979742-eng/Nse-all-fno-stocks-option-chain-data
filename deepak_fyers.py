@@ -33,7 +33,7 @@ css_str = """<style>
 .block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
-/* 🚀 COLUMN COMPRESS CSS (white-space: pre-wrap se \\n kaam karega) */
+/* 🚀 COLUMN COMPRESS CSS */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
     background-color: darkblue !important; 
     color: white !important; 
@@ -331,6 +331,8 @@ if os.path.exists(TOKEN_STORE_FILE):
         if td.get("date") == today_str: saved_token = td.get("token")
     except: pass
 
+auth_code = None
+
 if saved_token:
     auth_code = "AUTO_LOGGED_IN"
     st.sidebar.success("🚀 Connected via Saved Token!")
@@ -338,7 +340,6 @@ if saved_token:
     if st.sidebar.button("🔄 Force Logout / Clear Token"):
         if os.path.exists(TOKEN_STORE_FILE):
             os.remove(TOKEN_STORE_FILE)
-        # 🚀 CLEAN LOGOUT FIX: Box memory cleared 🚀
         for k in ['cached_data', 'auth_box']: 
             if k in st.session_state:
                 del st.session_state[k]
@@ -346,8 +347,16 @@ if saved_token:
 else:
     magic_url = f"https://api-t1.fyers.in/api/v3/generate-authcode?client_id={APP_ID}&redirect_uri={REDIRECT_URI}&response_type=code&state=deepak"
     st.sidebar.markdown(f"### [👉 Step 1: Click to Get Code]({magic_url})")
-    # 🚀 TEXT BOX MEMORY FIX: Key added 🚀
-    auth_code = st.sidebar.text_input("Step 2: Paste Code Here:", type="password", key="auth_box")
+    
+    # 🚀 SMART URL EXTRACTOR FIX 🚀
+    raw_code = st.sidebar.text_input("Step 2: Paste Full Google Link Here:", type="password", key="auth_box")
+    if raw_code:
+        if "auth_code=" in raw_code:
+            auth_code = raw_code.split("auth_code=")[1].split("&")[0]
+        elif "code=" in raw_code:
+            auth_code = raw_code.split("code=")[1].split("&")[0]
+        else:
+            auth_code = raw_code
 
 st.sidebar.markdown("---")
 st.sidebar.header("💾 9:17 AM Intraday Baseline Save")
@@ -389,7 +398,6 @@ if st.sidebar.button("Manual 9:17 AM Save"):
 if auth_code:
     token = None
     if auth_code != "AUTO_LOGGED_IN":
-        # 🚀 CRASH FIX: Safe Token Generator 🚀
         try:
             session = fyersModel.SessionModel(client_id=APP_ID, secret_key=SECRET_ID, redirect_uri=REDIRECT_URI, response_type="code", grant_type="authorization_code")
             session.set_token(auth_code)
@@ -399,16 +407,15 @@ if auth_code:
                 token = response['access_token']
                 json.dump({"date": today_str, "token": token}, open(TOKEN_STORE_FILE, 'w'))
                 st.sidebar.success("✅ Token Saved! Page refreshing...")
-                time.sleep(1) # Smart Refresh wait
-                st.rerun() # Refresh karke old code hide kar dega
+                time.sleep(1) 
+                st.rerun() 
             else:
-                st.sidebar.error(f"❌ Auth Code purana hai. Kripya naya code paste karein.")
+                st.sidebar.error(f"❌ Auth Code purana hai ya URL galat hai. Kripya naya code paste karein.")
         except Exception as e:
-            st.sidebar.error(f"❌ Error: {e}")
+            st.sidebar.error(f"❌ Error: Kripya dobara link par click karke naya URL layein.")
     else:
         token = saved_token
 
-    # Agar token safely mil gaya, tabhi aage ka data ayega
     if token:
         cached_result, last_scan_timestamp = run_master_scan(token, today_str)
 
