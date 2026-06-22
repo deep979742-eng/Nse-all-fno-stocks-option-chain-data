@@ -195,7 +195,7 @@ def run_master_scan(token, date_str):
     new_csv_rows = []
     live_ltp_data = {} 
 
-    # 🚀 ENGINE 1: FAST ENGINE (High Speed for 90% Stocks) 🚀
+    # 🚀 ENGINE 1: BATCH PROCESSING (Chunked Throttling - API Bypass) 🚀
     def fetch_option_chain_fast_local(q):
         sym = q['n']
         for attempt in range(2): 
@@ -203,13 +203,19 @@ def run_master_scan(token, date_str):
                 oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
                 if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']: return q, oc
             except: pass 
-            time.sleep(0.2) 
+            time.sleep(0.5) 
         return q, None 
 
     mapped_results = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
-        mapped_results = list(executor.map(fetch_option_chain_fast_local, all_quotes))
-        
+    chunk_size = 15 # Ek baar mein sirf 15 stocks ka batch bhejenge
+    
+    # 180 stocks ko 15-15 ke hisse mein baant diya
+    for i in range(0, len(all_quotes), chunk_size):
+        chunk = all_quotes[i:i+chunk_size]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+            mapped_results.extend(list(executor.map(fetch_option_chain_fast_local, chunk)))
+        time.sleep(0.7) # 15 stocks pure hone ke baad 0.7 second ka Deep Pause!
+
     final_results = []
     failed_quotes = []
 
@@ -219,13 +225,13 @@ def run_master_scan(token, date_str):
         else:
             failed_quotes.append(q)
 
-    # 🚀 ENGINE 2: RECOVERY ENGINE (Aaram se missing 16-17 stocks nikalna) 🚀
+    # 🚀 ENGINE 2: DEEP RECOVERY ENGINE 🚀
     if failed_quotes:
-        time.sleep(0.5) # Server ko thoda saans lene do
+        time.sleep(2.0) # Agar Soft-Ban laga hai, toh usko khatam hone ke liye 2 second wait
         for q in failed_quotes:
             sym = q['n']
             recovered = False
-            for _ in range(2): # 2 attempts slowly
+            for _ in range(2):
                 try:
                     oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
                     if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
@@ -233,7 +239,7 @@ def run_master_scan(token, date_str):
                         recovered = True
                         break
                 except: pass
-                time.sleep(0.5) # Dheere hit karo taaki Fyers block na kare
+                time.sleep(1.0) # 1-by-1 aaram se request bhejenge taaki miss na ho
             if not recovered:
                 final_results.append((q, None))
 
@@ -246,7 +252,7 @@ def run_master_scan(token, date_str):
         float_c = float(v.get('prev_close_price', 0))
         open_status = "NA" if open_p == 0 or float_c == 0 else "Gap Up 🔼" if open_p > float_c else "Gap Down 🔽" if open_p < float_c else "Same ➖"
 
-        if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
+        if oc and oc is not None and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
             chain = oc['data']['optionsChain']
             
             c_oi, p_oi, c_v, p_v = 0.0, 0.0, 0.0, 0.0
