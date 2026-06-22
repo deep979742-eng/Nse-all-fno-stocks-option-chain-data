@@ -33,7 +33,7 @@ css_str = """<style>
 .block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
-/* 🚀 COLUMN COMPRESS CSS */
+/* 🚀 COLUMN COMPRESS CSS (white-space: pre-wrap se \\n kaam karega) */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
     background-color: darkblue !important; 
     color: white !important; 
@@ -163,7 +163,6 @@ def run_master_scan(token, date_str):
                     decoded_str = base64.b64decode(full_str).decode('utf-8')
                     loaded_prices = json.loads(decoded_str)
                     for k, v in loaded_prices.items():
-                        # 🚀 EXACT MATCH: Ab kisi 'Generic Key' ki zaroorat nahi hai 🚀
                         baseline_prices[k] = round(float(v), 2)
             except: pass
 
@@ -260,7 +259,6 @@ def run_master_scan(token, date_str):
 
                 # 🚀 9:17 AM TO 9:20 AM CONTRACT HOLD & EXACT MATCH LOGIC 🚀
                 def get_conv(opt_type_val):
-                    # Data 9:20 se pehle 0% rahega taaki dashboard intraday setup hone tak clean rahe
                     if scan_time_ist.time() < datetime.time(9, 20):
                         return 0.0
                         
@@ -272,7 +270,6 @@ def run_master_scan(token, date_str):
                         if lp == 0: continue
                         
                         diff = 0.0
-                        # 🚀 EXACT MATCH: Baseline data ab seedha 9:17 AM ka hai 🚀
                         if sym in baseline_prices:
                             diff = round(lp - baseline_prices[sym], 2)
                                 
@@ -340,7 +337,6 @@ else:
     auth_code = st.sidebar.text_input("Step 2: Paste Code Here:", type="password")
 
 st.sidebar.markdown("---")
-# 🚀 NAYA NAAM: Kyunki ab EOD ki jagah 9:17 par save hota hai 🚀
 st.sidebar.header("💾 9:17 AM Intraday Baseline Save")
 
 def save_eod_data():
@@ -372,7 +368,7 @@ def save_eod_data():
 if st.sidebar.button("Manual 9:17 AM Save"):
     if save_eod_data(): 
         st.sidebar.success("Baseline Saved Successfully!")
-        run_master_scan.clear() # Cache clear taaki 9:20 wale scan mein naya data pick ho
+        run_master_scan.clear() 
 
 # ==========================================
 # 6. APP RENDERING & MAGIC VIEWER
@@ -393,13 +389,12 @@ if auth_code:
         st.session_state.cached_data = cached_result
         st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
         
-        # 🚀 9:17 AM AUTO-SAVE ENGINE 🚀 (Automatically saves live data to sheet at 9:17)
         if datetime.time(9, 17) <= now_ist.time() < datetime.time(9, 25):
             last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
             if last_save != today_str:
                 if save_eod_data(): 
                     open(AUTO_SAVE_FILE, "w").write(today_str)
-                    run_master_scan.clear() # Masterstroke: Cache clean to force 9:20 check
+                    run_master_scan.clear() 
     else:
         if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
@@ -429,7 +424,13 @@ if auth_code:
         tab1, tab2 = st.tabs(["📊 Dashboard", "📈 TREND CHART"])
         
         with tab1:
-            show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
+            ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
+            
+            t_col1, t_col2 = st.columns([1, 1])
+            with t_col1:
+                show_pct = st.toggle("📊 Show Checker Data in Percentage (%)", value=True)
+            with t_col2:
+                st.markdown(f"<div style='text-align: right; color: #888888; font-size: 14px; font-weight: bold; margin-top: 10px;'>⏱️ Last Refresh: {ref_time}</div>", unsafe_allow_html=True)
             
             vol_col_name = 'VOL CHK\nCPR'
             pcr_col_name = 'PCR\nCHK'
@@ -502,8 +503,7 @@ if auth_code:
                 )
 
         with tab2:
-            ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
-            st.markdown(f"### 📈 TREND CHART <span style='font-size: 16px; color: #888888;'> (⏱️ Last Refresh: {ref_time})</span>", unsafe_allow_html=True) 
+            st.markdown("### 📈 TREND CHART") 
             
             col_c1, col_c2 = st.columns([2, 2])
             with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
@@ -579,13 +579,17 @@ if auth_code:
 
     targets = [(m * 60 + 5) for m in range(0, 65, 5)]
     secs_wait = 300
-    for t in targets:
+    target_idx = 0
+    for i, t in enumerate(targets):
         if t > current_total_secs:
             secs_wait = t - current_total_secs
+            target_idx = i
             break
 
     if secs_wait < 5: secs_wait = 5
-    st_autorefresh(interval=secs_wait * 1000, key="exact_boundary_timer")
+    
+    # 🚀 BUG FIX: Dynamic Key lagayi taaki Streamlit purana timer yaad na rakhe 🚀
+    st_autorefresh(interval=secs_wait * 1000, key=f"exact_boundary_timer_{target_idx}")
 
 else:
     st.info("👈 Please enter Auth Code in sidebar.")
