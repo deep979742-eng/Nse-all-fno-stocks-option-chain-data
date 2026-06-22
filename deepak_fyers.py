@@ -63,7 +63,7 @@ HISTORY_FILE = "chart_history.csv"
 SNAPSHOT_FILE = "snapshot_950.json" 
 TOKEN_STORE_FILE = "fyers_token_store.json"
 AUTO_SAVE_FILE = "auto_save_tracker.txt"
-SHARED_LIVE_DATA_FILE = "shared_live_data.json" # 🚀 Naya file Master aur Viewer ko jodne ke liye
+SHARED_LIVE_DATA_FILE = "shared_live_data.json" 
 
 if 'live_base_date' not in st.session_state or st.session_state.live_base_date != today_str:
     st.session_state.live_base = {}
@@ -120,7 +120,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. MASTER SCANNER (Sirf Master Device chalayega)
+# 4. MASTER SCANNER
 # ==========================================
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
@@ -197,11 +197,11 @@ def run_master_scan(token, date_str):
     live_ltp_data = {} 
     missing_stock_names = []
 
-    # 🚀 RESTORED ORIGINAL SAFE ENGINE (100% Data Guarantee without hang) 🚀
+    # 🚀 100% SAFE ENGINE (2 Workers, 0.6s Wait) 🚀
     def fetch_option_chain_fast_local(q):
         sym = q['n']
         for attempt in range(3): 
-            if attempt == 0: time.sleep(0.6) # The magic pause
+            if attempt == 0: time.sleep(0.6) 
             else: time.sleep(2.5) 
                 
             try:
@@ -321,8 +321,9 @@ def run_master_scan(token, date_str):
 
     return final_list, scan_time_ist.timestamp()
 
+
 # ==========================================
-# 5. THE NEW SERVER / CLIENT ENGINE 🚀
+# 5. THE SERVER / CLIENT ENGINE 🚀
 # ==========================================
 st.sidebar.markdown("### 📱 APP MODE")
 app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
@@ -415,7 +416,6 @@ if app_mode == "💻 Master (Data Fetcher)":
                 st.session_state.cached_data = cached_result
                 st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
                 
-                # 🚀 SHARE DATA TO VIEWER CLIENT 🚀
                 try:
                     shared_pack = {"time": last_scan_timestamp, "data": cached_result, "missing": st.session_state.get('missing_stocks_list', [])}
                     json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
@@ -433,7 +433,7 @@ if app_mode == "💻 Master (Data Fetcher)":
         st.info("👈 Please enter Auth Code in sidebar to start Master Server.")
 
 elif app_mode == "📱 Viewer (Mobile Client)":
-    # 🚀 VIEWER EXECUTION (ZERO API CALLS) 🚀
+    # --- VIEWER EXECUTION ---
     st.sidebar.success("🟢 Viewer Mode Active!\n\nNo Fyers Login needed. Receiving data from Master.")
     if os.path.exists(SHARED_LIVE_DATA_FILE):
         try:
@@ -532,6 +532,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 'PE_CON': 'PE\nCONT %'
             })
 
+            # 🚀 FULL WIDTH FIX FOR LAPTOP IS ACTIVE HERE 🚀
             styled_df = (df.style.hide(axis="index")
                          .set_properties(**{'text-align': 'center'})
                          .format(format_dict)
@@ -632,18 +633,22 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 # 7. EXACT BOUNDARY AUTO-REFRESH LOGIC 🎯
 # ==========================================
 if app_mode == "💻 Master (Data Fetcher)":
-    # Master har 5 minute mein exact time par chalega (jaise 9:15:05)
     now_refresh = datetime.datetime.now(IST)
     current_total_secs = now_refresh.minute * 60 + now_refresh.second
+
     targets = [(m * 60 + 5) for m in range(0, 65, 5)]
     secs_wait = 300
-    for t in targets:
+    target_idx = 0
+    for i, t in enumerate(targets):
         if t > current_total_secs:
             secs_wait = t - current_total_secs
+            target_idx = i
             break
+
     if secs_wait < 5: secs_wait = 5
-    st_autorefresh(interval=secs_wait * 1000, key="master_timer")
+    
+    # 🚀 DYNAMIC KEY + HIGH LIMIT FIX: Timer ab kabhi out of sync nahi hoga 🚀
+    st_autorefresh(interval=secs_wait * 1000, limit=10000, key=f"master_timer_{target_idx}_{secs_wait}")
     
 else:
-    # Viewer Mobile Client har 30 seconds mein check karega ki Master ne naya data bheja ya nahi
-    st_autorefresh(interval=30000, key="viewer_timer")
+    st_autorefresh(interval=30000, limit=10000, key="viewer_timer")
