@@ -12,7 +12,7 @@ import concurrent.futures
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from streamlit_autorefresh import st_autorefresh
-import streamlit.components.v1 as components  # 🚀 NAYA IMPORT FOR BROWSER CLOCK
+import streamlit.components.v1 as components  
 
 # ==========================================
 # 1. FYERS CREDENTIALS & SETUP
@@ -120,26 +120,9 @@ def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
-
 # ==========================================
-# 4. MASTER ENGINE & TIMER DEFINITIONS 🚀
+# 4. MASTER SCANNER (Light 0.4s Old Stable Engine)
 # ==========================================
-st.sidebar.markdown("### 📱 APP MODE")
-app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
-st.sidebar.markdown("---")
-
-# 🚀 TARGET DEFINED: Exactly 5 mins 10 secs cycle logic 🚀
-if app_mode == "💻 Master (Data Fetcher)":
-    # 310000ms loop will increment 'refresh_count' every cycle
-    refresh_count = st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
-else:
-    refresh_count = st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
-
-
-# ==========================================
-# 5. DATA SCANNER (Triggered strictly by Auto-Refresh count)
-# ==========================================
-# 🚀 BUG FIX: NO TTL CACHE! Data refreshes EXACTLY when refresh_count changes 🚀
 @st.cache_data(show_spinner=False)
 def run_master_scan(token, date_str, cycle_trigger):
     fyers = fyersModel.FyersModel(client_id=APP_ID, is_async=False, token=token, log_path="")
@@ -215,7 +198,6 @@ def run_master_scan(token, date_str, cycle_trigger):
     live_ltp_data = {} 
     missing_stock_names = []
 
-    # 🚀 ORIGINAL 0.4 SEC DATA FETCH LOGIC (100% Safe Engine) 🚀
     def fetch_option_chain_fast_local(q):
         sym = q['n']
         time.sleep(0.4) 
@@ -339,8 +321,18 @@ def run_master_scan(token, date_str, cycle_trigger):
 
 
 # ==========================================
-# 6. SIDEBAR SETUP & LOGIN
+# 5. THE SERVER / CLIENT ENGINE 🚀
 # ==========================================
+st.sidebar.markdown("### 📱 APP MODE")
+app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
+st.sidebar.markdown("---")
+
+# 🚀 CONTINUOUS REFRESH KEY LINKED TO STREAMLIT ENGINE 🚀
+if app_mode == "💻 Master (Data Fetcher)":
+    refresh_count = st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
+else:
+    refresh_count = st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
+
 auth_code = None
 token = None
 cached_result = None
@@ -400,7 +392,7 @@ if app_mode == "💻 Master (Data Fetcher)":
     if st.sidebar.button("Manual 9:17 AM Save"):
         if save_eod_data(): 
             st.sidebar.success("Baseline Saved Successfully!")
-            st.cache_data.clear() # Force clear map
+            st.cache_data.clear() 
 
     # --- MASTER EXECUTION ---
     if auth_code:
@@ -421,7 +413,6 @@ if app_mode == "💻 Master (Data Fetcher)":
             token = saved_token
 
         if token:
-            # Pass refresh_count to function so it 100% bypasses cache safely when timer triggers
             cached_result, last_scan_timestamp = run_master_scan(token, today_str, refresh_count)
 
             if cached_result is not None:
@@ -460,7 +451,7 @@ elif app_mode == "📱 Viewer (Mobile Client)":
 
 
 # ==========================================
-# 7. APP RENDERING (Table & Charts)
+# 6. APP RENDERING (Table & Charts)
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
@@ -496,16 +487,19 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             
         with t_col2:
             if app_mode == "💻 Master (Data Fetcher)":
-                # 🚀 JAVASCRIPT BROWSER CLOCK FIX: Runs purely in browser, Zero Python Load 🚀
+                # 🚀 JAVASCRIPT FIXED: Ab 00:00 hote hi yeh Streamlit Cloud Engine ko Force Click bhejega 🚀
                 components.html("""
                 <div style="text-align: right; color: #FF4D4D; font-size: 14px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 8px;">
                     ⏱️ Next Refresh In: <span id="clock">05:10</span>
                 </div>
                 <script>
                     var timeLeft = 310;
-                    setInterval(function() {
-                        if(timeLeft <= 0) {
-                            document.getElementById('clock').innerHTML = "Fetching Data...";
+                    var clockTimer = setInterval(function() {
+                        if(timeLeft <= 1) {
+                            clearInterval(clockTimer);
+                            document.getElementById('clock').innerHTML = "Refreshing Data...";
+                            // 🚀 STREAMLIT FORCE REFRESH TRIGGER 🚀
+                            window.parent.postMessage({type: 'streamlit:setComponentValue', value: true}, '*');
                         } else {
                             timeLeft--;
                             var m = Math.floor(timeLeft / 60);
