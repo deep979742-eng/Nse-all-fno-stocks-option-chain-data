@@ -348,7 +348,6 @@ else:
     magic_url = f"https://api-t1.fyers.in/api/v3/generate-authcode?client_id={APP_ID}&redirect_uri={REDIRECT_URI}&response_type=code&state=deepak"
     st.sidebar.markdown(f"### [👉 Step 1: Click to Get Code]({magic_url})")
     
-    # 🚀 SMART URL EXTRACTOR FIX 🚀
     raw_code = st.sidebar.text_input("Step 2: Paste Full Google Link Here:", type="password", key="auth_box")
     if raw_code:
         if "auth_code=" in raw_code:
@@ -512,6 +511,7 @@ if auth_code:
                         'PE_CON': 'PE\nCONT %'
                     })
 
+                    # 🚀 BUG FIX: use_container_width=True WAPAS LAGA DIYA GAYA HAI TAAKI LAPTOP PAR FULL SCREEN AAYE 🚀
                     styled_df = (df.style.hide(axis="index")
                                  .set_properties(**{'text-align': 'center'})
                                  .format(format_dict)
@@ -521,7 +521,7 @@ if auth_code:
 
                     st.dataframe(
                         styled_df, 
-                        use_container_width=False, 
+                        use_container_width=True, # 👈 LAPTOP FULL WIDTH FIX
                         height=800, 
                         hide_index=True,
                         column_config={
