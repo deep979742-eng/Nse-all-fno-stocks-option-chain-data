@@ -33,7 +33,7 @@ css_str = """<style>
 .block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
-/* 🚀 COLUMN COMPRESS CSS (white-space: pre-wrap se \\n kaam karega) */
+/* 🚀 COLUMN COMPRESS CSS */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
     background-color: darkblue !important; 
     color: white !important; 
@@ -195,11 +195,12 @@ def run_master_scan(token, date_str):
     new_csv_rows = []
     live_ltp_data = {} 
 
+    # 🚀 FIX: Reduced Retries (Fast Fail) taaki Dashboard hang na ho 🚀
     def fetch_option_chain_fast_local(q):
         sym = q['n']
-        for attempt in range(3): 
-            if attempt == 0: time.sleep(0.6) 
-            else: time.sleep(2.5) 
+        for attempt in range(2): # Pehle 3 tha, ab 2 kar diya
+            if attempt == 0: time.sleep(0.2) # Initial sleep kam kar diya
+            else: time.sleep(1.0) # Retry sleep 2.5s se ghatakar 1.0s kar diya
                 
             try:
                 oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
@@ -207,7 +208,8 @@ def run_master_scan(token, date_str):
             except: pass 
         return q, None 
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    # 🚀 FIX: Increased ThreadPool workers from 2 to 5 to handle requests faster 🚀
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         results = executor.map(fetch_option_chain_fast_local, all_quotes)
         for q, oc in results:
             s_name = get_raw_symbol(q['n'])
@@ -431,7 +433,6 @@ if auth_code:
         with tab1:
             ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
             
-            # 🚀 UI FIX: Toggle button aur Timer alag-alag taaki overlap na ho 🚀
             t_col1, t_col2 = st.columns([6, 4])
             with t_col1:
                 show_pct = st.toggle("📊 Show Checker in %", value=True)
@@ -594,12 +595,6 @@ if auth_code:
 
     if secs_wait < 5: secs_wait = 5
     
-    # 🚀 STALE DATA WAKE-UP FIX: Agar data 5 min se purana hai (sleep mode ki wajah se), turant refresh karo! 🚀
-    if 'last_api_call' in st.session_state:
-        time_since_last = (now_refresh - st.session_state.last_api_call).total_seconds()
-        if time_since_last > 310: 
-            secs_wait = 2 # Force immediate refresh in 2 seconds
-
     st_autorefresh(interval=secs_wait * 1000, limit=10000, key=f"timer_{target_idx}")
 
 else:
