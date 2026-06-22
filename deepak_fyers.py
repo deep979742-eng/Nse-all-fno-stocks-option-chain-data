@@ -33,7 +33,7 @@ css_str = """<style>
 .block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
-/* 🚀 COLUMN COMPRESS CSS */
+/* 🚀 COLUMN COMPRESS CSS (white-space: pre-wrap se \\n kaam karega) */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
     background-color: darkblue !important; 
     color: white !important; 
@@ -195,12 +195,13 @@ def run_master_scan(token, date_str):
     new_csv_rows = []
     live_ltp_data = {} 
 
-    # 🚀 FIX: Reduced Retries (Fast Fail) taaki Dashboard hang na ho 🚀
+    # 🚀 JUGAAD FIX: Smart Traffic Controller (Missing Data aur Hang hone ke beech ka perfect balance) 🚀
     def fetch_option_chain_fast_local(q):
         sym = q['n']
-        for attempt in range(2): # Pehle 3 tha, ab 2 kar diya
-            if attempt == 0: time.sleep(0.2) # Initial sleep kam kar diya
-            else: time.sleep(1.0) # Retry sleep 2.5s se ghatakar 1.0s kar diya
+        time.sleep(0.1) # Micro-pause: Rate Limit Bypass taaki Fyers sabhi stocks ka data bheje
+        for attempt in range(3): 
+            if attempt == 1: time.sleep(0.8) # Agar ek adh fail ho, toh 0.8s wait
+            elif attempt == 2: time.sleep(1.5) # Aakhiri try mein 1.5s wait
                 
             try:
                 oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
@@ -208,8 +209,8 @@ def run_master_scan(token, date_str):
             except: pass 
         return q, None 
 
-    # 🚀 FIX: Increased ThreadPool workers from 2 to 5 to handle requests faster 🚀
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    # 🚀 FIX: Balance set to 3 max_workers. Ab screen hang nahi hogi aur data pura aayega. 🚀
+    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
         results = executor.map(fetch_option_chain_fast_local, all_quotes)
         for q, oc in results:
             s_name = get_raw_symbol(q['n'])
@@ -595,6 +596,11 @@ if auth_code:
 
     if secs_wait < 5: secs_wait = 5
     
+    if 'last_api_call' in st.session_state:
+        time_since_last = (now_refresh - st.session_state.last_api_call).total_seconds()
+        if time_since_last > 310: 
+            secs_wait = 2
+
     st_autorefresh(interval=secs_wait * 1000, limit=10000, key=f"timer_{target_idx}")
 
 else:
