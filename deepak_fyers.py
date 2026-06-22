@@ -120,7 +120,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. MASTER SCANNER
+# 4. MASTER SCANNER (The 10-Days Old Golden Engine)
 # ==========================================
 @st.cache_data(ttl=290, show_spinner=False)
 def run_master_scan(token, date_str):
@@ -197,7 +197,7 @@ def run_master_scan(token, date_str):
     live_ltp_data = {} 
     missing_stock_names = []
 
-    # 🚀 100% SAFE ENGINE (2 Workers, 0.6s Wait) 🚀
+    # 🚀 EXACTLY WAHI 10 DIN PURANA BHAROSEMAND ENGINE (1 to 1.5 mins without skip) 🚀
     def fetch_option_chain_fast_local(q):
         sym = q['n']
         for attempt in range(3): 
@@ -211,6 +211,7 @@ def run_master_scan(token, date_str):
             except: pass 
         return q, None 
 
+    # 🚀 ORIGINAL 2 WORKERS LOGIC 🚀
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         results = executor.map(fetch_option_chain_fast_local, all_quotes)
         
@@ -409,8 +410,7 @@ if app_mode == "💻 Master (Data Fetcher)":
             token = saved_token
 
         if token:
-            with st.spinner("⏳ Master is Fetching Option Chain from Fyers..."):
-                cached_result, last_scan_timestamp = run_master_scan(token, today_str)
+            cached_result, last_scan_timestamp = run_master_scan(token, today_str)
 
             if cached_result is not None:
                 st.session_state.cached_data = cached_result
@@ -532,7 +532,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 'PE_CON': 'PE\nCONT %'
             })
 
-            # 🚀 FULL WIDTH FIX FOR LAPTOP IS ACTIVE HERE 🚀
             styled_df = (df.style.hide(axis="index")
                          .set_properties(**{'text-align': 'center'})
                          .format(format_dict)
@@ -635,7 +634,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 if app_mode == "💻 Master (Data Fetcher)":
     now_refresh = datetime.datetime.now(IST)
     current_total_secs = now_refresh.minute * 60 + now_refresh.second
-
     targets = [(m * 60 + 5) for m in range(0, 65, 5)]
     secs_wait = 300
     target_idx = 0
@@ -644,11 +642,10 @@ if app_mode == "💻 Master (Data Fetcher)":
             secs_wait = t - current_total_secs
             target_idx = i
             break
-
     if secs_wait < 5: secs_wait = 5
     
-    # 🚀 DYNAMIC KEY + HIGH LIMIT FIX: Timer ab kabhi out of sync nahi hoga 🚀
-    st_autorefresh(interval=secs_wait * 1000, limit=10000, key=f"master_timer_{target_idx}_{secs_wait}")
+    # 🚀 FIXED THE KILLER TIMER BUG! Ab target_idx ke naam se key banegi, secs_wait se nahi! 🚀
+    st_autorefresh(interval=secs_wait * 1000, limit=10000, key=f"fyers_timer_{target_idx}")
     
 else:
     st_autorefresh(interval=30000, limit=10000, key="viewer_timer")
