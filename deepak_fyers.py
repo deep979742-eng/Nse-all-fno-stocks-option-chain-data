@@ -118,25 +118,6 @@ def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
-def get_generic_key(sym):
-    try:
-        if ":" in sym:
-            base_sym = sym.split(":")[1]
-            if base_sym.endswith("CE") or base_sym.endswith("PE"):
-                opt_type = base_sym[-2:]
-                alpha_part = ""
-                for char in base_sym:
-                    if char.isalpha(): alpha_part += char
-                    else: break
-                strike_part = ""
-                for char in reversed(base_sym[:-2]):
-                    if char.isdigit() or char == '.': strike_part = char + strike_part
-                    else: break
-                if alpha_part and strike_part:
-                    return f"{alpha_part}_{strike_part}{opt_type}"
-    except: pass
-    return None
-
 # ==========================================
 # 4. MASTER SCANNER
 # ==========================================
@@ -147,7 +128,6 @@ def run_master_scan(token, date_str):
     time_str = scan_time_ist.strftime('%H:%M')
     
     baseline_prices = {}
-    baseline_generic = {} 
     snap_950 = {}
     snapshot_changed = False
     
@@ -184,9 +164,6 @@ def run_master_scan(token, date_str):
                     loaded_prices = json.loads(decoded_str)
                     for k, v in loaded_prices.items():
                         baseline_prices[k] = round(float(v), 2)
-                        gen_key = get_generic_key(k)
-                        if gen_key:
-                            baseline_generic[gen_key] = round(float(v), 2)
             except: pass
 
             try:
@@ -258,7 +235,6 @@ def run_master_scan(token, date_str):
                 v_cpr = calc_vol_cpr(c_v, p_v)
                 v_pcr = calc_vol_pcr(c_v, p_v)
 
-                # 🚀 TOGGLE FIX: ABSOLUTE AND PERCENTAGE BOTH CALCULATED HERE 🚀
                 if scan_time_ist.time() < datetime.time(9, 50):
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
@@ -271,11 +247,9 @@ def run_master_scan(token, date_str):
                         base_pcr_val = base['pcr']
                         base_vol_val = base['vol_cpr']
                         
-                        # 1. Absolute Difference (For Value Mode)
                         pcr_abs = o_pcr - base_pcr_val
                         vol_abs = v_cpr - base_vol_val
                         
-                        # 2. Percentage Change (For Percentage Mode)
                         def get_standard_pct(current_val, base_val):
                             if base_val == 0: return 0.0
                             return ((current_val - base_val) / base_val) * 100.0
@@ -283,7 +257,12 @@ def run_master_scan(token, date_str):
                         pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
                         vol_pct = get_standard_pct(v_cpr, base_vol_val)
 
+                # 🚀 9:17 AM TO 9:20 AM CONTRACT HOLD & EXACT MATCH LOGIC 🚀
                 def get_conv(opt_type_val):
+                    # Data 9:20 se pehle 0% rahega taaki dashboard kachra match na dikhaye
+                    if scan_time_ist.time() < datetime.time(9, 20):
+                        return 0.0
+                        
                     strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
                     tot_p, tot_m = 0, 0
                     for stk in strikes:
@@ -292,12 +271,9 @@ def run_master_scan(token, date_str):
                         if lp == 0: continue
                         
                         diff = 0.0
+                        # 🚀 EXACT MATCH: Ab koi rollover bug (Fake Green) nahi hoga! 🚀
                         if sym in baseline_prices:
                             diff = round(lp - baseline_prices[sym], 2)
-                        else:
-                            gen_key = get_generic_key(sym)
-                            if gen_key and gen_key in baseline_generic:
-                                diff = round(lp - baseline_generic[gen_key], 2)
                                 
                         if diff > 0.00: tot_p += 1 
                         elif diff < 0.00: tot_m += 1 
@@ -363,7 +339,8 @@ else:
     auth_code = st.sidebar.text_input("Step 2: Paste Code Here:", type="password")
 
 st.sidebar.markdown("---")
-st.sidebar.header("💾 End Of Day (EOD) Save")
+# 🚀 NAYA NAAM: Kyunki ab EOD ki jagah 9:17 par save hota hai 🚀
+st.sidebar.header("💾 9:17 AM Intraday Baseline Save")
 
 def save_eod_data():
     if 'get_live_dump' in st.session_state:
@@ -391,8 +368,10 @@ def save_eod_data():
         except: pass
     return False
 
-if st.sidebar.button("Manual Save Data"):
-    if save_eod_data(): st.sidebar.success("Sheet Saved Successfully!")
+if st.sidebar.button("Manual 9:17 AM Save"):
+    if save_eod_data(): 
+        st.sidebar.success("Baseline Saved Successfully!")
+        run_master_scan.clear() # Cache clear taaki 9:20 wale scan mein naya data pick ho
 
 # ==========================================
 # 6. APP RENDERING & MAGIC VIEWER
@@ -413,10 +392,13 @@ if auth_code:
         st.session_state.cached_data = cached_result
         st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
         
-        if datetime.time(8, 0) <= now_ist.time() < datetime.time(9, 15):
+        # 🚀 9:17 AM AUTO-SAVE ENGINE 🚀 (Automatically saves live data to sheet at 9:17)
+        if datetime.time(9, 17) <= now_ist.time() < datetime.time(9, 25):
             last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
             if last_save != today_str:
-                if save_eod_data(): open(AUTO_SAVE_FILE, "w").write(today_str)
+                if save_eod_data(): 
+                    open(AUTO_SAVE_FILE, "w").write(today_str)
+                    run_master_scan.clear() # Masterstroke: Cache clean to force 9:20 check
     else:
         if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
@@ -519,7 +501,9 @@ if auth_code:
                 )
 
         with tab2:
-            st.markdown("### 📈 TREND CHART") 
+            ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
+            st.markdown(f"### 📈 TREND CHART <span style='font-size: 16px; color: #888888;'> (⏱️ Last Refresh: {ref_time})</span>", unsafe_allow_html=True) 
+            
             col_c1, col_c2 = st.columns([2, 2])
             with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
             with col_c2: 
@@ -534,7 +518,6 @@ if auth_code:
                             df_sym = df_sym.sort_values(by='Time')
                             df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
                             
-                            # 🚀 BUG FIX: Corrected target_col to read from CSV headers 🚀
                             target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
                             line_color = "#2962FF" 
                             ltp_color = "#FF5252"  
@@ -551,7 +534,7 @@ if auth_code:
                             fig.update_layout(
                                 template="plotly_white", 
                                 hovermode="x unified", 
-                                dragmode="pan", # 🚀 Default Drag ab Pan (Scroll) Hoga 🚀
+                                dragmode="pan", 
                                 height=400, 
                                 margin=dict(l=0, r=0, t=50, b=10), 
                                 plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", 
@@ -559,7 +542,6 @@ if auth_code:
                                 legend=dict(orientation="h", yanchor="bottom", y=1.08, xanchor="center", x=0.5, font=dict(color="#424242", size=13), bgcolor="rgba(255,255,255,0)")
                             )
                             
-                            # 🚀 TradingView jaisa Dotted Crosshair Configuration 🚀
                             fig.update_xaxes(
                                 rangeslider=dict(visible=False), 
                                 type="date", 
@@ -580,7 +562,6 @@ if auth_code:
                                 secondary_y=True
                             )
                             
-                            # 🚀 Config mein ScrollZoom ON aur Faltu menu bar buttons OFF kiye hain 🚀
                             st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
                         else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                     else: st.info("⏳ Market data hasn't started logging yet today.")
