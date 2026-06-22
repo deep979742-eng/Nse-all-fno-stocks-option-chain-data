@@ -33,7 +33,7 @@ css_str = """<style>
 .block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
-/* 🚀 COLUMN COMPRESS CSS (white-space: pre-wrap se \\n kaam karega) */
+/* 🚀 COLUMN COMPRESS CSS */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
     background-color: darkblue !important; 
     color: white !important; 
@@ -194,116 +194,147 @@ def run_master_scan(token, date_str):
     final_list = []
     new_csv_rows = []
     live_ltp_data = {} 
-    missing_stock_names = [] # 🚀 Naya feature: Missing stocks ko pakadne ke liye
+    missing_stock_names = []
 
-    # 🚀 THE BULLETPROOF ENGINE (Exponential Backoff for 100% Accuracy) 🚀
-    def fetch_option_chain_fast_local(q):
+    # 🚀 SINGLE FETCH FUNCTION 🚀
+    def fetch_single(q):
         sym = q['n']
-        for attempt in range(4): # 4 Attempts total
-            time.sleep(0.3) # Har request se pehle micro pause taaki limit hit na ho
-            try:
-                oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
-                if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']: 
-                    return q, oc
-            except: pass 
-            
-            # Agar fail hua, toh dheere-dheere wait time badhao (1s, 2s, 3s)
-            time.sleep(1.0 + attempt) 
-            
-        return q, None 
+        try:
+            oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
+            if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']: 
+                return q, oc
+        except: pass 
+        return q, None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
-        results = executor.map(fetch_option_chain_fast_local, all_quotes)
+    mapped_results = []
+    failed_quotes = []
+    
+    # 🚀 STEP 1: ASLI CHUNKING ENGINE (15 stocks at a time) 🚀
+    chunk_size = 15
+    for i in range(0, len(all_quotes), chunk_size):
+        chunk = all_quotes[i:i+chunk_size]
         
-        for q, oc in results:
-            s_name = get_raw_symbol(q['n'])
-            v = q['v']
-            spot_ltp = float(v.get('lp', 0)) 
-            open_p = float(v.get('open_price', 0))
-            float_c = float(v.get('prev_close_price', 0))
-            open_status = "NA" if open_p == 0 or float_c == 0 else "Gap Up 🔼" if open_p > float_c else "Gap Down 🔽" if open_p < float_c else "Same ➖"
+        # Sirf 3 workers taaki limit ekdum safe rahe
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            batch_results = list(executor.map(fetch_single, chunk))
+            
+        for q, oc in batch_results:
+            if oc is not None:
+                mapped_results.append((q, oc))
+            else:
+                failed_quotes.append(q)
+                
+        # 15 stocks pure hone ke baad Deep Pause! (Isse S, T wale block nahi honge)
+        time.sleep(0.5) 
 
-            if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
-                chain = oc['data']['optionsChain']
+    # 🚀 STEP 2: RECOVERY ENGINE 🚀
+    if failed_quotes:
+        time.sleep(1.5) # Soft-Ban thanda hone do
+        for q in failed_quotes:
+            sym = q['n']
+            recovered = False
+            for _ in range(2): # Dheere-dheere 2 bar pucho
+                try:
+                    oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
+                    if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
+                        mapped_results.append((q, oc))
+                        recovered = True
+                        break
+                except: pass
+                time.sleep(0.8) # Har retry ke beech shanti
+            if not recovered:
+                mapped_results.append((q, None))
+
+    # 🚀 DATA PROCESSING 🚀
+    for q, oc in mapped_results:
+        s_name = get_raw_symbol(q['n'])
+        v = q['v']
+        spot_ltp = float(v.get('lp', 0)) 
+        open_p = float(v.get('open_price', 0))
+        float_c = float(v.get('prev_close_price', 0))
+        open_status = "NA" if open_p == 0 or float_c == 0 else "Gap Up 🔼" if open_p > float_c else "Gap Down 🔽" if open_p < float_c else "Same ➖"
+
+        if oc is not None and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
+            chain = oc['data']['optionsChain']
+            
+            c_oi, p_oi, c_v, p_v = 0.0, 0.0, 0.0, 0.0
+            
+            for s in chain:
+                sym_str = str(s.get('symbol', ''))
+                o_type = str(s.get('option_type', ''))
                 
-                c_oi, p_oi, c_v, p_v = 0.0, 0.0, 0.0, 0.0
-                
-                for s in chain:
-                    sym_str = str(s.get('symbol', ''))
-                    o_type = str(s.get('option_type', ''))
+                if sym_str.endswith('CE') or o_type == 'CE':
+                    c_oi += float(s.get('oi', 0))
+                    c_v += float(s.get('volume', 0))
+                elif sym_str.endswith('PE') or o_type == 'PE':
+                    p_oi += float(s.get('oi', 0))
+                    p_v += float(s.get('volume', 0))
                     
-                    if sym_str.endswith('CE') or o_type == 'CE':
-                        c_oi += float(s.get('oi', 0))
-                        c_v += float(s.get('volume', 0))
-                    elif sym_str.endswith('PE') or o_type == 'PE':
-                        p_oi += float(s.get('oi', 0))
-                        p_v += float(s.get('volume', 0))
-                        
-                    lp_str = round(float(s.get('ltp', 0)), 2)
-                    if lp_str > 0: 
-                        live_ltp_data[sym_str] = lp_str
+                lp_str = round(float(s.get('ltp', 0)), 2)
+                if lp_str > 0: 
+                    live_ltp_data[sym_str] = lp_str
 
-                o_pcr = calc_opt_pcr(c_oi, p_oi)
-                v_cpr = calc_vol_cpr(c_v, p_v)
-                v_pcr = calc_vol_pcr(c_v, p_v)
+            o_pcr = calc_opt_pcr(c_oi, p_oi)
+            v_cpr = calc_vol_cpr(c_v, p_v)
+            v_pcr = calc_vol_pcr(c_v, p_v)
 
-                if scan_time_ist.time() < datetime.time(9, 50):
+            if scan_time_ist.time() < datetime.time(9, 50):
+                pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
+            else:
+                if s_name not in snap_950:
+                    snap_950[s_name] = {'pcr': o_pcr, 'vol_cpr': v_cpr}
+                    snapshot_changed = True
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
-                    if s_name not in snap_950:
-                        snap_950[s_name] = {'pcr': o_pcr, 'vol_cpr': v_cpr}
-                        snapshot_changed = True
-                        pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
-                    else:
-                        base = snap_950[s_name]
-                        base_pcr_val = base['pcr']
-                        base_vol_val = base['vol_cpr']
+                    base = snap_950[s_name]
+                    base_pcr_val = base['pcr']
+                    base_vol_val = base['vol_cpr']
+                    
+                    pcr_abs = o_pcr - base_pcr_val
+                    vol_abs = v_cpr - base_vol_val
+                    
+                    def get_standard_pct(current_val, base_val):
+                        if base_val == 0: return 0.0
+                        return ((current_val - base_val) / base_val) * 100.0
                         
-                        pcr_abs = o_pcr - base_pcr_val
-                        vol_abs = v_cpr - base_vol_val
-                        
-                        def get_standard_pct(current_val, base_val):
-                            if base_val == 0: return 0.0
-                            return ((current_val - base_val) / base_val) * 100.0
+                    pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
+                    vol_pct = get_standard_pct(v_cpr, base_vol_val)
+
+            def get_conv(opt_type_val):
+                if scan_time_ist.time() < datetime.time(9, 20):
+                    return 0.0
+                    
+                strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
+                tot_p, tot_m = 0, 0
+                for stk in strikes:
+                    sym = str(stk.get('symbol', ''))
+                    lp = round(float(stk.get('ltp', 0)), 2)
+                    if lp == 0: continue
+                    
+                    diff = 0.0
+                    if sym in baseline_prices:
+                        diff = round(lp - baseline_prices[sym], 2)
                             
-                        pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
-                        vol_pct = get_standard_pct(v_cpr, base_vol_val)
+                    if diff > 0.00: tot_p += 1 
+                    elif diff < 0.00: tot_m += 1 
 
-                def get_conv(opt_type_val):
-                    if scan_time_ist.time() < datetime.time(9, 20):
-                        return 0.0
-                        
-                    strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
-                    tot_p, tot_m = 0, 0
-                    for stk in strikes:
-                        sym = str(stk.get('symbol', ''))
-                        lp = round(float(stk.get('ltp', 0)), 2)
-                        if lp == 0: continue
-                        
-                        diff = 0.0
-                        if sym in baseline_prices:
-                            diff = round(lp - baseline_prices[sym], 2)
-                                
-                        if diff > 0.00: tot_p += 1 
-                        elif diff < 0.00: tot_m += 1 
+                act = tot_p + tot_m
+                if act == 0: return 0.0
+                return round((tot_p / act) * 100, 2) if tot_p >= tot_m else -round((tot_m / act) * 100, 2)
+            
+            final_list.append({
+                'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
+                'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp,
+                'VOL_ABS': round(vol_abs, 2), 'PCR_ABS': round(pcr_abs, 2), 
+                'VOL_PCT': round(vol_pct, 2), 'PCR_PCT': round(pcr_pct, 2),
+                'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
+            })
 
-                    act = tot_p + tot_m
-                    if act == 0: return 0.0
-                    return round((tot_p / act) * 100, 2) if tot_p >= tot_m else -round((tot_m / act) * 100, 2)
-                
-                final_list.append({
-                    'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
-                    'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp,
-                    'VOL_ABS': round(vol_abs, 2), 'PCR_ABS': round(pcr_abs, 2), 
-                    'VOL_PCT': round(vol_pct, 2), 'PCR_PCT': round(pcr_pct, 2),
-                    'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
-                })
-
-                if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
-                    new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': spot_ltp, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
-            else:
-                missing_stock_names.append(s_name) # 🚀 Pakda gaya! Missing stock yahan record hoga
-                final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
+            if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
+                new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': spot_ltp, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
+        else:
+            missing_stock_names.append(s_name) 
+            final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
     if snapshot_changed and client:
         try:
@@ -313,7 +344,7 @@ def run_master_scan(token, date_str):
         except: pass
 
     st.session_state.get_live_dump = live_ltp_data
-    st.session_state.missing_stocks_list = missing_stock_names # Global memory mein save
+    st.session_state.missing_stocks_list = missing_stock_names 
 
     if new_csv_rows:
         new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
@@ -445,10 +476,9 @@ if auth_code:
             with t_col2:
                 st.markdown(f"<div style='text-align: right; color: #888888; font-size: 13px; font-weight: bold; margin-top: 10px;'>⏱️ Last: {ref_time}</div>", unsafe_allow_html=True)
             
-            # 🚀 WARNING BAR: Agar Fyers ne data nahi diya toh yahan sabke naam aa jayenge 🚀
             if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
                 missing_str = ", ".join(st.session_state.missing_stocks_list)
-                st.warning(f"⚠️ Fyers API ne in {len(st.session_state.missing_stocks_list)} stocks ka data nahi diya: **{missing_str}**. (Ye F&O Ban ya Illiquid ho sakte hain)")
+                st.warning(f"⚠️ Fyers API ne in {len(st.session_state.missing_stocks_list)} stocks ka data nahi diya: **{missing_str}**. (Agar koi naya stock hamesha yahan aata hai, toh ho sakta hai usme F&O Options allow na ho)")
             
             vol_col_name = 'VOL CHK\nCPR'
             pcr_col_name = 'PCR\nCHK'
