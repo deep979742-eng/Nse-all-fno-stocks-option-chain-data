@@ -9,8 +9,6 @@ from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
 import concurrent.futures
-import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from streamlit_autorefresh import st_autorefresh
 import streamlit.components.v1 as components  
 
@@ -24,16 +22,15 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# 🚀 DEEPAK BHAI'S ORIGINAL GOLDEN UI CSS (VERTICAL HEADERS & SPACING) 🚀
+# CSS - FULLY MOBILE RESPONSIVE & LAPTOP SCREEN FIT
 css_str = """<style>
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } 
 
-.block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
+.block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
-/* ALL Headers Vertical (Including SYMBOL) to Save Maximum Space on Mobile */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
     background-color: darkblue !important; 
     color: white !important; 
@@ -49,10 +46,8 @@ css_str = """<style>
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
 
-/* Radio Alignment Fix for Single Line Layout */
 div[role="radiogroup"] { margin-top: 5px !important; }
 
-/* Extreme Mobile Optimization */
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
     [data-testid='stDataFrameTable'] th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
@@ -126,7 +121,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. MASTER APP MODE SELECTION
+# 4. APP MODE SELECTION
 # ==========================================
 st.sidebar.markdown("### 📱 APP MODE")
 app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
@@ -136,7 +131,7 @@ if app_mode == "📱 Viewer (Mobile Client)":
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 
 # ==========================================
-# 5. DATA SCANNER (Master Device Fast Engine)
+# 5. DATA SCANNER (Master Fast Engine)
 # ==========================================
 @st.cache_data(show_spinner=False)
 def run_master_scan(token, date_str, cycle_id):
@@ -417,7 +412,6 @@ if app_mode == "💻 Master (Data Fetcher)":
             token = saved_token
 
         if token:
-            # Cache Buster Engine
             if 'fetch_cycle_id' not in st.session_state: 
                 st.session_state.fetch_cycle_id = int(time.time())
             if 'last_api_call_ts' not in st.session_state: 
@@ -441,7 +435,6 @@ if app_mode == "💻 Master (Data Fetcher)":
                     json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
                 except: pass
                 
-                # VIP EXACT 9:17 SAVE TRIGGER
                 if datetime.time(9, 17) <= now_ist.time() < datetime.time(9, 20):
                     last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
                     if last_save != today_str:
@@ -453,7 +446,6 @@ if app_mode == "💻 Master (Data Fetcher)":
         st.info("👈 Please enter Auth Code in sidebar to start Master Server.")
 
 elif app_mode == "📱 Viewer (Mobile Client)":
-    # --- VIEWER EXECUTION ---
     st.sidebar.success("🟢 Viewer Mode Active!\n\nNo Fyers Login needed. Receiving data from Master.")
     if os.path.exists(SHARED_LIVE_DATA_FILE):
         try:
@@ -468,7 +460,7 @@ elif app_mode == "📱 Viewer (Mobile Client)":
         st.session_state.cached_data = []
 
 # ==========================================
-# 7. APP RENDERING (SINGLE LINE UI & TABLES)
+# 7. APP RENDERING & PREMIUM APEXCHARTS 📈
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
@@ -493,7 +485,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
     ]
 
-    # 🚀 SINGLE-LINE HEADER LAYOUT WITH TIMER INCORPORATED 🚀
     col_menu, col_search, col_toggle, col_timer = st.columns([3, 2, 2.5, 2.5], gap="small")
     
     with col_menu:
@@ -538,7 +529,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
     st.divider()
 
-    # 🚀 ROUTING LOGIC BASED ON SELECTED TAB 🚀
     if selected_tab == "📊 Dashboard":
         
         if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
@@ -608,8 +598,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
 
+    # 🚀 NEW PREMIUM APEXCHARTS ENGINE (SLN STYLE) 🚀
     elif selected_tab == "📈 CHART":
-        st.markdown("### 📈 TREND CHART") 
+        st.markdown("### 📈 SIR TREND CHART") 
         col_c1, col_c2 = st.columns([2, 2])
         with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
         with col_c2: chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True)
@@ -621,53 +612,87 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                     df_sym = hist_df[(hist_df['Date'] == today_str) & (hist_df['Symbol'] == sel_stock)].copy()
                     if not df_sym.empty:
                         df_sym = df_sym.sort_values(by='Time')
-                        df_sym['Datetime'] = pd.to_datetime(df_sym['Date'] + ' ' + df_sym['Time'])
                         
                         target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
-                        line_color = "#2962FF" 
-                        ltp_color = "#FF5252"  
+                        indicator_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF"
                         
-                        fig = make_subplots(specs=[[{"secondary_y": True}]])
-                        fig.add_trace(go.Scatter(x=df_sym['Datetime'], y=df_sym[target_col], name=f"{chart_mode}", line=dict(color=line_color, width=2.5, shape="spline"), mode="lines"), secondary_y=False)
-                        fig.add_trace(go.Scatter(x=df_sym['Datetime'], y=df_sym['LTP'], name="Stock LTP", line=dict(color=ltp_color, width=2.5, shape="spline"), mode="lines"), secondary_y=True)
+                        time_list = df_sym['Time'].tolist()
+                        indicator_list = df_sym[target_col].tolist()
+                        ltp_list = df_sym['LTP'].tolist()
 
-                        market_open_time = pd.to_datetime(f"{today_str} 09:15:00")
-                        actual_first_data_time = df_sym['Datetime'].min()
-                        dynamic_start_time = max(actual_first_data_time, market_open_time)
-                        fixed_end_time = pd.to_datetime(f"{today_str} 15:30:00")
+                        # 🚀 THE JAVASCRIPT INJECTION FOR SLN STYLE PREMIUM CHART 🚀
+                        apex_html = f"""
+                        <!DOCTYPE html>
+                        <html>
+                        <head>
+                            <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+                            <style> body {{ margin: 0; padding: 0; background-color: #FFFFFF; font-family: 'Segoe UI', Arial, sans-serif; }} </style>
+                        </head>
+                        <body>
+                            <div id="apex-chart"></div>
+                            <script>
+                                var options = {{
+                                    series: [{{
+                                        name: '{chart_mode}',
+                                        type: 'area',
+                                        data: {json.dumps(indicator_list)}
+                                    }}, {{
+                                        name: 'LTP',
+                                        type: 'line',
+                                        data: {json.dumps(ltp_list)}
+                                    }}],
+                                    chart: {{
+                                        height: 480,
+                                        type: 'line',
+                                        toolbar: {{ show: true, tools: {{ download: false, selection: true, zoom: true, pan: true }} }},
+                                        animations: {{ enabled: false }}
+                                    }},
+                                    colors: ['{indicator_color}', '#00CC66'],
+                                    stroke: {{
+                                        curve: 'smooth',
+                                        width: [2, 3]
+                                    }},
+                                    fill: {{
+                                        type: ['gradient', 'solid'],
+                                        gradient: {{
+                                            shadeIntensity: 1,
+                                            opacityFrom: 0.35,
+                                            opacityTo: 0.05,
+                                            stops: [0, 100]
+                                        }}
+                                    }},
+                                    dataLabels: {{ enabled: false }},
+                                    xaxis: {{
+                                        categories: {json.dumps(time_list)},
+                                        tickAmount: 10,
+                                        labels: {{ style: {{ colors: '#888' }} }}
+                                    }},
+                                    yaxis: [
+                                        {{
+                                            title: {{ text: '{chart_mode}', style: {{ color: '{indicator_color}' }} }},
+                                            labels: {{ style: {{ colors: '{indicator_color}' }} }},
+                                        }},
+                                        {{
+                                            opposite: true,
+                                            title: {{ text: 'LTP', style: {{ color: '#00CC66' }} }},
+                                            labels: {{ style: {{ colors: '#00CC66' }} }},
+                                        }}
+                                    ],
+                                    tooltip: {{
+                                        shared: true,
+                                        intersect: false,
+                                        y: {{ formatter: function (y) {{ if (typeof y !== "undefined") {{ return y.toFixed(2); }} return y; }} }}
+                                    }},
+                                    legend: {{ position: 'top', horizontalAlign: 'right' }}
+                                }};
 
-                        fig.update_layout(
-                            template="plotly_white", 
-                            hovermode="x unified", 
-                            dragmode="pan", 
-                            height=400, 
-                            margin=dict(l=0, r=0, t=50, b=10), 
-                            plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", 
-                            font=dict(color="#424242", family="Arial, sans-serif"),
-                            legend=dict(orientation="h", yanchor="bottom", y=1.08, xanchor="center", x=0.5, font=dict(color="#424242", size=13), bgcolor="rgba(255,255,255,0)")
-                        )
-                        
-                        fig.update_xaxes(
-                            rangeslider=dict(visible=False), 
-                            type="date", 
-                            range=[dynamic_start_time, fixed_end_time], 
-                            showgrid=False, zeroline=False, showline=True, linecolor="#E0E0E0", tickfont=dict(color="#9E9E9E"),
-                            showspikes=True, spikecolor="#9E9E9E", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot"
-                        )
-                        fig.update_yaxes(
-                            title=dict(text=f"{chart_mode}", font=dict(color=line_color, size=12)), tickfont=dict(color=line_color), 
-                            gridcolor="#F5F5F5", gridwidth=1, zeroline=False, autorange=True,
-                            showspikes=True, spikecolor="#9E9E9E", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot",
-                            secondary_y=False
-                        )
-                        fig.update_yaxes(
-                            title=dict(text="LTP", font=dict(color=ltp_color, size=12)), tickfont=dict(color=ltp_color), 
-                            showgrid=False, zeroline=False, autorange=True,
-                            showspikes=True, spikecolor="#9E9E9E", spikesnap="cursor", spikemode="across", spikethickness=1, spikedash="dot",
-                            secondary_y=True
-                        )
-                        
-                        st.plotly_chart(fig, use_container_width=True, config={'scrollZoom': True, 'displayModeBar': False})
+                                var chart = new ApexCharts(document.querySelector("#apex-chart"), options);
+                                chart.render();
+                            </script>
+                        </body>
+                        </html>
+                        """
+                        components.html(apex_html, height=500)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
