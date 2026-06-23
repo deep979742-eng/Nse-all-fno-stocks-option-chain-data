@@ -120,11 +120,23 @@ def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
+
 # ==========================================
-# 4. MASTER SCANNER (Light 0.4s Old Stable Engine)
+# 4. MASTER ENGINE & TIMER DEFINITIONS
 # ==========================================
+st.sidebar.markdown("### 📱 APP MODE")
+app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
+st.sidebar.markdown("---")
+
+if app_mode == "📱 Viewer (Mobile Client)":
+    st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
+
+# ==========================================
+# 5. DATA SCANNER (Master Device)
+# ==========================================
+# 🚀 CACHE BUSTER ACTIVE: 'cycle_id' parameter ab memory ko force clear karega 🚀
 @st.cache_data(show_spinner=False)
-def run_master_scan(token, date_str, cycle_trigger):
+def run_master_scan(token, date_str, cycle_id):
     fyers = fyersModel.FyersModel(client_id=APP_ID, is_async=False, token=token, log_path="")
     scan_time_ist = datetime.datetime.now(IST)
     time_str = scan_time_ist.strftime('%H:%M')
@@ -319,20 +331,9 @@ def run_master_scan(token, date_str, cycle_trigger):
 
     return final_list, scan_time_ist.timestamp()
 
-
 # ==========================================
-# 5. THE SERVER / CLIENT ENGINE 🚀
+# 6. SIDEBAR SETUP & LOGIN
 # ==========================================
-st.sidebar.markdown("### 📱 APP MODE")
-app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
-st.sidebar.markdown("---")
-
-# 🚀 CONTINUOUS REFRESH KEY LINKED TO STREAMLIT ENGINE 🚀
-if app_mode == "💻 Master (Data Fetcher)":
-    refresh_count = st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
-else:
-    refresh_count = st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
-
 auth_code = None
 token = None
 cached_result = None
@@ -394,7 +395,7 @@ if app_mode == "💻 Master (Data Fetcher)":
             st.sidebar.success("Baseline Saved Successfully!")
             st.cache_data.clear() 
 
-    # --- MASTER EXECUTION ---
+    # --- MASTER EXECUTION LOGIC ---
     if auth_code:
         if auth_code != "AUTO_LOGGED_IN":
             try:
@@ -413,9 +414,25 @@ if app_mode == "💻 Master (Data Fetcher)":
             token = saved_token
 
         if token:
-            cached_result, last_scan_timestamp = run_master_scan(token, today_str, refresh_count)
+            # 🚀 CACHE BUSTER (Memory Clearer) Engine 🚀
+            if 'fetch_cycle_id' not in st.session_state: 
+                st.session_state.fetch_cycle_id = int(time.time())
+            if 'last_api_call_ts' not in st.session_state: 
+                st.session_state.last_api_call_ts = 0
+
+            now_ts = time.time()
+            # Agar last fresh fetch ko 5 min (300 sec) poore ho chuke hain, tabhi Cache ko 'Kick' maro
+            if now_ts - st.session_state.last_api_call_ts >= 300:
+                st.session_state.fetch_cycle_id = now_ts
+
+            # Ye function memory id ke according fresh fetch karega
+            cached_result, last_scan_timestamp = run_master_scan(token, today_str, st.session_state.fetch_cycle_id)
 
             if cached_result is not None:
+                # Agar ye sach me ek naya fresh fetch tha, toh time ko lock kar do
+                if st.session_state.last_api_call_ts != st.session_state.fetch_cycle_id:
+                    st.session_state.last_api_call_ts = time.time()
+                    
                 st.session_state.cached_data = cached_result
                 st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
                 
@@ -451,7 +468,7 @@ elif app_mode == "📱 Viewer (Mobile Client)":
 
 
 # ==========================================
-# 6. APP RENDERING (Table & Charts)
+# 7. APP RENDERING (Table & Charts)
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
@@ -487,28 +504,31 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             
         with t_col2:
             if app_mode == "💻 Master (Data Fetcher)":
-                # 🚀 JAVASCRIPT FIXED: Ab 00:00 hote hi yeh Streamlit Cloud Engine ko Force Click bhejega 🚀
-                components.html("""
+                # 🚀 DYNAMIC JS TIMER FIX: Toggle dabane par timer ab shuru se start nahi hoga 🚀
+                elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
+                rem_secs = max(1, int(310 - elapsed))
+                
+                js_code = f"""
                 <div style="text-align: right; color: #FF4D4D; font-size: 14px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 8px;">
-                    ⏱️ Next Refresh In: <span id="clock">05:10</span>
+                    ⏱️ Next Fetch In: <span id="clock"></span>
                 </div>
                 <script>
-                    var timeLeft = 310;
-                    var clockTimer = setInterval(function() {
-                        if(timeLeft <= 1) {
+                    var timeLeft = {rem_secs};
+                    var clockTimer = setInterval(function() {{
+                        if(timeLeft <= 0) {{
                             clearInterval(clockTimer);
-                            document.getElementById('clock').innerHTML = "Refreshing Data...";
-                            // 🚀 STREAMLIT FORCE REFRESH TRIGGER 🚀
-                            window.parent.postMessage({type: 'streamlit:setComponentValue', value: true}, '*');
-                        } else {
+                            document.getElementById('clock').innerHTML = "🔄 Fetching From Fyers...";
+                            window.parent.location.reload(); 
+                        }} else {{
                             timeLeft--;
                             var m = Math.floor(timeLeft / 60);
                             var s = timeLeft % 60;
                             document.getElementById('clock').innerHTML = (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
-                        }
-                    }, 1000);
+                        }}
+                    }}, 1000);
                 </script>
-                """, height=40)
+                """
+                components.html(js_code, height=40)
             else:
                 mode_text = "Viewer"
                 st.markdown(f"<div style='text-align: right; color: #888888; font-size: 13px; font-weight: bold; margin-top: 10px;'>⏱️ Last ({mode_text}): {ref_time}</div>", unsafe_allow_html=True)
