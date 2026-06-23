@@ -120,6 +120,7 @@ def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
+
 # ==========================================
 # 4. APP MODE SELECTION
 # ==========================================
@@ -598,12 +599,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
 
-    # 🚀 NEW PREMIUM APEXCHARTS ENGINE (SLN STYLE WITH BRUSH SLIDER) 🚀
     elif selected_tab == "📈 CHART":
-        # Removed the big text title to keep it extra clean as requested
         col_c1, col_c2 = st.columns([2, 2])
-        with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
-        with col_c2: chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True)
+        with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
+        with col_c2: chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True, label_visibility="collapsed")
 
         if os.path.exists(HISTORY_FILE):
             try:
@@ -620,7 +619,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # HTML/JS for ApexCharts with Main Chart + Slider (Brush) Chart
+                        # 🚀 JS INJECTION: Slider height exactly 60px (50% of previous 120px) 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -628,7 +627,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
                                 body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
-                                .apexcharts-toolbar {{ top: -10px !important; right: 5px !important; }}
+                                .apexcharts-toolbar {{ top: -10px !important; right: auto !important; left: 10px !important; z-index: 10 !important; }}
                             </style>
                         </head>
                         <body>
@@ -658,7 +657,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
-                                    stroke: {{ curve: 'smooth', width: [2, 3] }},
+                                    stroke: {{ curve: 'smooth', width: [2, 2] }}, 
                                     fill: {{
                                         type: ['gradient', 'solid'],
                                         gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }}
@@ -692,7 +691,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                // Dot Wala Slider (Brush Chart)
+                                // 🚀 REDUCED HEIGHT: height is now 60 (exactly 50% thinner) 🚀
                                 var optionsSlider = {{
                                     series: [{{
                                         name: '{chart_mode}',
@@ -700,7 +699,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 120,
+                                        height: 60,
                                         type: 'area',
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -736,7 +735,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=550)
+                        components.html(apex_html, height=490)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
