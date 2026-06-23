@@ -460,7 +460,7 @@ elif app_mode == "📱 Viewer (Mobile Client)":
         st.session_state.cached_data = []
 
 # ==========================================
-# 7. APP RENDERING & PREMIUM APEXCHARTS 📈
+# 7. APP RENDERING (SINGLE LINE UI & TABLES)
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
@@ -598,9 +598,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         st.markdown("<br>", unsafe_allow_html=True)
         st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
 
-    # 🚀 NEW PREMIUM APEXCHARTS ENGINE (SLN STYLE) 🚀
+    # 🚀 NEW PREMIUM APEXCHARTS ENGINE (SLN STYLE WITH BRUSH SLIDER) 🚀
     elif selected_tab == "📈 CHART":
-        st.markdown("### 📈 SIR TREND CHART") 
+        # Removed the big text title to keep it extra clean as requested
         col_c1, col_c2 = st.columns([2, 2])
         with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
         with col_c2: chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True)
@@ -620,52 +620,55 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE JAVASCRIPT INJECTION FOR SLN STYLE PREMIUM CHART 🚀
+                        # HTML/JS for ApexCharts with Main Chart + Slider (Brush) Chart
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
                         <head>
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-                            <style> body {{ margin: 0; padding: 0; background-color: #FFFFFF; font-family: 'Segoe UI', Arial, sans-serif; }} </style>
+                            <style> 
+                                body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
+                                .apexcharts-toolbar {{ top: -10px !important; right: 5px !important; }}
+                            </style>
                         </head>
                         <body>
-                            <div id="apex-chart"></div>
+                            <div id="chart-main"></div>
+                            <div id="chart-slider" style="margin-top: -15px;"></div>
+                            
                             <script>
-                                var options = {{
+                                var dataIndicator = {json.dumps(indicator_list)};
+                                var dataLTP = {json.dumps(ltp_list)};
+                                var timeCats = {json.dumps(time_list)};
+                                
+                                var optionsMain = {{
                                     series: [{{
                                         name: '{chart_mode}',
                                         type: 'area',
-                                        data: {json.dumps(indicator_list)}
+                                        data: dataIndicator
                                     }}, {{
                                         name: 'LTP',
                                         type: 'line',
-                                        data: {json.dumps(ltp_list)}
+                                        data: dataLTP
                                     }}],
                                     chart: {{
-                                        height: 480,
+                                        id: 'mainChart',
+                                        height: 400,
                                         type: 'line',
                                         toolbar: {{ show: true, tools: {{ download: false, selection: true, zoom: true, pan: true }} }},
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
-                                    stroke: {{
-                                        curve: 'smooth',
-                                        width: [2, 3]
-                                    }},
+                                    stroke: {{ curve: 'smooth', width: [2, 3] }},
                                     fill: {{
                                         type: ['gradient', 'solid'],
-                                        gradient: {{
-                                            shadeIntensity: 1,
-                                            opacityFrom: 0.35,
-                                            opacityTo: 0.05,
-                                            stops: [0, 100]
-                                        }}
+                                        gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }}
                                     }},
                                     dataLabels: {{ enabled: false }},
                                     xaxis: {{
-                                        categories: {json.dumps(time_list)},
+                                        categories: timeCats,
                                         tickAmount: 10,
-                                        labels: {{ style: {{ colors: '#888' }} }}
+                                        labels: {{ style: {{ colors: '#888' }} }},
+                                        tooltip: {{ enabled: false }}
                                     }},
                                     yaxis: [
                                         {{
@@ -686,13 +689,54 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     legend: {{ position: 'top', horizontalAlign: 'right' }}
                                 }};
 
-                                var chart = new ApexCharts(document.querySelector("#apex-chart"), options);
-                                chart.render();
+                                var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
+                                chartMain.render();
+
+                                // Dot Wala Slider (Brush Chart)
+                                var optionsSlider = {{
+                                    series: [{{
+                                        name: '{chart_mode}',
+                                        data: dataIndicator
+                                    }}],
+                                    chart: {{
+                                        id: 'sliderChart',
+                                        height: 120,
+                                        type: 'area',
+                                        brush: {{ target: 'mainChart', enabled: true }},
+                                        selection: {{ 
+                                            enabled: true,
+                                            xaxis: {{
+                                                min: timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0],
+                                                max: timeCats[timeCats.length - 1]
+                                            }}
+                                        }},
+                                        toolbar: {{ show: false }},
+                                        animations: {{ enabled: false }}
+                                    }},
+                                    colors: ['{indicator_color}'],
+                                    fill: {{
+                                        type: 'gradient',
+                                        gradient: {{ shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.1, stops: [0, 100] }}
+                                    }},
+                                    stroke: {{ curve: 'smooth', width: 1 }},
+                                    dataLabels: {{ enabled: false }},
+                                    xaxis: {{
+                                        categories: timeCats,
+                                        tickAmount: 10,
+                                        labels: {{ show: false }},
+                                        tooltip: {{ enabled: false }}
+                                    }},
+                                    yaxis: {{ show: false, tickAmount: 2 }},
+                                    grid: {{ show: false }}
+                                }};
+
+                                var chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
+                                chartSlider.render();
                             </script>
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=500)
+                        components.html(apex_html, height=550)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
