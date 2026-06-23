@@ -486,10 +486,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
     ]
 
+    # 🚀 NIFTYTRADER MENU REMOVED 🚀
     col_menu, col_search, col_toggle, col_timer = st.columns([3, 2, 2.5, 2.5], gap="small")
     
     with col_menu:
-        selected_tab = st.radio("Menu", ["📊 Dashboard", "🌐 NiftyTrader", "📈 CHART"], horizontal=True, label_visibility="collapsed")
+        selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
         
     with col_search:
         search_query = st.text_input("Search", placeholder="🔍 Search Stock...", label_visibility="collapsed").upper()
@@ -592,13 +593,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 hide_index=True
             )
 
-    elif selected_tab == "🌐 NiftyTrader":
-        st.markdown("### 🌐 NiftyTrader Live Options Chart")
-        selected_nt_stock = st.selectbox("Select Stock for Chart:", raw_symbols, index=0, key="nt_stock")
-        nt_url = f"https://www.niftytrader.in/stock-options-chart/{selected_nt_stock.lower()}"
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
-
     elif selected_tab == "📈 CHART":
         col_c1, col_c2 = st.columns([2, 2])
         with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
@@ -619,7 +613,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 JS INJECTION: 80px Slider Height & Pan Default (No Auto-Zoom on Touch) 🚀
+                        # 🚀 JS INJECTION: ICONS GAYAB & SLIDER 100px 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -627,7 +621,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
                                 body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
-                                .apexcharts-toolbar {{ top: -10px !important; right: auto !important; left: 10px !important; z-index: 10 !important; }}
                             </style>
                         </head>
                         <body>
@@ -653,11 +646,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         id: 'mainChart',
                                         height: 400,
                                         type: 'line',
-                                        toolbar: {{ 
-                                            show: true, 
-                                            tools: {{ download: false, selection: true, zoom: true, pan: true }},
-                                            autoSelected: 'pan' /* 👈 FIXED: Prevents auto-zoom box on mobile touch */
-                                        }},
+                                        toolbar: {{ show: false }}, /* 👈 LEFT ICONS (Zoom/Pan) REMOVED */
+                                        autoSelected: 'pan',
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
@@ -695,7 +685,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                // 🚀 FIXED: Height set to exactly 80px 🚀
+                                // 🚀 SLIDER SET TO 100px HEIGHT 🚀
                                 var optionsSlider = {{
                                     series: [{{
                                         name: '{chart_mode}',
@@ -703,7 +693,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 80,
+                                        height: 100, /* 👈 EXACTLY 100px */
                                         type: 'area',
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -739,7 +729,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=510)
+                        components.html(apex_html, height=530)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
