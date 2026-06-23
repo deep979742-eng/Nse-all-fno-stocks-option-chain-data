@@ -619,7 +619,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 JS INJECTION: Slider height exactly 60px (50% of previous 120px) 🚀
+                        # 🚀 JS INJECTION: 80px Slider Height & Pan Default (No Auto-Zoom on Touch) 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -653,7 +653,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         id: 'mainChart',
                                         height: 400,
                                         type: 'line',
-                                        toolbar: {{ show: true, tools: {{ download: false, selection: true, zoom: true, pan: true }} }},
+                                        toolbar: {{ 
+                                            show: true, 
+                                            tools: {{ download: false, selection: true, zoom: true, pan: true }},
+                                            autoSelected: 'pan' /* 👈 FIXED: Prevents auto-zoom box on mobile touch */
+                                        }},
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
@@ -691,7 +695,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                // 🚀 REDUCED HEIGHT: height is now 60 (exactly 50% thinner) 🚀
+                                // 🚀 FIXED: Height set to exactly 80px 🚀
                                 var optionsSlider = {{
                                     series: [{{
                                         name: '{chart_mode}',
@@ -699,7 +703,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 60,
+                                        height: 80,
                                         type: 'area',
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -735,7 +739,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=490)
+                        components.html(apex_html, height=510)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
