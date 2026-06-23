@@ -24,33 +24,38 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# CSS - FULLY MOBILE RESPONSIVE & LAPTOP SCREEN FIT
+# 🚀 DEEPAK BHAI'S ORIGINAL GOLDEN UI CSS (VERTICAL HEADERS & SPACING) 🚀
 css_str = """<style>
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stStatusWidget'] { visibility: hidden !important; display: none !important; } 
 
-/* 🚀 DESKTOP SCREEN SETTING */
-.block-container { padding-top: 3.5rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
+.block-container { padding-top: 3rem !important; padding-bottom: 1rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 [data-testid='stDataFrameTable'] > thead > tr { background-color: darkblue !important; } 
 
-/* 🚀 COLUMN COMPRESS CSS */
+/* ALL Headers Vertical (Including SYMBOL) to Save Maximum Space on Mobile */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
     background-color: darkblue !important; 
     color: white !important; 
     font-weight: bold !important; 
     text-align: center !important; 
-    white-space: pre-wrap !important; 
+    writing-mode: vertical-rl !important; 
+    transform: rotate(180deg) !important; 
+    white-space: nowrap !important; 
     padding: 8px 4px !important;
+    height: 120px !important;
 } 
 
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
 
-/* 🚀 MOBILE SCREEN SETTING */
+/* Radio Alignment Fix for Single Line Layout */
+div[role="radiogroup"] { margin-top: 5px !important; }
+
+/* Extreme Mobile Optimization */
 @media (max-width: 768px) { 
-    .block-container { padding-top: 4rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
-    [data-testid='stDataFrameTable'] th { font-size: 10px !important; padding: 4px 2px !important; } 
+    .block-container { padding-top: 1rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
+    [data-testid='stDataFrameTable'] th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
     [data-testid='stDataFrameTable'] td { font-size: 10px !important; padding: 4px 2px !important; } 
 }
 </style>"""
@@ -120,9 +125,8 @@ def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
-
 # ==========================================
-# 4. MASTER ENGINE & TIMER DEFINITIONS
+# 4. MASTER APP MODE SELECTION
 # ==========================================
 st.sidebar.markdown("### 📱 APP MODE")
 app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
@@ -132,9 +136,8 @@ if app_mode == "📱 Viewer (Mobile Client)":
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 
 # ==========================================
-# 5. DATA SCANNER (Master Device)
+# 5. DATA SCANNER (Master Device Fast Engine)
 # ==========================================
-# 🚀 CACHE BUSTER ACTIVE: 'cycle_id' parameter ab memory ko force clear karega 🚀
 @st.cache_data(show_spinner=False)
 def run_master_scan(token, date_str, cycle_id):
     fyers = fyersModel.FyersModel(client_id=APP_ID, is_async=False, token=token, log_path="")
@@ -414,22 +417,19 @@ if app_mode == "💻 Master (Data Fetcher)":
             token = saved_token
 
         if token:
-            # 🚀 CACHE BUSTER (Memory Clearer) Engine 🚀
+            # Cache Buster Engine
             if 'fetch_cycle_id' not in st.session_state: 
                 st.session_state.fetch_cycle_id = int(time.time())
             if 'last_api_call_ts' not in st.session_state: 
                 st.session_state.last_api_call_ts = 0
 
             now_ts = time.time()
-            # Agar last fresh fetch ko 5 min (300 sec) poore ho chuke hain, tabhi Cache ko 'Kick' maro
-            if now_ts - st.session_state.last_api_call_ts >= 300:
+            if now_ts - st.session_state.last_api_call_ts >= 100: 
                 st.session_state.fetch_cycle_id = now_ts
 
-            # Ye function memory id ke according fresh fetch karega
             cached_result, last_scan_timestamp = run_master_scan(token, today_str, st.session_state.fetch_cycle_id)
 
             if cached_result is not None:
-                # Agar ye sach me ek naya fresh fetch tha, toh time ko lock kar do
                 if st.session_state.last_api_call_ts != st.session_state.fetch_cycle_id:
                     st.session_state.last_api_call_ts = time.time()
                     
@@ -441,7 +441,8 @@ if app_mode == "💻 Master (Data Fetcher)":
                     json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
                 except: pass
                 
-                if datetime.time(9, 17) <= now_ist.time() < datetime.time(9, 25):
+                # VIP EXACT 9:17 SAVE TRIGGER
+                if datetime.time(9, 17) <= now_ist.time() < datetime.time(9, 20):
                     last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
                     if last_save != today_str:
                         if save_eod_data(): 
@@ -466,9 +467,8 @@ elif app_mode == "📱 Viewer (Mobile Client)":
         st.info("⏳ Waiting for Master Server to fetch data. Master ko on rakhein...")
         st.session_state.cached_data = []
 
-
 # ==========================================
-# 7. APP RENDERING (Table & Charts)
+# 7. APP RENDERING (SINGLE LINE UI & TABLES)
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
@@ -493,127 +493,126 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
     ]
 
-    tab1, tab2 = st.tabs(["📊 Dashboard", "📈 TREND CHART"])
+    # 🚀 SINGLE-LINE HEADER LAYOUT WITH TIMER INCORPORATED 🚀
+    col_menu, col_search, col_toggle, col_timer = st.columns([3, 2, 2.5, 2.5], gap="small")
     
-    with tab1:
-        ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
+    with col_menu:
+        selected_tab = st.radio("Menu", ["📊 Dashboard", "🌐 NiftyTrader", "📈 CHART"], horizontal=True, label_visibility="collapsed")
         
-        t_col1, t_col2 = st.columns([6, 4])
-        with t_col1:
-            show_pct = st.toggle("📊 Show Checker in %", value=True)
+    with col_search:
+        search_query = st.text_input("Search", placeholder="🔍 Search Stock...", label_visibility="collapsed").upper()
+        
+    with col_toggle:
+        show_pct = st.toggle("📊 Show Checker (%)", value=True)
+        
+    with col_timer:
+        if app_mode == "💻 Master (Data Fetcher)":
+            elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
+            rem_secs = max(1, int(310 - elapsed))
             
-        with t_col2:
-            if app_mode == "💻 Master (Data Fetcher)":
-                # 🚀 DYNAMIC JS TIMER FIX: Toggle dabane par timer ab shuru se start nahi hoga 🚀
-                elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
-                rem_secs = max(1, int(310 - elapsed))
-                
-                js_code = f"""
-                <div style="text-align: right; color: #FF4D4D; font-size: 14px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 8px;">
-                    ⏱️ Next Fetch In: <span id="clock"></span>
-                </div>
-                <script>
-                    var timeLeft = {rem_secs};
-                    var clockTimer = setInterval(function() {{
-                        if(timeLeft <= 0) {{
-                            clearInterval(clockTimer);
-                            document.getElementById('clock').innerHTML = "🔄 Fetching From Fyers...";
-                            window.parent.location.reload(); 
-                        }} else {{
-                            timeLeft--;
-                            var m = Math.floor(timeLeft / 60);
-                            var s = timeLeft % 60;
-                            document.getElementById('clock').innerHTML = (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
-                        }}
-                    }}, 1000);
-                </script>
-                """
-                components.html(js_code, height=40)
-            else:
-                mode_text = "Viewer"
-                st.markdown(f"<div style='text-align: right; color: #888888; font-size: 13px; font-weight: bold; margin-top: 10px;'>⏱️ Last ({mode_text}): {ref_time}</div>", unsafe_allow_html=True)
+            js_code = f"""
+            <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
+                ⏱️ Next Fetch: <span id="clock"></span>
+            </div>
+            <script>
+                var timeLeft = {rem_secs};
+                var clockTimer = setInterval(function() {{
+                    if(timeLeft <= 0) {{
+                        clearInterval(clockTimer);
+                        document.getElementById('clock').innerHTML = "🔄 Fetching...";
+                        window.parent.location.reload(); 
+                    }} else {{
+                        timeLeft--;
+                        var m = Math.floor(timeLeft / 60);
+                        var s = timeLeft % 60;
+                        document.getElementById('clock').innerHTML = (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
+                    }}
+                }}, 1000);
+            </script>
+            """
+            components.html(js_code, height=40)
+        else:
+            mode_text = "Viewer"
+            ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
+            st.markdown(f"<div style='text-align: right; color: #888888; font-size: 12px; font-weight: bold; margin-top: 8px;'>⏱️ Last: {ref_time}</div>", unsafe_allow_html=True)
+
+    st.divider()
+
+    # 🚀 ROUTING LOGIC BASED ON SELECTED TAB 🚀
+    if selected_tab == "📊 Dashboard":
         
         if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
             missing_str = ", ".join(st.session_state.missing_stocks_list)
             st.warning(f"⚠️ Fyers API ne in {len(st.session_state.missing_stocks_list)} stocks ka data nahi diya: **{missing_str}**")
-        
-        vol_col_name = 'VOL CHK\nCPR'
-        pcr_col_name = 'PCR\nCHK'
         
         checker_fmt = '{:+.2f}%' if show_pct else '{:+.2f}'
         
         format_dict = {
             'VOL PCR': '{:.2f}', 
             'OPTION PCR': '{:.2f}',
-            'VOLUME\nCPR': '{:.2f}', 
+            'VOL CPR': '{:.2f}', 
             'LTP': '{:.2f}', 
-            'LTP\nCHANGE': '{:.2f}', 
-            'CHANGE\n%': '{:+.2f}%', 
-            'CE\nCONT %': '{:+.2f}%', 
-            'PE\nCONT %': '{:+.2f}%',
-            pcr_col_name: checker_fmt, 
-            vol_col_name: checker_fmt
+            'LTP CHANGE': '{:.2f}', 
+            'CHANGE%': '{:+.2f}%', 
+            'CE_CONTRACT': '{:+.1f}%', 
+            'PE_CONTRACT': '{:+.1f}%',
+            'PCR CHECKER': checker_fmt, 
+            'VOL CHECKER': checker_fmt
         }
         
         df = pd.DataFrame(st.session_state.cached_data)
         
+        if search_query: 
+            df = df[df['SYMS'].str.contains(search_query, na=False)]
+            
         if not df.empty:
             df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
             df = df.sort_values(by='Conv_Rank', ascending=False)
             
-            df[vol_col_name] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
-            df[pcr_col_name] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
+            df['VOL CHECKER'] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
+            df['PCR CHECKER'] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
             
-            df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', pcr_col_name, vol_col_name]]
+            df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHECKER', 'VOL CHECKER']]
             
             df = df.rename(columns={
                 'SYMS': 'SYMBOL', 
                 'OPEN_STATUS': 'OPENING',
                 'V_PCR': 'VOL PCR',
                 'O_PCR': 'OPTION PCR',
-                'V_CPR': 'VOLUME\nCPR', 
-                'LTP_CH': 'LTP\nCHANGE', 
-                'CHG_%': 'CHANGE\n%', 
+                'V_CPR': 'VOL CPR', 
+                'LTP_CH': 'LTP CHANGE', 
+                'CHG_%': 'CHANGE%', 
                 'LTP': 'LTP', 
-                'CE_CON': 'CE\nCONT %', 
-                'PE_CON': 'PE\nCONT %'
+                'CE_CON': 'CE_CONTRACT', 
+                'PE_CON': 'PE_CONTRACT'
             })
 
             styled_df = (df.style.hide(axis="index")
                          .set_properties(**{'text-align': 'center'})
                          .format(format_dict)
                          .set_table_styles(header_styles)
-                         .map(style_indicators, subset=['OPENING', 'LTP\nCHANGE', 'CHANGE\n%', 'CE\nCONT %', 'PE\nCONT %', vol_col_name, pcr_col_name])
-                         .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOLUME\nCPR']))
+                         .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
+                         .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
 
             st.dataframe(
                 styled_df, 
                 use_container_width=True, 
                 height=800, 
-                hide_index=True,
-                column_config={
-                    "SYMBOL": st.column_config.TextColumn(width="small"),
-                    "OPENING": st.column_config.TextColumn(width="small"),
-                    "VOL PCR": st.column_config.NumberColumn(width="small"),
-                    "OPTION PCR": st.column_config.NumberColumn(width="small"),
-                    "VOLUME\nCPR": st.column_config.NumberColumn(width="small"),
-                    "LTP\nCHANGE": st.column_config.NumberColumn(width="small"),
-                    "CHANGE\n%": st.column_config.NumberColumn(width="small"),
-                    "LTP": st.column_config.NumberColumn(width="small"),
-                    "CE\nCONT %": st.column_config.NumberColumn(width="small"),
-                    "PE\nCONT %": st.column_config.NumberColumn(width="small"),
-                    pcr_col_name: st.column_config.NumberColumn(width="small"),
-                    vol_col_name: st.column_config.NumberColumn(width="small")
-                }
+                hide_index=True
             )
 
-    with tab2:
+    elif selected_tab == "🌐 NiftyTrader":
+        st.markdown("### 🌐 NiftyTrader Live Options Chart")
+        selected_nt_stock = st.selectbox("Select Stock for Chart:", raw_symbols, index=0, key="nt_stock")
+        nt_url = f"https://www.niftytrader.in/stock-options-chart/{selected_nt_stock.lower()}"
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
+
+    elif selected_tab == "📈 CHART":
         st.markdown("### 📈 TREND CHART") 
-        
         col_c1, col_c2 = st.columns([2, 2])
         with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock")
-        with col_c2: 
-            chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True)
+        with col_c2: chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True)
 
         if os.path.exists(HISTORY_FILE):
             try:
