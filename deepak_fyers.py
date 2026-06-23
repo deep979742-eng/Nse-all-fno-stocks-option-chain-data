@@ -501,7 +501,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
             rem_secs = max(1, int(310 - elapsed))
             
-            # 🚀 THE "SMART URL" RAM CLEANER SCRIPT 🚀
+            # 🚀 REFINED OLD HARD REFRESH: Added a memory release step before reload to prevent freezing 🚀
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Next Fetch: <span id="clock"></span>
@@ -511,11 +511,16 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 var clockTimer = setInterval(function() {{
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Clearing RAM...";
+                        document.getElementById('clock').innerHTML = "🔄 Reloading...";
                         
-                        // FIX: Replaces the URL with a fresh timestamp so Chrome deletes old RAM instantly
-                        var baseUrl = window.parent.location.href.split('?')[0];
-                        window.parent.location.replace(baseUrl + "?r=" + new Date().getTime());
+                        // Refinement: Hide content slightly before reload to release mobile DOM memory
+                        document.body.style.opacity = "0"; 
+                        
+                        setTimeout(function() {{
+                            // Force true reload just like before
+                            window.parent.location.reload(true); 
+                        }}, 200);
+                        
                     }} else {{
                         timeLeft--;
                         var m = Math.floor(timeLeft / 60);
@@ -693,7 +698,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 100, 
+                                        height: 80, 
                                         type: 'area',
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -729,7 +734,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=530)
+                        components.html(apex_html, height=510)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
