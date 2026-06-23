@@ -1,3 +1,4 @@
+ data yahan dikhega.")
 import streamlit as st
 import pandas as pd
 import datetime
@@ -119,7 +120,6 @@ def get_fyers_symbol(s): return f"NSE:NIFTY50-INDEX" if s=="NIFTY" else f"NSE:NI
 def get_raw_symbol(fyers_sym): 
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
-
 
 # ==========================================
 # 4. APP MODE SELECTION
@@ -486,7 +486,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
     ]
 
-    # 🚀 NIFTYTRADER MENU REMOVED 🚀
     col_menu, col_search, col_toggle, col_timer = st.columns([3, 2, 2.5, 2.5], gap="small")
     
     with col_menu:
@@ -503,6 +502,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
             rem_secs = max(1, int(310 - elapsed))
             
+            # 🚀 THE "SMART URL" RAM CLEANER SCRIPT 🚀
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Next Fetch: <span id="clock"></span>
@@ -512,8 +512,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 var clockTimer = setInterval(function() {{
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Fetching...";
-                        window.parent.location.reload(); 
+                        document.getElementById('clock').innerHTML = "🔄 Clearing RAM...";
+                        
+                        // FIX: Replaces the URL with a fresh timestamp so Chrome deletes old RAM instantly
+                        var baseUrl = window.parent.location.href.split('?')[0];
+                        window.parent.location.replace(baseUrl + "?r=" + new Date().getTime());
                     }} else {{
                         timeLeft--;
                         var m = Math.floor(timeLeft / 60);
@@ -613,7 +616,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 JS INJECTION: ICONS GAYAB & SLIDER 100px 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -646,7 +648,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         id: 'mainChart',
                                         height: 400,
                                         type: 'line',
-                                        toolbar: {{ show: false }}, /* 👈 LEFT ICONS (Zoom/Pan) REMOVED */
+                                        toolbar: {{ show: false }}, 
                                         autoSelected: 'pan',
                                         animations: {{ enabled: false }}
                                     }},
@@ -685,7 +687,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                // 🚀 SLIDER SET TO 100px HEIGHT 🚀
                                 var optionsSlider = {{
                                     series: [{{
                                         name: '{chart_mode}',
@@ -693,7 +694,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 100, /* 👈 EXACTLY 100px */
+                                        height: 100, 
                                         type: 'area',
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
