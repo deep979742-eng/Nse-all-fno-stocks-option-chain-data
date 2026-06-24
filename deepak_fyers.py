@@ -522,7 +522,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 var clockTimer = setInterval(function() {{
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Reloading Natively...";
+                        document.getElementById('clock').innerHTML = "🔄 Reloading...";
                         document.body.style.opacity = "0"; 
                         setTimeout(function() {{
                             window.parent.location.reload(true); 
@@ -626,7 +626,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE ULTIMATE "KILL ZOOM" AND "FORCE CSS" APEXCHARTS ENGINE 🚀
+                        # 🚀 THE ULTIMATE GOLDEN RATIO & STRICT CSS ENGINE 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -635,7 +635,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <style> 
                                 body {{ margin: 0; padding: 0 10px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
                                 
-                                /* 👉 1. FORCE THE GREY SELECTION BOX WITH DOTTED BORDERS (SENSIBULL STYLE) 👈 */
+                                /* 👉 FORCE THE GREY SELECTION BOX WITH DOTTED BORDERS (SENSIBULL STYLE) 👈 */
                                 #chart-slider .apexcharts-selection-rect {{
                                     fill: #888888 !important;
                                     fill-opacity: 0.25 !important;
@@ -644,7 +644,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     stroke-dasharray: 4 4 !important;
                                 }}
                                 
-                                /* 👉 2. FORCE ALWAYS VISIBLE BLACK/WHITE CAPSULE HANDLES 👈 */
+                                /* 👉 FORCE ALWAYS VISIBLE BLACK/WHITE CAPSULE HANDLES 👈 */
                                 #chart-slider .apexcharts-selection-icon {{
                                     display: block !important;
                                     visibility: visible !important;
@@ -670,12 +670,12 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     visibility: visible !important;
                                 }}
                                 
-                                /* 👉 3. HIDE MAIN CHART TOOLBAR VISUALLY SO IT STAYS IN PAN MODE 👈 */
+                                /* 👉 HIDE MAIN CHART TOOLBAR VISUALLY SO IT STAYS IN PAN MODE 👈 */
                                 #chart-main .apexcharts-toolbar {{
                                     display: none !important;
                                 }}
                                 
-                                /* 👉 4. KILL ANY ACCIDENTAL ZOOM BOXES ON MAIN CHART 👈 */
+                                /* 👉 KILL ANY ACCIDENTAL ZOOM BOXES ON MAIN CHART 👈 */
                                 #chart-main .apexcharts-selection-rect {{
                                     display: none !important;
                                 }}
@@ -704,27 +704,26 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'mainChart',
-                                        height: 400,
+                                        height: 550, /* 🚀 BADA MAIN CHART (Like Photo) 🚀 */
                                         type: 'line',
-                                        /* 🔥 KILL SWITCH: Toolbar is technically ON so 'pan' works, but hidden via CSS! 🔥 */
                                         toolbar: {{ 
                                             show: true, 
                                             tools: {{
                                                 download: false,
-                                                selection: false, /* NO SELECTION BOX */
-                                                zoom: false,      /* NO ZOOM TOOL */
+                                                selection: false, 
+                                                zoom: false,      /* ⛔ NO ZOOM TOOL ⛔ */
                                                 zoomin: false,
                                                 zoomout: false,
-                                                pan: true,        /* ONLY PAN ALLOWED */
+                                                pan: true,        /* ✅ ONLY PAN ALLOWED ✅ */
                                                 reset: false
                                             }},
-                                            autoSelected: 'pan'   /* FORCE PANNING DEFAULT */
+                                            autoSelected: 'pan'   
                                         }},
                                         zoom: {{
-                                            enabled: true,        /* Needed for brush to link */
-                                            allowMouseWheelZoom: false /* NO MOUSE WHEEL ZOOM */
+                                            enabled: true,        
+                                            allowMouseWheelZoom: false /* ⛔ NO MOUSE WHEEL ZOOM ⛔ */
                                         }},
-                                        selection: {{ enabled: false }}, /* NO SELECTION BOX ON MAIN CHART */
+                                        selection: {{ enabled: false }}, 
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
@@ -763,7 +762,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                // 🚀 120px SLIDER WITH FORCED CSS (SENSIBULL STYLE) 🚀
+                                // 🚀 80px PERFECTLY BALANCED SLIDER 🚀
                                 var optionsSlider = {{
                                     series: [{{
                                         name: '{chart_mode}',
@@ -771,7 +770,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 120, 
+                                        height: 80, /* 🚀 BALANCED SLIDER HEIGHT 🚀 */
                                         type: 'line', 
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -780,7 +779,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                                 min: timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0],
                                                 max: timeCats[timeCats.length - 1]
                                             }}
-                                            /* Styling is strictly managed by CSS !important tags above */
                                         }},
                                         toolbar: {{ show: false }},
                                         animations: {{ enabled: false }}
@@ -806,8 +804,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        # Height is 570px to force a complete cache break inside Streamlit's iframe
-                        components.html(apex_html, height=570)
+                        # 🚀 STREAMLIT IFRAME HEIGHT INCREASED TO PREVENT SQUISHING 🚀
+                        components.html(apex_html, height=700)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
