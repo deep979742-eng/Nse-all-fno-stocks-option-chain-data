@@ -626,14 +626,14 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE ULTIMATE DEVICE DETECTOR & HARDWARE ACCELERATION SCRIPT 🚀
+                        # 🚀 THE ULTIMATE ENGINE WITH TOP-LEFT RESET BUTTON 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
                         <head>
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
-                                body {{ margin: 0; padding: 0 10px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
+                                body {{ margin: 0; padding: 0 10px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; position: relative; }} 
                                 
                                 /* 👉 1. SENSIBULL STYLE GREY BOX 👈 */
                                 #chart-slider .apexcharts-selection-rect {{
@@ -644,7 +644,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     stroke-dasharray: 4 4 !important;
                                 }}
                                 
-                                /* 👉 2. FORCE ALWAYS VISIBLE HANDLES 👈 */
+                                /* 👉 2. LEFT BUTTON ALWAYS VISIBLE 👈 */
                                 #chart-slider .apexcharts-selection-icon {{
                                     display: block !important;
                                     visibility: visible !important;
@@ -656,18 +656,18 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 #chart-slider .apexcharts-selection-icon rect {{
                                     fill: #222222 !important; 
                                     stroke: #ffffff !important; 
-                                    stroke-width: 1.5px !important;
-                                    width: 10px !important;
-                                    height: 22px !important;
+                                    stroke-width: 1px !important;
+                                    width: 12px !important;     
+                                    height: 24px !important;    
                                     rx: 4px !important;
-                                    transform: translateY(-4px) !important;
+                                    transform: translateY(0px) !important; 
                                     opacity: 1 !important;
                                     visibility: visible !important;
                                 }}
                                 #chart-slider .apexcharts-selection-icon circle {{
                                     fill: #ffffff !important;
-                                    r: 2.5 !important;
-                                    transform: translateY(2px) !important;
+                                    r: 2 !important;
+                                    transform: translateX(1px) translateY(12px) !important; 
                                     opacity: 1 !important;
                                     visibility: visible !important;
                                 }}
@@ -680,7 +680,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     pointer-events: none !important;
                                 }}
                                 
-                                /* 👉 4. HIDE MAIN CHART TOOLBAR & ZOOM BOX 👈 */
+                                /* 👉 4. KILL MAIN CHART TOOLBAR & ZOOM BOX 👈 */
                                 #chart-main .apexcharts-toolbar,
                                 #chart-main .apexcharts-selection-rect {{
                                     display: none !important;
@@ -689,38 +689,64 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 /* 👉 5. BASE TOUCH ACTIONS 👈 */
                                 #chart-main {{ touch-action: pan-x pan-y !important; }}
                                 #chart-slider {{ 
-                                    touch-action: pan-x !important; /* Strict Horizontal touch lock */
+                                    touch-action: pan-x !important; 
                                     -webkit-user-select: none;
+                                }}
+
+                                /* 👉 6. CUSTOM PREMIUM RESET BUTTON 👈 */
+                                #reset-btn {{
+                                    position: absolute;
+                                    top: 15px;
+                                    left: 15px;
+                                    z-index: 999;
+                                    background-color: rgba(255, 255, 255, 0.9);
+                                    border: 1px solid #cccccc;
+                                    border-radius: 5px;
+                                    padding: 5px 10px;
+                                    font-size: 12px;
+                                    font-weight: bold;
+                                    color: #333333;
+                                    cursor: pointer;
+                                    box-shadow: 0px 2px 5px rgba(0,0,0,0.1);
+                                    transition: all 0.2s;
+                                }}
+                                #reset-btn:hover {{
+                                    background-color: #ffffff;
+                                    border-color: #999999;
                                 }}
                                 
                             </style>
                         </head>
                         <body>
+                            <button id="reset-btn" onclick="resetChart()">🔄 Reset</button>
+                            
                             <div id="chart-main"></div>
                             <div id="chart-slider" style="margin-top: -10px;"></div>
                             
                             <script>
-                                /* 🚀 SMART DEVICE DETECTOR: Check if user is on mobile/touch 🚀 */
+                                /* 🚀 SMART DEVICE DETECTOR: Mobile Touch & Lag Fix 🚀 */
                                 var isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
                                 
                                 if(isTouchDevice) {{
-                                    /* DYNAMIC MOBILE CSS INJECTION */
                                     var mobileStyle = document.createElement('style');
                                     mobileStyle.innerHTML = `
-                                        /* Make handle FAT and long for easy thumb grab on mobile */
                                         #chart-slider .apexcharts-selection-icon rect {{
-                                            width: 16px !important; 
-                                            height: 34px !important;
-                                            transform: translateY(-10px) !important;
+                                            width: 24px !important;     
+                                            height: 24px !important;    
+                                            transform: translateY(0px) !important; 
                                         }}
                                         #chart-slider .apexcharts-selection-icon circle {{
-                                            r: 3.5 !important;
-                                            transform: translateY(1px) translateX(3px) !important;
+                                            r: 4 !important;
+                                            transform: translateX(6px) translateY(12px) !important;
                                         }}
-                                        /* FORCE MOBILE GRAPHICS CARD ACCELERATION TO KILL LAG */
-                                        #chart-slider svg {{
+                                        #chart-slider svg, #chart-main svg {{
                                             transform: translateZ(0); 
                                             will-change: transform; 
+                                        }}
+                                        /* Make reset button slightly bigger for mobile touch */
+                                        #reset-btn {{
+                                            padding: 8px 12px;
+                                            font-size: 14px;
                                         }}
                                     `;
                                     document.head.appendChild(mobileStyle);
@@ -742,21 +768,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'mainChart',
-                                        height: 550,
+                                        height: 400, 
                                         type: 'line',
-                                        toolbar: {{ 
-                                            show: true, 
-                                            tools: {{
-                                                download: false,
-                                                selection: false, 
-                                                zoom: false,      
-                                                zoomin: false,
-                                                zoomout: false,
-                                                pan: true,        
-                                                reset: false
-                                            }},
-                                            autoSelected: 'pan'   
-                                        }},
+                                        toolbar: {{ show: false }}, 
+                                        autoSelected: 'pan', 
                                         zoom: {{
                                             enabled: true,        
                                             allowMouseWheelZoom: false 
@@ -837,6 +852,23 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
                                 var chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
                                 chartSlider.render();
+
+                                /* 🔄 RESET CHART FUNCTION 🔄 */
+                                function resetChart() {{
+                                    var minT = timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0];
+                                    var maxT = timeCats[timeCats.length - 1];
+                                    
+                                    chartSlider.updateOptions({{
+                                        chart: {{
+                                            selection: {{
+                                                xaxis: {{
+                                                    min: minT,
+                                                    max: maxT
+                                                }}
+                                            }}
+                                        }}
+                                    }});
+                                }}
                             </script>
                         </body>
                         </html>
