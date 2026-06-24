@@ -1,3 +1,4 @@
+ data yahan dikhega.")
 import streamlit as st
 import pandas as pd
 import datetime
@@ -626,7 +627,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE ULTIMATE NO-BLUE-BOX SCRIPT 🚀
+                        # 🚀 THE ULTIMATE DYNAMIC RATIO ENGINE (NO DEAD SPACE) 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -701,11 +702,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     -webkit-user-select: none;
                                 }}
 
-                                /* 👉 7. CUSTOM PREMIUM RESET BUTTON 👈 */
+                                /* 👉 7. CUSTOM PREMIUM RESET BUTTON (Adjusted for no overlap) 👈 */
                                 #reset-btn {{
                                     position: absolute;
-                                    top: 15px;
-                                    left: 15px;
+                                    top: 5px;
+                                    left: 10px;
                                     z-index: 999;
                                     background-color: rgba(255, 255, 255, 0.9);
                                     border: 1px solid #cccccc;
@@ -721,6 +722,17 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 #reset-btn:hover {{
                                     background-color: #ffffff;
                                     border-color: #999999;
+                                }}
+
+                                /* 👉 8. MOBILE SPECIFIC CSS TWEAKS 👈 */
+                                @media (max-width: 768px) {{
+                                    #reset-btn {{
+                                        top: 2px !important;
+                                        left: 5px !important;
+                                        padding: 4px 8px !important;
+                                        font-size: 11px !important;
+                                        background-color: rgba(255, 255, 255, 0.8) !important;
+                                    }}
                                 }}
                                 
                             </style>
@@ -759,10 +771,15 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 }}, {{ passive: false }});
 
 
-                                /* 🚀 SMART DEVICE DETECTOR: Mobile Lag Fix 🚀 */
-                                var isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+                                /* 🚀 SMART DEVICE DETECTOR: Mobile Height Fix & Sizing 🚀 */
+                                var isMobile = window.innerWidth <= 768;
                                 
-                                if(isTouchDevice) {{
+                                /* Mobile par chart chhota (320px) taaki skyscraper na lage. Laptop par bada (400px) */
+                                var mainChartHeight = isMobile ? 320 : 400; 
+                                var sliderChartHeight = isMobile ? 60 : 50;
+                                var xTicks = isMobile ? 5 : 10; /* Mobile par kam labels taaki overlap na ho */
+
+                                if(isMobile) {{
                                     var mobileStyle = document.createElement('style');
                                     mobileStyle.innerHTML = `
                                         #chart-slider .apexcharts-selection-icon rect {{
@@ -777,10 +794,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         #chart-slider svg, #chart-main svg {{
                                             transform: translateZ(0); 
                                             will-change: transform; 
-                                        }}
-                                        #reset-btn {{
-                                            padding: 8px 12px;
-                                            font-size: 14px;
                                         }}
                                     `;
                                     document.head.appendChild(mobileStyle);
@@ -802,7 +815,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'mainChart',
-                                        height: 400, 
+                                        height: mainChartHeight, /* DYNAMIC HEIGHT APPLIED */
                                         type: 'line',
                                         
                                         /* 🔥 THE MAGIC FIX: Toolbar MUST be true for Pan to work, but we hide it via CSS 🔥 */
@@ -834,10 +847,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }}
                                     }},
                                     dataLabels: {{ enabled: false }},
-                                    grid: {{ padding: {{ left: 10, right: 10 }} }},
+                                    grid: {{ padding: {{ left: 5, right: 5 }} }},
                                     xaxis: {{
                                         categories: timeCats,
-                                        tickAmount: 10,
+                                        tickAmount: xTicks, /* DYNAMIC TICKS APPLIED */
                                         labels: {{ style: {{ colors: '#888' }} }},
                                         tooltip: {{ enabled: false }}
                                     }},
@@ -870,7 +883,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 50, 
+                                        height: sliderChartHeight, /* DYNAMIC SLIDER HEIGHT APPLIED */
                                         type: 'line', 
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -921,8 +934,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        # 🚀 IFRAME HEIGHT EXACTLY 650px AS REQUESTED 🚀
-                        components.html(apex_html, height=650)
+                        # 🚀 STREAMLIT IFRAME HEIGHT PERFECTLY BALANCED AT 500px 🚀
+                        # Isse neche ki khaali safed jagah (blank space) hamesha ke liye khatam ho jayegi!
+                        components.html(apex_html, height=500)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
