@@ -626,7 +626,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 GPU MOBILE ACCELERATION & SMART SLIDER ENGINE 🚀
+                        # 🚀 THE ULTIMATE DEVICE DETECTOR & HARDWARE ACCELERATION SCRIPT 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -644,7 +644,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     stroke-dasharray: 4 4 !important;
                                 }}
                                 
-                                /* 👉 2. LEFT BUTTON ALWAYS VISIBLE 👈 */
+                                /* 👉 2. FORCE ALWAYS VISIBLE HANDLES 👈 */
                                 #chart-slider .apexcharts-selection-icon {{
                                     display: block !important;
                                     visibility: visible !important;
@@ -652,43 +652,47 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     cursor: ew-resize !important;
                                 }}
                                 
-                                /* DEFAULT LAPTOP STYLE (Clean & Neat) */
+                                /* DEFAULT LAPTOP STYLE BUTTONS */
                                 #chart-slider .apexcharts-selection-icon rect {{
                                     fill: #222222 !important; 
                                     stroke: #ffffff !important; 
-                                    stroke-width: 1px !important;
-                                    width: 12px !important;     
-                                    height: 24px !important;    
+                                    stroke-width: 1.5px !important;
+                                    width: 10px !important;
+                                    height: 22px !important;
                                     rx: 4px !important;
-                                    transform: translateY(0px) !important; 
+                                    transform: translateY(-4px) !important;
                                     opacity: 1 !important;
                                     visibility: visible !important;
                                 }}
                                 #chart-slider .apexcharts-selection-icon circle {{
                                     fill: #ffffff !important;
-                                    r: 2 !important;
-                                    transform: translateX(1px) translateY(12px) !important; 
+                                    r: 2.5 !important;
+                                    transform: translateY(2px) !important;
                                     opacity: 1 !important;
                                     visibility: visible !important;
                                 }}
                                 
                                 /* 👉 3. HIDE RIGHT HANDLE (ONLY LEFT IS VISIBLE) 👈 */
-                                #chart-slider .apexcharts-selection-icon:nth-of-type(2),
-                                #chart-slider .apexcharts-selection-icon:last-of-type {{
+                                #chart-slider .apexcharts-selection-icon ~ .apexcharts-selection-icon {{
                                     display: none !important;
                                     visibility: hidden !important;
                                     opacity: 0 !important;
                                     pointer-events: none !important;
                                 }}
                                 
-                                /* 👉 4. KILL MAIN CHART ZOOM BOX 👈 */
+                                /* 👉 4. HIDE MAIN CHART TOOLBAR & ZOOM BOX 👈 */
+                                #chart-main .apexcharts-toolbar,
                                 #chart-main .apexcharts-selection-rect {{
                                     display: none !important;
                                 }}
                                 
                                 /* 👉 5. BASE TOUCH ACTIONS 👈 */
-                                #chart-main {{ touch-action: pan-y pan-x !important; }}
-                                #chart-slider {{ touch-action: none !important; -webkit-user-select: none; }}
+                                #chart-main {{ touch-action: pan-x pan-y !important; }}
+                                #chart-slider {{ 
+                                    touch-action: pan-x !important; /* Strict Horizontal touch lock */
+                                    -webkit-user-select: none;
+                                }}
+                                
                             </style>
                         </head>
                         <body>
@@ -696,24 +700,25 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <div id="chart-slider" style="margin-top: -10px;"></div>
                             
                             <script>
-                                /* 🚀 SMART DEVICE DETECTOR: Mobile Touch & Lag Fix 🚀 */
+                                /* 🚀 SMART DEVICE DETECTOR: Check if user is on mobile/touch 🚀 */
                                 var isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
                                 
                                 if(isTouchDevice) {{
+                                    /* DYNAMIC MOBILE CSS INJECTION */
                                     var mobileStyle = document.createElement('style');
                                     mobileStyle.innerHTML = `
-                                        /* Make handle WIDER (Fat) for easy thumb grab WITHOUT clipping vertically */
+                                        /* Make handle FAT and long for easy thumb grab on mobile */
                                         #chart-slider .apexcharts-selection-icon rect {{
-                                            width: 24px !important;     
-                                            height: 24px !important;    
-                                            transform: translateY(0px) !important; 
+                                            width: 16px !important; 
+                                            height: 34px !important;
+                                            transform: translateY(-10px) !important;
                                         }}
                                         #chart-slider .apexcharts-selection-icon circle {{
-                                            r: 4 !important;
-                                            transform: translateX(6px) translateY(12px) !important;
+                                            r: 3.5 !important;
+                                            transform: translateY(1px) translateX(3px) !important;
                                         }}
                                         /* FORCE MOBILE GRAPHICS CARD ACCELERATION TO KILL LAG */
-                                        #chart-slider svg, #chart-main svg {{
+                                        #chart-slider svg {{
                                             transform: translateZ(0); 
                                             will-change: transform; 
                                         }}
@@ -737,13 +742,24 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'mainChart',
-                                        height: 400, /* Fixed 400px jaisa aapko pasand aaya tha */
+                                        height: 550,
                                         type: 'line',
-                                        toolbar: {{ show: false }}, 
-                                        autoSelected: 'pan', /* Panning enabled */
+                                        toolbar: {{ 
+                                            show: true, 
+                                            tools: {{
+                                                download: false,
+                                                selection: false, 
+                                                zoom: false,      
+                                                zoomin: false,
+                                                zoomout: false,
+                                                pan: true,        
+                                                reset: false
+                                            }},
+                                            autoSelected: 'pan'   
+                                        }},
                                         zoom: {{
                                             enabled: true,        
-                                            allowMouseWheelZoom: false /* NO MOUSE WHEEL ZOOM */
+                                            allowMouseWheelZoom: false 
                                         }},
                                         selection: {{ enabled: false }}, 
                                         animations: {{ enabled: false }}
@@ -784,7 +800,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                // 🚀 50px WALA SENSIBULL SLIDER 🚀
                                 var optionsSlider = {{
                                     series: [{{
                                         name: '{chart_mode}',
@@ -792,7 +807,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 50, /* Clean thin line look */
+                                        height: 50, 
                                         type: 'line', 
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -805,7 +820,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         toolbar: {{ show: false }},
                                         animations: {{ enabled: false }}
                                     }},
-                                    colors: ['#dddddd'], /* Light grey track */
+                                    colors: ['#dddddd'],
                                     stroke: {{ curve: 'smooth', width: 1.5 }},
                                     dataLabels: {{ enabled: false }},
                                     grid: {{ show: false, padding: {{ left: 10, right: 10, top: 0, bottom: 0 }} }},
