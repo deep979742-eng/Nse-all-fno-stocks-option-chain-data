@@ -522,7 +522,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 var clockTimer = setInterval(function() {{
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Reloading Natively...";
+                        document.getElementById('clock').innerHTML = "🔄 Reloading...";
                         document.body.style.opacity = "0"; 
                         setTimeout(function() {{
                             window.parent.location.reload(true); 
@@ -626,7 +626,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE ULTIMATE HACK: LEFT-ONLY HANDLE & ZERO MOBILE LAG 🚀
+                        # 🚀 THE ULTIMATE DEVICE DETECTOR & HARDWARE ACCELERATION SCRIPT 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -651,6 +651,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     opacity: 1 !important;
                                     cursor: ew-resize !important;
                                 }}
+                                
+                                /* DEFAULT LAPTOP STYLE BUTTONS */
                                 #chart-slider .apexcharts-selection-icon rect {{
                                     fill: #222222 !important; 
                                     stroke: #ffffff !important; 
@@ -684,9 +686,12 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     display: none !important;
                                 }}
                                 
-                                /* 👉 5. MOBILE TOUCH HANG FIX 👈 */
-                                #chart-main {{ touch-action: pan-y !important; }}
-                                #chart-slider {{ touch-action: none !important; }}
+                                /* 👉 5. BASE TOUCH ACTIONS 👈 */
+                                #chart-main {{ touch-action: pan-x pan-y !important; }}
+                                #chart-slider {{ 
+                                    touch-action: pan-x !important; /* Strict Horizontal touch lock */
+                                    -webkit-user-select: none;
+                                }}
                                 
                             </style>
                         </head>
@@ -695,6 +700,32 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <div id="chart-slider" style="margin-top: -10px;"></div>
                             
                             <script>
+                                /* 🚀 SMART DEVICE DETECTOR: Check if user is on mobile/touch 🚀 */
+                                var isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+                                
+                                if(isTouchDevice) {{
+                                    /* DYNAMIC MOBILE CSS INJECTION */
+                                    var mobileStyle = document.createElement('style');
+                                    mobileStyle.innerHTML = `
+                                        /* Make handle FAT and long for easy thumb grab on mobile */
+                                        #chart-slider .apexcharts-selection-icon rect {{
+                                            width: 16px !important; 
+                                            height: 34px !important;
+                                            transform: translateY(-10px) !important;
+                                        }}
+                                        #chart-slider .apexcharts-selection-icon circle {{
+                                            r: 3.5 !important;
+                                            transform: translateY(1px) translateX(3px) !important;
+                                        }}
+                                        /* FORCE MOBILE GRAPHICS CARD ACCELERATION TO KILL LAG */
+                                        #chart-slider svg {{
+                                            transform: translateZ(0); 
+                                            will-change: transform; 
+                                        }}
+                                    `;
+                                    document.head.appendChild(mobileStyle);
+                                }}
+
                                 var dataIndicator = {json.dumps(indicator_list)};
                                 var dataLTP = {json.dumps(ltp_list)};
                                 var timeCats = {json.dumps(time_list)};
@@ -776,7 +807,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 80, 
+                                        height: 50, 
                                         type: 'line', 
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -789,10 +820,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         toolbar: {{ show: false }},
                                         animations: {{ enabled: false }}
                                     }},
-                                    colors: ['{indicator_color}'],
+                                    colors: ['#dddddd'],
                                     stroke: {{ curve: 'smooth', width: 1.5 }},
                                     dataLabels: {{ enabled: false }},
-                                    grid: {{ show: false, padding: {{ left: 10, right: 10 }} }},
+                                    grid: {{ show: false, padding: {{ left: 10, right: 10, top: 0, bottom: 0 }} }},
                                     xaxis: {{
                                         categories: timeCats,
                                         tickAmount: 10,
