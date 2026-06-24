@@ -253,12 +253,12 @@ def run_master_scan(token, date_str, cycle_id):
                 o_type = str(s.get('option_type', ''))
                 
                 if sym_str.endswith('CE') or o_type == 'CE':
-                        c_oi += float(s.get('oi', 0))
-                        c_v += float(s.get('volume', 0))
+                    c_oi += float(s.get('oi', 0))
+                    c_v += float(s.get('volume', 0))
                 elif sym_str.endswith('PE') or o_type == 'PE':
-                        p_oi += float(s.get('oi', 0))
-                        p_v += float(s.get('volume', 0))
-                        
+                    p_oi += float(s.get('oi', 0))
+                    p_v += float(s.get('volume', 0))
+                    
                 lp_str = round(float(s.get('ltp', 0)), 2)
                 if lp_str > 0: 
                     live_ltp_data[sym_str] = lp_str
@@ -433,7 +433,6 @@ if app_mode == "💻 Master (Data Fetcher)":
             now_ts = time.time()
             if now_ts - st.session_state.last_api_call_ts >= 100: 
                 st.session_state.fetch_cycle_id = now_ts
-                st.cache_data.clear() 
 
             cached_result, last_scan_timestamp = run_master_scan(token, today_str, st.session_state.fetch_cycle_id)
 
@@ -524,7 +523,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 var clockTimer = setInterval(function() {{
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Fetching...";
+                        document.getElementById('clock').innerHTML = "🔄 Fetching Natively...";
                     }} else {{
                         timeLeft--;
                         var m = Math.floor(timeLeft / 60);
@@ -604,6 +603,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 hide_index=True
             )
 
+    # 🚀 PREMIUM WAVE CHART ENGINE 🚀
     elif selected_tab == "📈 CHART":
         col_c1, col_c2 = st.columns([2, 2])
         with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
@@ -624,7 +624,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 JS INJECTION: Bigger Handles, Smooth Mobile Drag, Left/Right Margins 🚀
+                        # 🚀 WAVE STYLE ENABLED: `curve: 'smooth'` applied perfectly 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -632,9 +632,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
                                 body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
-                                /* 1. BIGGER DOTS (HANDLES) FOR SLIDER */
                                 .apexcharts-selection-icon circle {{ r: 8 !important; stroke-width: 2 !important; }}
-                                /* 2. SMOOTH MOBILE TOUCH (PREVENT BROWSER INTERFERENCE) */
                                 #chart-slider {{ touch-action: pan-y pinch-zoom !important; }}
                             </style>
                         </head>
@@ -666,13 +664,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
+                                    /* 🌊 PERFECT WAVE CURVE FOR BOTH LINES 🌊 */
                                     stroke: {{ curve: 'smooth', width: [2, 2] }}, 
                                     fill: {{
                                         type: ['gradient', 'solid'],
                                         gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }}
                                     }},
                                     dataLabels: {{ enabled: false }},
-                                    /* 3. PADDING (LEFT & RIGHT MARGINS) */
                                     grid: {{ padding: {{ left: 20, right: 20 }} }},
                                     xaxis: {{
                                         categories: timeCats,
@@ -727,9 +725,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         type: 'gradient',
                                         gradient: {{ shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.1, stops: [0, 100] }}
                                     }},
+                                    /* 🌊 SLIDER LINE WAVY TOO 🌊 */
                                     stroke: {{ curve: 'smooth', width: 1 }},
                                     dataLabels: {{ enabled: false }},
-                                    /* 3. PADDING (LEFT & RIGHT MARGINS) */
                                     grid: {{ show: false, padding: {{ left: 20, right: 20 }} }},
                                     xaxis: {{
                                         categories: timeCats,
