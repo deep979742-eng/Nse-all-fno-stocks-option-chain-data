@@ -626,9 +626,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE ULTIMATE MOBILE-BALANCED & VISIBLE SLIDER ENGINE 🚀
+                        # 🚀 GPU MOBILE ACCELERATION & SMART SLIDER ENGINE 🚀
                         apex_html = f"""
-                        <!-- ANTI_CACHE: {time.time()} -->
                         <!DOCTYPE html>
                         <html>
                         <head>
@@ -636,16 +635,16 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <style> 
                                 body {{ margin: 0; padding: 0 10px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
                                 
-                                /* 👉 1. EKDUM SAAF DIKHNE WALA GREY SELECTION BOX 👈 */
-                                .apexcharts-selection-rect {{
+                                /* 👉 1. SENSIBULL STYLE GREY BOX 👈 */
+                                #chart-slider .apexcharts-selection-rect {{
                                     fill: #888888 !important;
                                     fill-opacity: 0.25 !important;
-                                    stroke: #222222 !important;
-                                    stroke-width: 1px !important;
+                                    stroke: #444444 !important;
+                                    stroke-width: 1.5px !important;
                                     stroke-dasharray: 4 4 !important;
                                 }}
                                 
-                                /* 👉 2. HAMESHA DIKHNE WALE BLACK CAPSULE HANDLES (DONO TARAF) 👈 */
+                                /* 👉 2. LEFT BUTTON ALWAYS VISIBLE 👈 */
                                 #chart-slider .apexcharts-selection-icon {{
                                     display: block !important;
                                     visibility: visible !important;
@@ -653,39 +652,43 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     cursor: ew-resize !important;
                                 }}
                                 
+                                /* DEFAULT LAPTOP STYLE (Clean & Neat) */
                                 #chart-slider .apexcharts-selection-icon rect {{
                                     fill: #222222 !important; 
                                     stroke: #ffffff !important; 
-                                    stroke-width: 1.5px !important;
-                                    width: 10px !important;
-                                    height: 22px !important;
+                                    stroke-width: 1px !important;
+                                    width: 12px !important;     
+                                    height: 24px !important;    
                                     rx: 4px !important;
-                                    transform: translateY(-4px) !important;
+                                    transform: translateY(0px) !important; 
                                     opacity: 1 !important;
                                     visibility: visible !important;
                                 }}
-                                
                                 #chart-slider .apexcharts-selection-icon circle {{
                                     fill: #ffffff !important;
-                                    r: 2.5 !important;
-                                    transform: translateY(2px) !important;
+                                    r: 2 !important;
+                                    transform: translateX(1px) translateY(12px) !important; 
                                     opacity: 1 !important;
                                     visibility: visible !important;
                                 }}
                                 
-                                /* 👉 3. HIDE MAIN CHART TOOLBAR SO IT STAYS IN PAN MODE 👈 */
-                                #chart-main .apexcharts-toolbar {{
+                                /* 👉 3. HIDE RIGHT HANDLE (ONLY LEFT IS VISIBLE) 👈 */
+                                #chart-slider .apexcharts-selection-icon:nth-of-type(2),
+                                #chart-slider .apexcharts-selection-icon:last-of-type {{
                                     display: none !important;
+                                    visibility: hidden !important;
+                                    opacity: 0 !important;
+                                    pointer-events: none !important;
                                 }}
                                 
-                                /* 👉 4. KILL ANY ACCIDENTAL ZOOM BOXES ON MAIN CHART 👈 */
+                                /* 👉 4. KILL MAIN CHART ZOOM BOX 👈 */
                                 #chart-main .apexcharts-selection-rect {{
                                     display: none !important;
                                 }}
                                 
-                                /* 👉 5. MOBILE TOUCH HANG FIX (SMART SWIPE) 👈 */
-                                #chart-main {{ touch-action: pan-y !important; }}
-                                #chart-slider {{ touch-action: pan-x !important; -webkit-user-select: none; }}
+                                /* 👉 5. BASE TOUCH ACTIONS 👈 */
+                                #chart-main {{ touch-action: pan-y pan-x !important; }}
+                                #chart-slider {{ touch-action: none !important; -webkit-user-select: none; }}
                             </style>
                         </head>
                         <body>
@@ -693,6 +696,31 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <div id="chart-slider" style="margin-top: -10px;"></div>
                             
                             <script>
+                                /* 🚀 SMART DEVICE DETECTOR: Mobile Touch & Lag Fix 🚀 */
+                                var isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+                                
+                                if(isTouchDevice) {{
+                                    var mobileStyle = document.createElement('style');
+                                    mobileStyle.innerHTML = `
+                                        /* Make handle WIDER (Fat) for easy thumb grab WITHOUT clipping vertically */
+                                        #chart-slider .apexcharts-selection-icon rect {{
+                                            width: 24px !important;     
+                                            height: 24px !important;    
+                                            transform: translateY(0px) !important; 
+                                        }}
+                                        #chart-slider .apexcharts-selection-icon circle {{
+                                            r: 4 !important;
+                                            transform: translateX(6px) translateY(12px) !important;
+                                        }}
+                                        /* FORCE MOBILE GRAPHICS CARD ACCELERATION TO KILL LAG */
+                                        #chart-slider svg, #chart-main svg {{
+                                            transform: translateZ(0); 
+                                            will-change: transform; 
+                                        }}
+                                    `;
+                                    document.head.appendChild(mobileStyle);
+                                }}
+
                                 var dataIndicator = {json.dumps(indicator_list)};
                                 var dataLTP = {json.dumps(ltp_list)};
                                 var timeCats = {json.dumps(time_list)};
@@ -709,25 +737,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'mainChart',
-                                        /* 🚀 RESPONSIVE GOLDEN HEIGHT (Perfect for Laptop & Mobile) 🚀 */
-                                        height: 400,
+                                        height: 400, /* Fixed 400px jaisa aapko pasand aaya tha */
                                         type: 'line',
-                                        toolbar: {{ 
-                                            show: true, 
-                                            tools: {{
-                                                download: false,
-                                                selection: false, 
-                                                zoom: false,      
-                                                zoomin: false,
-                                                zoomout: false,
-                                                pan: true,        
-                                                reset: false
-                                            }},
-                                            autoSelected: 'pan'   
-                                        }},
+                                        toolbar: {{ show: false }}, 
+                                        autoSelected: 'pan', /* Panning enabled */
                                         zoom: {{
                                             enabled: true,        
-                                            allowMouseWheelZoom: false 
+                                            allowMouseWheelZoom: false /* NO MOUSE WHEEL ZOOM */
                                         }},
                                         selection: {{ enabled: false }}, 
                                         animations: {{ enabled: false }}
@@ -768,7 +784,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                // 🚀 80px PERFECTLY VISIBLE & RESPONSIVE SLIDER 🚀
+                                // 🚀 50px WALA SENSIBULL SLIDER 🚀
                                 var optionsSlider = {{
                                     series: [{{
                                         name: '{chart_mode}',
@@ -776,7 +792,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 80, 
+                                        height: 50, /* Clean thin line look */
                                         type: 'line', 
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -789,10 +805,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         toolbar: {{ show: false }},
                                         animations: {{ enabled: false }}
                                     }},
-                                    colors: ['#888888'], /* Slider ke andar ki line clearly dikhegi */
+                                    colors: ['#dddddd'], /* Light grey track */
                                     stroke: {{ curve: 'smooth', width: 1.5 }},
                                     dataLabels: {{ enabled: false }},
-                                    grid: {{ show: false, padding: {{ left: 10, right: 10 }} }},
+                                    grid: {{ show: false, padding: {{ left: 10, right: 10, top: 0, bottom: 0 }} }},
                                     xaxis: {{
                                         categories: timeCats,
                                         tickAmount: 10,
@@ -810,8 +826,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        # 🚀 STREAMLIT IFRAME HEIGHT PERFECTLY BALANCED AT 520px (400 Main + 80 Slider + Margins) 🚀
-                        components.html(apex_html, height=520)
+                        # 🚀 IFRAME HEIGHT EXACTLY 650px AS REQUESTED 🚀
+                        components.html(apex_html, height=650)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
