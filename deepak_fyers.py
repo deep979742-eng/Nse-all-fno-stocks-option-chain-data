@@ -120,18 +120,23 @@ def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
+
 # ==========================================
-# 4. APP MODE SELECTION
+# 4. APP MODE SELECTION (NATIVE AUTO-REFRESH)
 # ==========================================
 st.sidebar.markdown("### 📱 APP MODE")
 app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
 st.sidebar.markdown("---")
 
+# 🚀 STREAMLIT SAFE AUTO-REFRESH (No JS location.reload needed) 🚀
 if app_mode == "📱 Viewer (Mobile Client)":
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
+elif app_mode == "💻 Master (Data Fetcher)":
+    # 310,000ms = 5 minutes and 10 seconds perfectly timed native loop
+    st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
-# 5. DATA SCANNER (Master Fast Engine)
+# 5. DATA SCANNER (Master Fast Engine WITH ANTI-FREEZE TIMEOUT)
 # ==========================================
 @st.cache_data(show_spinner=False)
 def run_master_scan(token, date_str, cycle_id):
@@ -207,6 +212,7 @@ def run_master_scan(token, date_str, cycle_id):
     new_csv_rows = []
     live_ltp_data = {} 
     missing_stock_names = []
+    results_list = []
 
     def fetch_option_chain_fast_local(q):
         sym = q['n']
@@ -219,98 +225,109 @@ def run_master_scan(token, date_str, cycle_id):
             return q, oc
         except: return q, None
 
+    # 🚀 ANTI-DEADLOCK ENGINE: Max 120 Seconds Timeout on API Fetch 🚀
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-        results = executor.map(fetch_option_chain_fast_local, all_quotes)
-        
-        for q, oc in results:
-            s_name = get_raw_symbol(q['n'])
-            v = q['v']
-            spot_ltp = float(v.get('lp', 0)) 
-            open_p = float(v.get('open_price', 0))
-            float_c = float(v.get('prev_close_price', 0))
-            open_status = "NA" if open_p == 0 or float_c == 0 else "Gap Up 🔼" if open_p > float_c else "Gap Down 🔽" if open_p < float_c else "Same ➖"
+        future_to_q = {executor.submit(fetch_option_chain_fast_local, q): q for q in all_quotes}
+        try:
+            for future in concurrent.futures.as_completed(future_to_q, timeout=120):
+                try:
+                    res = future.result()
+                    if res: results_list.append(res)
+                except Exception:
+                    pass
+        except concurrent.futures.TimeoutError:
+            missing_stock_names.append("⚠️ Fyers Server Timeout (Anti-Hang Rescue)")
+            
+    # Process the safe results collected before any deadlock
+    for q, oc in results_list:
+        s_name = get_raw_symbol(q['n'])
+        v = q['v']
+        spot_ltp = float(v.get('lp', 0)) 
+        open_p = float(v.get('open_price', 0))
+        float_c = float(v.get('prev_close_price', 0))
+        open_status = "NA" if open_p == 0 or float_c == 0 else "Gap Up 🔼" if open_p > float_c else "Gap Down 🔽" if open_p < float_c else "Same ➖"
 
-            if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
-                chain = oc['data']['optionsChain']
+        if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
+            chain = oc['data']['optionsChain']
+            
+            c_oi, p_oi, c_v, p_v = 0.0, 0.0, 0.0, 0.0
+            
+            for s in chain:
+                sym_str = str(s.get('symbol', ''))
+                o_type = str(s.get('option_type', ''))
                 
-                c_oi, p_oi, c_v, p_v = 0.0, 0.0, 0.0, 0.0
-                
-                for s in chain:
-                    sym_str = str(s.get('symbol', ''))
-                    o_type = str(s.get('option_type', ''))
+                if sym_str.endswith('CE') or o_type == 'CE':
+                    c_oi += float(s.get('oi', 0))
+                    c_v += float(s.get('volume', 0))
+                elif sym_str.endswith('PE') or o_type == 'PE':
+                    p_oi += float(s.get('oi', 0))
+                    p_v += float(s.get('volume', 0))
                     
-                    if sym_str.endswith('CE') or o_type == 'CE':
-                        c_oi += float(s.get('oi', 0))
-                        c_v += float(s.get('volume', 0))
-                    elif sym_str.endswith('PE') or o_type == 'PE':
-                        p_oi += float(s.get('oi', 0))
-                        p_v += float(s.get('volume', 0))
-                        
-                    lp_str = round(float(s.get('ltp', 0)), 2)
-                    if lp_str > 0: 
-                        live_ltp_data[sym_str] = lp_str
+                lp_str = round(float(s.get('ltp', 0)), 2)
+                if lp_str > 0: 
+                    live_ltp_data[sym_str] = lp_str
 
-                o_pcr = calc_opt_pcr(c_oi, p_oi)
-                v_cpr = calc_vol_cpr(c_v, p_v)
-                v_pcr = calc_vol_pcr(c_v, p_v)
+            o_pcr = calc_opt_pcr(c_oi, p_oi)
+            v_cpr = calc_vol_cpr(c_v, p_v)
+            v_pcr = calc_vol_pcr(c_v, p_v)
 
-                if scan_time_ist.time() < datetime.time(9, 50):
+            if scan_time_ist.time() < datetime.time(9, 50):
+                pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
+            else:
+                if s_name not in snap_950:
+                    snap_950[s_name] = {'pcr': o_pcr, 'vol_cpr': v_cpr}
+                    snapshot_changed = True
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
-                    if s_name not in snap_950:
-                        snap_950[s_name] = {'pcr': o_pcr, 'vol_cpr': v_cpr}
-                        snapshot_changed = True
-                        pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
-                    else:
-                        base = snap_950[s_name]
-                        base_pcr_val = base['pcr']
-                        base_vol_val = base['vol_cpr']
+                    base = snap_950[s_name]
+                    base_pcr_val = base['pcr']
+                    base_vol_val = base['vol_cpr']
+                    
+                    pcr_abs = o_pcr - base_pcr_val
+                    vol_abs = v_cpr - base_vol_val
+                    
+                    def get_standard_pct(current_val, base_val):
+                        if base_val == 0: return 0.0
+                        return ((current_val - base_val) / base_val) * 100.0
                         
-                        pcr_abs = o_pcr - base_pcr_val
-                        vol_abs = v_cpr - base_vol_val
-                        
-                        def get_standard_pct(current_val, base_val):
-                            if base_val == 0: return 0.0
-                            return ((current_val - base_val) / base_val) * 100.0
+                    pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
+                    vol_pct = get_standard_pct(v_cpr, base_vol_val)
+
+            def get_conv(opt_type_val):
+                if scan_time_ist.time() < datetime.time(9, 20):
+                    return 0.0
+                    
+                strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
+                tot_p, tot_m = 0, 0
+                for stk in strikes:
+                    sym = str(stk.get('symbol', ''))
+                    lp = round(float(stk.get('ltp', 0)), 2)
+                    if lp == 0: continue
+                    
+                    diff = 0.0
+                    if sym in baseline_prices:
+                        diff = round(lp - baseline_prices[sym], 2)
                             
-                        pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
-                        vol_pct = get_standard_pct(v_cpr, base_vol_val)
+                    if diff > 0.00: tot_p += 1 
+                    elif diff < 0.00: tot_m += 1 
 
-                def get_conv(opt_type_val):
-                    if scan_time_ist.time() < datetime.time(9, 20):
-                        return 0.0
-                        
-                    strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
-                    tot_p, tot_m = 0, 0
-                    for stk in strikes:
-                        sym = str(stk.get('symbol', ''))
-                        lp = round(float(stk.get('ltp', 0)), 2)
-                        if lp == 0: continue
-                        
-                        diff = 0.0
-                        if sym in baseline_prices:
-                            diff = round(lp - baseline_prices[sym], 2)
-                                
-                        if diff > 0.00: tot_p += 1 
-                        elif diff < 0.00: tot_m += 1 
+                act = tot_p + tot_m
+                if act == 0: return 0.0
+                return round((tot_p / act) * 100, 2) if tot_p >= tot_m else -round((tot_m / act) * 100, 2)
+            
+            final_list.append({
+                'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
+                'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp,
+                'VOL_ABS': round(vol_abs, 2), 'PCR_ABS': round(pcr_abs, 2), 
+                'VOL_PCT': round(vol_pct, 2), 'PCR_PCT': round(pcr_pct, 2),
+                'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
+            })
 
-                    act = tot_p + tot_m
-                    if act == 0: return 0.0
-                    return round((tot_p / act) * 100, 2) if tot_p >= tot_m else -round((tot_m / act) * 100, 2)
-                
-                final_list.append({
-                    'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
-                    'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp,
-                    'VOL_ABS': round(vol_abs, 2), 'PCR_ABS': round(pcr_abs, 2), 
-                    'VOL_PCT': round(vol_pct, 2), 'PCR_PCT': round(pcr_pct, 2),
-                    'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
-                })
-
-                if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
-                    new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': spot_ltp, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
-            else:
-                missing_stock_names.append(s_name) 
-                final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
+            if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
+                new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': spot_ltp, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
+        else:
+            missing_stock_names.append(s_name) 
+            final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
     if snapshot_changed and client:
         try:
@@ -420,6 +437,7 @@ if app_mode == "💻 Master (Data Fetcher)":
             now_ts = time.time()
             if now_ts - st.session_state.last_api_call_ts >= 100: 
                 st.session_state.fetch_cycle_id = now_ts
+                st.cache_data.clear() # 🚀 KICK THE CACHE FORCES NEW DATA NATIVELY
 
             cached_result, last_scan_timestamp = run_master_scan(token, today_str, st.session_state.fetch_cycle_id)
 
@@ -501,7 +519,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
             rem_secs = max(1, int(310 - elapsed))
             
-            # 🚀 REFINED OLD HARD REFRESH: Added a memory release step before reload to prevent freezing 🚀
+            # 🚀 PURE UI TIMER: DANGEROUS RELOAD COMMAND REMOVED. 🚀
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Next Fetch: <span id="clock"></span>
@@ -511,16 +529,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 var clockTimer = setInterval(function() {{
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Reloading...";
-                        
-                        // Refinement: Hide content slightly before reload to release mobile DOM memory
-                        document.body.style.opacity = "0"; 
-                        
-                        setTimeout(function() {{
-                            // Force true reload just like before
-                            window.parent.location.reload(true); 
-                        }}, 200);
-                        
+                        document.getElementById('clock').innerHTML = "🔄 Fetching Natively...";
+                        // Streamlit handles the actual execution from backend! No JS reload needed!
                     }} else {{
                         timeLeft--;
                         var m = Math.floor(timeLeft / 60);
@@ -698,7 +708,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 80, 
+                                        height: 100, 
                                         type: 'area',
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -734,7 +744,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=510)
+                        components.html(apex_html, height=530)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
