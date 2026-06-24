@@ -13,7 +13,7 @@ from streamlit_autorefresh import st_autorefresh
 import streamlit.components.v1 as components  
 
 # ==========================================
-# 1. FYERS CREDENTIALS & SETUP (Initialized Turn 1 detailed)
+# 1. FYERS CREDENTIALS & SETUP
 # ==========================================
 CLIENT_ID = "YD02909"
 APP_ID = "I0QMW3KFAW-100"
@@ -71,7 +71,7 @@ if 'live_base_date' not in st.session_state or st.session_state.live_base_date !
     st.session_state.live_base_date = today_str
 
 # ==========================================
-# 2. GOOGLE SHEETS DYNAMIC CONNECTION (Preserved)
+# 2. GOOGLE SHEETS DYNAMIC CONNECTION
 # ==========================================
 @st.cache_resource
 def get_gspread_client():
@@ -85,7 +85,7 @@ def get_gspread_client():
     return None
 
 # ==========================================
-# 3. STOCK LIST & HELPER FUNCTIONS (Preserved Raw Data Logic)
+# 3. STOCK LIST & HELPER FUNCTIONS
 # ==========================================
 raw_symbols = [
     "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
@@ -121,7 +121,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. APP MODE SELECTION (NATIVE AUTO-REFRESH Preserved Safe Interval)
+# 4. APP MODE SELECTION 
 # ==========================================
 st.sidebar.markdown("### 📱 APP MODE")
 app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
@@ -133,7 +133,7 @@ elif app_mode == "💻 Master (Data Fetcher)":
     st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
-# 5. DATA SCANNER (Master Fast Engine Safe Timeout detailed turn 1 detailed)
+# 5. DATA SCANNER (Master Fast Engine)
 # ==========================================
 @st.cache_data(show_spinner=False)
 def run_master_scan(token, date_str, cycle_id):
@@ -232,7 +232,7 @@ def run_master_scan(token, date_str, cycle_id):
                 except Exception:
                     pass
         except concurrent.futures.TimeoutError:
-            missing_stock_names.append("⚠️ Fyers Server Timeout (Anti-Hang Rescue Preserved turn 1 detailed)")
+            missing_stock_names.append("⚠️ Fyers Server Timeout (Anti-Hang Rescue)")
             
     for q, oc in results_list:
         s_name = get_raw_symbol(q['n'])
@@ -472,7 +472,7 @@ elif app_mode == "📱 Viewer (Mobile Client)":
         st.session_state.cached_data = []
 
 # ==========================================
-# 7. APP RENDERING (SINGLE LINE UI & TABLES (Preserved Delegation & Logic)
+# 7. APP RENDERING (SINGLE LINE UI & TABLES)
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
@@ -513,7 +513,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
             rem_secs = max(1, int(310 - elapsed))
             
-            # Anti-caching hard reload code added turn 1 detailed.
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Next Fetch: <span id="clock"></span>
@@ -523,7 +522,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 var clockTimer = setInterval(function() {{
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Reloading Natively...";
+                        document.getElementById('clock').innerHTML = "🔄 Reloading...";
                         document.body.style.opacity = "0"; 
                         setTimeout(function() {{
                             window.parent.location.reload(true); 
@@ -607,7 +606,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 hide_index=True
             )
 
-    # 🚀 DOTTED GRABABLE SCROLL HANDLES ACTIVE 🚀
     elif selected_tab == "📈 CHART":
         col_c1, col_c2 = st.columns([2, 2])
         with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
@@ -628,7 +626,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE ULTIMATE ANTI-CACHE APEXCHARTS ENGINE WITH DOTTED HANDLES ACTIVE 🚀
+                        # 🚀 THE ULTIMATE KILL-SWITCH ENGINE 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -636,6 +634,24 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
                                 body {{ margin: 0; padding: 0 10px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
+                                
+                                /* 👉 FORCE: SENSIBULL STYLE GREY BOX WITH DOTTED BORDER 👈 */
+                                .apexcharts-selection-rect {{
+                                    fill: #999999 !important;
+                                    fill-opacity: 0.25 !important;
+                                    stroke: #333333 !important;
+                                    stroke-width: 1.5px !important;
+                                    stroke-dasharray: 4 4 !important;
+                                }}
+                                
+                                /* 👉 FORCE: SENSIBULL STYLE WHITE/GREY CIRCLE HANDLES 👈 */
+                                .apexcharts-selection-icon circle {{
+                                    r: 6 !important;
+                                    fill: #ffffff !important;
+                                    stroke: #333333 !important;
+                                    stroke-width: 2 !important;
+                                }}
+                                
                                 #chart-slider, #chart-main {{ touch-action: pan-y pinch-zoom !important; }}
                                 .apexcharts-selection-icon {{ cursor: ew-resize !important; }}
                             </style>
@@ -663,16 +679,19 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         id: 'mainChart',
                                         height: 400,
                                         type: 'line',
-                                        toolbar: {{ show: false }}, 
-                                        autoSelected: 'pan', /* 👈 Pan (Scroll) Preserved */
-                                        zoom: {{
-                                            enabled: true, 
-                                            allowMouseWheelZoom: false /* 👈 No Mouse Wheel Zoom Preserved */
+                                        toolbar: {{ 
+                                            show: false,
+                                            /* 🔥 FORCE ALLOW PANNING ONLY, NO ZOOM TOOLS 🔥 */
+                                            tools: {{ zoom: false, selection: false, pan: true }},
+                                            autoSelected: 'pan' 
                                         }},
+                                        /* ⛔ ABSOLUTE KILL SWITCH: NO DRAWING ZOOM BOX ALLOWED ⛔ */
+                                        zoom: {{ enabled: false }}, 
+                                        selection: {{ enabled: false }},
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
-                                    stroke: {{ curve: 'smooth', width: [2, 2] }}, /* 🌊 Wave Lines Preserved */
+                                    stroke: {{ curve: 'smooth', width: [2, 2] }}, 
                                     fill: {{
                                         type: ['gradient', 'solid'],
                                         gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }}
@@ -707,7 +726,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                // 🚀 STRICT ANTI-CACHE DOTTED HANDLES CONFIGURATION ACTIVE 🚀
                                 var optionsSlider = {{
                                     series: [{{
                                         name: '{chart_mode}',
@@ -715,7 +733,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 120, /* Slider height Preserved 120px */
+                                        height: 120, 
                                         type: 'line', 
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -723,10 +741,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                             xaxis: {{
                                                 min: timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0],
                                                 max: timeCats[timeCats.length - 1]
-                                            }},
-                                            /* 👉 THE DOTTED LINE STYLE ACTIVE & ACTIVE 👈 */
-                                            fill: {{ color: '#888888', opacity: 0.2 }},
-                                            stroke: {{ width: 2, dashArray: 4, color: '#444444', opacity: 0.8 }}
+                                            }}
+                                            /* Styling is now forced completely by the hardcoded CSS above */
                                         }},
                                         toolbar: {{ show: false }},
                                         animations: {{ enabled: false }}
@@ -752,7 +768,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        # Functional data Preserved initialized raw symbols and logic Preserved turn 1 detailed. All formatting delegates and logic safe.
                         components.html(apex_html, height=550)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
