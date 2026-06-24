@@ -232,7 +232,7 @@ def run_master_scan(token, date_str, cycle_id):
                 except Exception:
                     pass
         except concurrent.futures.TimeoutError:
-            missing_stock_names.append("⚠️ Fyers Server Timeout (Anti-Hang Rescue)")
+            missing_stock_names.append("⚠️ Fyers Server Timeout")
             
     for q, oc in results_list:
         s_name = get_raw_symbol(q['n'])
@@ -474,55 +474,4 @@ elif app_mode == "📱 Viewer (Mobile Client)":
 # ==========================================
 # 7. APP RENDERING (SINGLE LINE UI & TABLES)
 # ==========================================
-if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
-    
-    def style_indicators(val):
-        if isinstance(val, str): 
-            if "Gap Up" in val: return 'color: #00AA00; font-weight: bold; text-align: center;'
-            if "Gap Down" in val: return 'color: #FF0000; font-weight: bold; text-align: center;'
-            if "Same" in val: return 'color: #00BFFF; font-weight: bold; text-align: center;'
-            return 'text-align: center;'
-        if val > 0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-        elif val < 0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-        return 'color: #888888; font-weight: bold; text-align: center;'
-
-    def style_pcr_columns(val):
-        if isinstance(val, (int, float)):
-            if val >= 1.0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-            elif val > 0 and val < 1.0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-        return 'text-align: center;'
-
-    header_styles = [
-        {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
-        {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
-    ]
-
-    col_menu, col_search, col_toggle, col_timer = st.columns([3, 2, 2.5, 2.5], gap="small")
-    
-    with col_menu:
-        selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
-        
-    with col_search:
-        search_query = st.text_input("Search", placeholder="🔍 Search Stock...", label_visibility="collapsed").upper()
-        
-    with col_toggle:
-        show_pct = st.toggle("📊 Show Checker (%)", value=True)
-        
-    with col_timer:
-        if app_mode == "💻 Master (Data Fetcher)":
-            elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
-            rem_secs = max(1, int(310 - elapsed))
-            
-            js_code = f"""
-            <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
-                ⏱️ Next Fetch: <span id="clock"></span>
-            </div>
-            <script>
-                var timeLeft = {rem_secs};
-                var clockTimer = setInterval(function() {{
-                    if(timeLeft <= 0) {{
-                        clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Reloading...";
-                        document.body.style.opacity = "0"; 
-                        setTimeout(function() {{
-                            window.parent.location.
+if 'cached_data' in st.session_state and len(st.session_state.cached_data) >
