@@ -121,7 +121,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. APP MODE SELECTION
+# 4. APP MODE SELECTION (NATIVE AUTO-REFRESH)
 # ==========================================
 st.sidebar.markdown("### 📱 APP MODE")
 app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
@@ -626,20 +626,18 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE SENSIBULL STYLE SLIDER (Grey box, dotted line) & PERFECT MARGINS 🚀
+                        # 🚀 THE ULTIMATE CACHE-BUSTED APEXCHARTS ENGINE 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
                         <head>
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
-                                /* 1. Padding jisse chart screen ke andar na ghuse */
-                                body {{ margin: 0; padding: 0 15px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
+                                body {{ margin: 0; padding: 0 10px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
                                 
-                                /* 2. Smooth mobile touch */
-                                #chart-slider {{ touch-action: pan-y pinch-zoom !important; }}
+                                /* 👉 MOUSE WHEEL ZOOM DISABLE OVERRIDE 👈 */
+                                #chart-main, #chart-slider {{ touch-action: pan-y pinch-zoom !important; }}
                                 
-                                /* 3. Handle Clean Up */
                                 .apexcharts-selection-icon {{ cursor: ew-resize !important; }}
                             </style>
                         </head>
@@ -648,6 +646,14 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <div id="chart-slider" style="margin-top: -10px;"></div>
                             
                             <script>
+                                // 🔥 JS BLOCKER: Stop Mouse Scroll completely from zooming! 🔥
+                                document.getElementById("chart-main").addEventListener("wheel", function(e) {{
+                                    if(e.ctrlKey || e.metaKey) {{
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }}
+                                }}, {{ passive: false }});
+                                
                                 var dataIndicator = {json.dumps(indicator_list)};
                                 var dataLTP = {json.dumps(ltp_list)};
                                 var timeCats = {json.dumps(time_list)};
@@ -667,11 +673,16 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         height: 400,
                                         type: 'line',
                                         toolbar: {{ show: false }}, 
-                                        autoSelected: 'pan',
+                                        autoSelected: 'pan', /* 👈 Pan (Scroll) Active */
+                                        zoom: {{
+                                            enabled: true, 
+                                            allowMouseWheelZoom: false /* 👈 Strict No Mouse Wheel Zoom */
+                                        }},
+                                        selection: {{ enabled: false }}, /* Disable box selection on main chart */
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
-                                    stroke: {{ curve: 'smooth', width: [2, 2] }}, 
+                                    stroke: {{ curve: 'smooth', width: [2, 2] }}, /* 🌊 Wave Lines */
                                     fill: {{
                                         type: ['gradient', 'solid'],
                                         gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }}
@@ -706,7 +717,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                // 🚀 EXACT SENSIBULL STYLE SLIDER CONFIGURATION 🚀
+                                // 🚀 EXACT SENSIBULL STYLE SLIDER 🚀
                                 var optionsSlider = {{
                                     series: [{{
                                         name: '{chart_mode}',
@@ -714,8 +725,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 100, 
-                                        type: 'line', /* Changed to line to look super clean */
+                                        height: 120, /* Slider height 120px */
+                                        type: 'line', 
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
                                             enabled: true,
@@ -723,9 +734,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                                 min: timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0],
                                                 max: timeCats[timeCats.length - 1]
                                             }},
-                                            /* 👉 The Grey Box with Dotted borders 👈 */
-                                            fill: {{ color: '#999999', opacity: 0.2 }},
-                                            stroke: {{ width: 1, dashArray: 4, color: '#555555', opacity: 0.6 }}
+                                            /* 👉 THE GREY BOX & DOTTED LINE STYLE 👈 */
+                                            fill: {{ color: '#888888', opacity: 0.2 }},
+                                            stroke: {{ width: 2, dashArray: 4, color: '#444444', opacity: 0.8 }}
                                         }},
                                         toolbar: {{ show: false }},
                                         animations: {{ enabled: false }}
@@ -751,7 +762,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=530)
+                        components.html(apex_html, height=550)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
