@@ -128,11 +128,9 @@ st.sidebar.markdown("### 📱 APP MODE")
 app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
 st.sidebar.markdown("---")
 
-# 🚀 STREAMLIT SAFE AUTO-REFRESH (No JS location.reload needed) 🚀
 if app_mode == "📱 Viewer (Mobile Client)":
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 elif app_mode == "💻 Master (Data Fetcher)":
-    # 310,000ms = 5 minutes and 10 seconds perfectly timed native loop
     st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
@@ -225,7 +223,6 @@ def run_master_scan(token, date_str, cycle_id):
             return q, oc
         except: return q, None
 
-    # 🚀 ANTI-DEADLOCK ENGINE: Max 120 Seconds Timeout on API Fetch 🚀
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         future_to_q = {executor.submit(fetch_option_chain_fast_local, q): q for q in all_quotes}
         try:
@@ -238,7 +235,6 @@ def run_master_scan(token, date_str, cycle_id):
         except concurrent.futures.TimeoutError:
             missing_stock_names.append("⚠️ Fyers Server Timeout (Anti-Hang Rescue)")
             
-    # Process the safe results collected before any deadlock
     for q, oc in results_list:
         s_name = get_raw_symbol(q['n'])
         v = q['v']
@@ -257,12 +253,12 @@ def run_master_scan(token, date_str, cycle_id):
                 o_type = str(s.get('option_type', ''))
                 
                 if sym_str.endswith('CE') or o_type == 'CE':
-                    c_oi += float(s.get('oi', 0))
-                    c_v += float(s.get('volume', 0))
+                        c_oi += float(s.get('oi', 0))
+                        c_v += float(s.get('volume', 0))
                 elif sym_str.endswith('PE') or o_type == 'PE':
-                    p_oi += float(s.get('oi', 0))
-                    p_v += float(s.get('volume', 0))
-                    
+                        p_oi += float(s.get('oi', 0))
+                        p_v += float(s.get('volume', 0))
+                        
                 lp_str = round(float(s.get('ltp', 0)), 2)
                 if lp_str > 0: 
                     live_ltp_data[sym_str] = lp_str
@@ -437,7 +433,7 @@ if app_mode == "💻 Master (Data Fetcher)":
             now_ts = time.time()
             if now_ts - st.session_state.last_api_call_ts >= 100: 
                 st.session_state.fetch_cycle_id = now_ts
-                st.cache_data.clear() # 🚀 KICK THE CACHE FORCES NEW DATA NATIVELY
+                st.cache_data.clear() 
 
             cached_result, last_scan_timestamp = run_master_scan(token, today_str, st.session_state.fetch_cycle_id)
 
@@ -519,7 +515,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
             rem_secs = max(1, int(310 - elapsed))
             
-            # 🚀 PURE UI TIMER: DANGEROUS RELOAD COMMAND REMOVED. 🚀
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Next Fetch: <span id="clock"></span>
@@ -529,8 +524,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 var clockTimer = setInterval(function() {{
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Fetching Natively...";
-                        // Streamlit handles the actual execution from backend! No JS reload needed!
+                        document.getElementById('clock').innerHTML = "🔄 Fetching...";
                     }} else {{
                         timeLeft--;
                         var m = Math.floor(timeLeft / 60);
@@ -630,6 +624,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
+                        # 🚀 JS INJECTION: Bigger Handles, Smooth Mobile Drag, Left/Right Margins 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -637,6 +632,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
                                 body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
+                                /* 1. BIGGER DOTS (HANDLES) FOR SLIDER */
+                                .apexcharts-selection-icon circle {{ r: 8 !important; stroke-width: 2 !important; }}
+                                /* 2. SMOOTH MOBILE TOUCH (PREVENT BROWSER INTERFERENCE) */
+                                #chart-slider {{ touch-action: pan-y pinch-zoom !important; }}
                             </style>
                         </head>
                         <body>
@@ -673,6 +672,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }}
                                     }},
                                     dataLabels: {{ enabled: false }},
+                                    /* 3. PADDING (LEFT & RIGHT MARGINS) */
+                                    grid: {{ padding: {{ left: 20, right: 20 }} }},
                                     xaxis: {{
                                         categories: timeCats,
                                         tickAmount: 10,
@@ -708,7 +709,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 100, 
+                                        height: 80, 
                                         type: 'area',
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -728,14 +729,15 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }},
                                     stroke: {{ curve: 'smooth', width: 1 }},
                                     dataLabels: {{ enabled: false }},
+                                    /* 3. PADDING (LEFT & RIGHT MARGINS) */
+                                    grid: {{ show: false, padding: {{ left: 20, right: 20 }} }},
                                     xaxis: {{
                                         categories: timeCats,
                                         tickAmount: 10,
                                         labels: {{ show: false }},
                                         tooltip: {{ enabled: false }}
                                     }},
-                                    yaxis: {{ show: false, tickAmount: 2 }},
-                                    grid: {{ show: false }}
+                                    yaxis: {{ show: false, tickAmount: 2 }}
                                 }};
 
                                 var chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
@@ -744,7 +746,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=530)
+                        components.html(apex_html, height=510)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
