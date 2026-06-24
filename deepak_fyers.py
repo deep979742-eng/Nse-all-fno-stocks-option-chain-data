@@ -626,9 +626,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE ULTIMATE ANTI-ZOOM SHIELD SCRIPT 🚀
+                        # 🚀 THE ULTIMATE NO-BLUE-BOX SCRIPT 🚀
                         apex_html = f"""
-                        <!-- ANTI_CACHE: {time.time()} -->
                         <!DOCTYPE html>
                         <html>
                         <head>
@@ -636,7 +635,17 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <style> 
                                 body {{ margin: 0; padding: 0 10px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; position: relative; }} 
                                 
-                                /* 👉 1. SENSIBULL STYLE GREY BOX 👈 */
+                                /* 👉 1. EXTREME KILL SWITCH FOR BLUE BOX ON MAIN CHART 👈 */
+                                #chart-main .apexcharts-selection-rect,
+                                #chart-main .apexcharts-zoom-rect {{
+                                    display: none !important;
+                                    opacity: 0 !important;
+                                    visibility: hidden !important;
+                                    stroke-width: 0 !important;
+                                    pointer-events: none !important;
+                                }}
+
+                                /* 👉 2. SENSIBULL STYLE GREY BOX (FOR SLIDER ONLY) 👈 */
                                 #chart-slider .apexcharts-selection-rect {{
                                     fill: #888888 !important;
                                     fill-opacity: 0.25 !important;
@@ -645,7 +654,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     stroke-dasharray: 4 4 !important;
                                 }}
                                 
-                                /* 👉 2. LEFT BUTTON ALWAYS VISIBLE 👈 */
+                                /* 👉 3. LEFT BUTTON ALWAYS VISIBLE 👈 */
                                 #chart-slider .apexcharts-selection-icon {{
                                     display: block !important;
                                     visibility: visible !important;
@@ -653,7 +662,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     cursor: ew-resize !important;
                                 }}
                                 
-                                /* DEFAULT LAPTOP STYLE BUTTONS */
                                 #chart-slider .apexcharts-selection-icon rect {{
                                     fill: #222222 !important; 
                                     stroke: #ffffff !important; 
@@ -673,7 +681,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     visibility: visible !important;
                                 }}
                                 
-                                /* 👉 3. HIDE RIGHT HANDLE (ONLY LEFT IS VISIBLE) 👈 */
+                                /* 👉 4. HIDE RIGHT HANDLE (ONLY LEFT IS VISIBLE) 👈 */
                                 #chart-slider .apexcharts-selection-icon ~ .apexcharts-selection-icon {{
                                     display: none !important;
                                     visibility: hidden !important;
@@ -681,20 +689,19 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     pointer-events: none !important;
                                 }}
                                 
-                                /* 👉 4. KILL MAIN CHART TOOLBAR & ZOOM BOX 👈 */
-                                #chart-main .apexcharts-toolbar,
-                                #chart-main .apexcharts-selection-rect {{
+                                /* 👉 5. HIDE MAIN CHART TOOLBAR VISUALLY 👈 */
+                                #chart-main .apexcharts-toolbar {{
                                     display: none !important;
                                 }}
                                 
-                                /* 👉 5. BASE TOUCH ACTIONS 👈 */
-                                #chart-main {{ touch-action: pan-y !important; }}
+                                /* 👉 6. BASE TOUCH ACTIONS 👈 */
+                                #chart-main {{ touch-action: pan-x pan-y !important; }}
                                 #chart-slider {{ 
-                                    touch-action: none !important; 
+                                    touch-action: pan-x !important; 
                                     -webkit-user-select: none;
                                 }}
 
-                                /* 👉 6. CUSTOM PREMIUM RESET BUTTON 👈 */
+                                /* 👉 7. CUSTOM PREMIUM RESET BUTTON 👈 */
                                 #reset-btn {{
                                     position: absolute;
                                     top: 15px;
@@ -719,7 +726,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             </style>
                         </head>
                         <body>
-                            <!-- 🔄 RESET BUTTON HTML (Type Button ensures NO refresh/zoom triggers) -->
                             <button type="button" id="reset-btn" onclick="resetChart()">🔄 Reset</button>
                             
                             <div id="chart-main"></div>
@@ -729,13 +735,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 /* ⛔ 100% DOUBLE-CLICK & TOUCH ZOOM KILL SHIELD ⛔ */
                                 var mainChartNode = document.getElementById('chart-main');
                                 
-                                // Kill Double Click on PC
                                 mainChartNode.addEventListener('dblclick', function(e) {{
                                     e.preventDefault();
                                     e.stopPropagation();
                                 }}, true);
 
-                                // Kill Pinch to Zoom (2 Fingers) on Mobile
                                 mainChartNode.addEventListener('touchmove', function(e) {{
                                     if (e.touches.length > 1) {{
                                         e.preventDefault();
@@ -743,7 +747,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}
                                 }}, {{ passive: false }});
 
-                                // Kill Double Tap to Zoom on Mobile
                                 var lastTap = 0;
                                 mainChartNode.addEventListener('touchstart', function(e) {{
                                     var currentTime = new Date().getTime();
@@ -801,11 +804,25 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         id: 'mainChart',
                                         height: 400, 
                                         type: 'line',
-                                        toolbar: {{ show: false }}, 
-                                        autoSelected: 'pan', 
+                                        
+                                        /* 🔥 THE MAGIC FIX: Toolbar MUST be true for Pan to work, but we hide it via CSS 🔥 */
+                                        toolbar: {{ 
+                                            show: true, 
+                                            tools: {{
+                                                download: false,
+                                                selection: false, 
+                                                zoom: false,      /* ⛔ NO ZOOM TOOL ⛔ */
+                                                zoomin: false,
+                                                zoomout: false,
+                                                pan: true,        /* ✅ PAN TOOL IS ACTIVE ✅ */
+                                                reset: false
+                                            }},
+                                            autoSelected: 'pan'   /* ✅ PAN IS DEFAULT ✅ */
+                                        }},
+                                        
+                                        /* ⛔ ZOOM 100% DISABLED HERE TO KILL THE BLUE BOX ⛔ */
                                         zoom: {{
-                                            enabled: true,        
-                                            allowMouseWheelZoom: false 
+                                            enabled: false 
                                         }},
                                         selection: {{ enabled: false }}, 
                                         animations: {{ enabled: false }}
