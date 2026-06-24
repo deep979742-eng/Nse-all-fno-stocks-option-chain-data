@@ -121,7 +121,7 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. APP MODE SELECTION 
+# 4. APP MODE SELECTION
 # ==========================================
 st.sidebar.markdown("### 📱 APP MODE")
 app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
@@ -133,7 +133,7 @@ elif app_mode == "💻 Master (Data Fetcher)":
     st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
-# 5. DATA SCANNER (Master Fast Engine)
+# 5. DATA SCANNER (Master Fast Engine WITH ANTI-FREEZE)
 # ==========================================
 @st.cache_data(show_spinner=False)
 def run_master_scan(token, date_str, cycle_id):
@@ -523,10 +523,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
                         document.getElementById('clock').innerHTML = "🔄 Reloading...";
-                        document.body.style.opacity = "0"; 
-                        setTimeout(function() {{
-                            window.parent.location.reload(true); 
-                        }}, 200);
                     }} else {{
                         timeLeft--;
                         var m = Math.floor(timeLeft / 60);
@@ -626,34 +622,56 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE ULTIMATE KILL-SWITCH ENGINE 🚀
+                        # 🚀 THE ULTIMATE ALWAYS-VISIBLE HANDLES HACK 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
                         <head>
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
-                                body {{ margin: 0; padding: 0 10px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
+                                body {{ margin: 0; padding: 0 15px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
                                 
-                                /* 👉 FORCE: SENSIBULL STYLE GREY BOX WITH DOTTED BORDER 👈 */
+                                /* 👉 1. THE GREY SELECTION BOX WITH DOTTED BORDERS 👈 */
                                 .apexcharts-selection-rect {{
                                     fill: #999999 !important;
-                                    fill-opacity: 0.25 !important;
-                                    stroke: #333333 !important;
+                                    fill-opacity: 0.20 !important;
+                                    stroke: #555555 !important;
                                     stroke-width: 1.5px !important;
                                     stroke-dasharray: 4 4 !important;
                                 }}
                                 
-                                /* 👉 FORCE: SENSIBULL STYLE WHITE/GREY CIRCLE HANDLES 👈 */
+                                /* 👉 2. THE ALWAYS VISIBLE HANDLES (KILL SWITCH FOR APEX HIDING) 👈 */
+                                .apexcharts-xcrosshairs, 
+                                .apexcharts-selection-icon {{
+                                    opacity: 1 !important; /* Force Always Show */
+                                    visibility: visible !important; /* Force Always Show */
+                                    display: block !important;
+                                    cursor: ew-resize !important;
+                                }}
+                                
+                                /* Ensure the capsule drawing doesn't hide */
+                                .apexcharts-selection-icon rect,
                                 .apexcharts-selection-icon circle {{
-                                    r: 6 !important;
+                                    opacity: 1 !important; /* Force Always Show */
+                                    visibility: visible !important;
+                                }}
+                                
+                                .apexcharts-selection-icon rect {{
+                                    fill: #222222 !important; /* Elegant dark capsule */
+                                    stroke: #ffffff !important;
+                                    stroke-width: 1.5px !important;
+                                    width: 10px !important;
+                                    height: 22px !important;
+                                    rx: 4px !important;
+                                    transform: translateY(-4px) !important;
+                                }}
+                                .apexcharts-selection-icon circle {{
                                     fill: #ffffff !important;
-                                    stroke: #333333 !important;
-                                    stroke-width: 2 !important;
+                                    r: 2.5 !important;
+                                    transform: translateY(2px) !important;
                                 }}
                                 
                                 #chart-slider, #chart-main {{ touch-action: pan-y pinch-zoom !important; }}
-                                .apexcharts-selection-icon {{ cursor: ew-resize !important; }}
                             </style>
                         </head>
                         <body>
@@ -679,15 +697,17 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         id: 'mainChart',
                                         height: 400,
                                         type: 'line',
-                                        toolbar: {{ 
-                                            show: false,
-                                            /* 🔥 FORCE ALLOW PANNING ONLY, NO ZOOM TOOLS 🔥 */
-                                            tools: {{ zoom: false, selection: false, pan: true }},
-                                            autoSelected: 'pan' 
+                                        toolbar: {{ show: false }}, 
+                                        
+                                        /* 🔥 Panning isexplicitly set to 'pan' while zoom is active backend to link brush flawlessly without drawing zoom box 🔥 */
+                                        autoSelected: 'pan', 
+                                        zoom: {{
+                                            enabled: true, 
+                                            type: 'x',
+                                            autoSelected: 'pan',
+                                            allowMouseWheelZoom: false /* NO MOUSE WHEEL ZOOM */
                                         }},
-                                        /* ⛔ ABSOLUTE KILL SWITCH: NO DRAWING ZOOM BOX ALLOWED ⛔ */
-                                        zoom: {{ enabled: false }}, 
-                                        selection: {{ enabled: false }},
+                                        selection: {{ enabled: false }}, /* NO ZOOM BOX ON MAIN CHART */
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
@@ -726,6 +746,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
+                                // 🚀 3. THIN TRACK BAR (50px Height) 🚀
                                 var optionsSlider = {{
                                     series: [{{
                                         name: '{chart_mode}',
@@ -733,7 +754,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 120, 
+                                        height: 50, /* Clean thin line look */
                                         type: 'line', 
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -742,15 +763,14 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                                 min: timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0],
                                                 max: timeCats[timeCats.length - 1]
                                             }}
-                                            /* Styling is now forced completely by the hardcoded CSS above */
                                         }},
                                         toolbar: {{ show: false }},
                                         animations: {{ enabled: false }}
                                     }},
-                                    colors: ['{indicator_color}'],
+                                    colors: ['#dddddd'], /* Clean light track line color */
                                     stroke: {{ curve: 'smooth', width: 1.5 }},
                                     dataLabels: {{ enabled: false }},
-                                    grid: {{ show: false, padding: {{ left: 10, right: 10 }} }},
+                                    grid: {{ show: false, padding: {{ left: 10, right: 10, top: 0, bottom: 0 }} }},
                                     xaxis: {{
                                         categories: timeCats,
                                         tickAmount: 10,
@@ -768,7 +788,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=550)
+                        components.html(apex_html, height=480)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
