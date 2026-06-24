@@ -120,9 +120,8 @@ def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
-
 # ==========================================
-# 4. APP MODE SELECTION (NATIVE AUTO-REFRESH)
+# 4. APP MODE SELECTION
 # ==========================================
 st.sidebar.markdown("### 📱 APP MODE")
 app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
@@ -134,7 +133,7 @@ elif app_mode == "💻 Master (Data Fetcher)":
     st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
-# 5. DATA SCANNER (Master Fast Engine WITH ANTI-FREEZE TIMEOUT)
+# 5. DATA SCANNER (Master Fast Engine)
 # ==========================================
 @st.cache_data(show_spinner=False)
 def run_master_scan(token, date_str, cycle_id):
@@ -523,7 +522,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 var clockTimer = setInterval(function() {{
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Fetching Natively...";
+                        document.getElementById('clock').innerHTML = "🔄 Reloading...";
+                        document.body.style.opacity = "0"; 
+                        setTimeout(function() {{
+                            window.parent.location.reload(true); 
+                        }}, 200);
                     }} else {{
                         timeLeft--;
                         var m = Math.floor(timeLeft / 60);
@@ -623,30 +626,26 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 WAVE CHART, 120px SLIDER & BIGGER RED DOTS (HANDLES) 🚀
+                        # 🚀 THE SENSIBULL STYLE SLIDER (Grey box, dotted line) & PERFECT MARGINS 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
                         <head>
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
-                                body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
+                                /* 1. Padding jisse chart screen ke andar na ghuse */
+                                body {{ margin: 0; padding: 0 15px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
                                 
-                                /* 👉 DOT (HANDLE) ENLARGEMENT CSS 👈 */
-                                .apexcharts-selection-icon {{
-                                    transform: scale(2) !important;
-                                    transform-origin: center !important;
-                                }}
-                                .apexcharts-selection-icon rect {{
-                                    fill: #FF4D4D !important;
-                                }}
-                                
+                                /* 2. Smooth mobile touch */
                                 #chart-slider {{ touch-action: pan-y pinch-zoom !important; }}
+                                
+                                /* 3. Handle Clean Up */
+                                .apexcharts-selection-icon {{ cursor: ew-resize !important; }}
                             </style>
                         </head>
                         <body>
                             <div id="chart-main"></div>
-                            <div id="chart-slider" style="margin-top: -15px;"></div>
+                            <div id="chart-slider" style="margin-top: -10px;"></div>
                             
                             <script>
                                 var dataIndicator = {json.dumps(indicator_list)};
@@ -672,16 +671,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
-                                    
-                                    /* 🌊 PERFECT SMOOTH WAVE CURVE 🌊 */
                                     stroke: {{ curve: 'smooth', width: [2, 2] }}, 
-                                    
                                     fill: {{
                                         type: ['gradient', 'solid'],
                                         gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }}
                                     }},
                                     dataLabels: {{ enabled: false }},
-                                    grid: {{ padding: {{ left: 20, right: 20 }} }},
+                                    grid: {{ padding: {{ left: 10, right: 10 }} }},
                                     xaxis: {{
                                         categories: timeCats,
                                         tickAmount: 10,
@@ -710,6 +706,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
+                                // 🚀 EXACT SENSIBULL STYLE SLIDER CONFIGURATION 🚀
                                 var optionsSlider = {{
                                     series: [{{
                                         name: '{chart_mode}',
@@ -717,37 +714,35 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 120, /* 👈 SLIDER WAPAS 120px KAR DIYA */
-                                        type: 'area',
+                                        height: 100, 
+                                        type: 'line', /* Changed to line to look super clean */
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
                                             enabled: true,
                                             xaxis: {{
                                                 min: timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0],
                                                 max: timeCats[timeCats.length - 1]
-                                            }}
+                                            }},
+                                            /* 👉 The Grey Box with Dotted borders 👈 */
+                                            fill: {{ color: '#999999', opacity: 0.2 }},
+                                            stroke: {{ width: 1, dashArray: 4, color: '#555555', opacity: 0.6 }}
                                         }},
                                         toolbar: {{ show: false }},
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}'],
-                                    fill: {{
-                                        type: 'gradient',
-                                        gradient: {{ shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.1, stops: [0, 100] }}
-                                    }},
-                                    
-                                    /* 🌊 SLIDER WAVY LINE 🌊 */
-                                    stroke: {{ curve: 'smooth', width: 1 }},
-                                    
+                                    stroke: {{ curve: 'smooth', width: 1.5 }},
                                     dataLabels: {{ enabled: false }},
-                                    grid: {{ show: false, padding: {{ left: 20, right: 20 }} }},
+                                    grid: {{ show: false, padding: {{ left: 10, right: 10 }} }},
                                     xaxis: {{
                                         categories: timeCats,
                                         tickAmount: 10,
                                         labels: {{ show: false }},
+                                        axisBorder: {{ show: false }},
+                                        axisTicks: {{ show: false }},
                                         tooltip: {{ enabled: false }}
                                     }},
-                                    yaxis: {{ show: false, tickAmount: 2 }}
+                                    yaxis: {{ show: false }}
                                 }};
 
                                 var chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
@@ -756,7 +751,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=550)
+                        components.html(apex_html, height=530)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
