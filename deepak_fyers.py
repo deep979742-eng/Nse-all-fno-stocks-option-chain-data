@@ -232,7 +232,7 @@ def run_master_scan(token, date_str, cycle_id):
                 except Exception:
                     pass
         except concurrent.futures.TimeoutError:
-            missing_stock_names.append("⚠️ Fyers Server Timeout")
+            missing_stock_names.append("⚠️ Fyers Server Timeout (Anti-Hang Rescue)")
             
     for q, oc in results_list:
         s_name = get_raw_symbol(q['n'])
@@ -626,7 +626,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE ULTIMATE GOLDEN RATIO & STRICT CSS ENGINE 🚀
+                        # 🚀 THE ULTIMATE HACK: LEFT-ONLY HANDLE & ZERO MOBILE LAG 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -635,7 +635,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <style> 
                                 body {{ margin: 0; padding: 0 10px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
                                 
-                                /* 👉 FORCE THE GREY SELECTION BOX WITH DOTTED BORDERS (SENSIBULL STYLE) 👈 */
+                                /* 👉 1. SENSIBULL STYLE GREY BOX 👈 */
                                 #chart-slider .apexcharts-selection-rect {{
                                     fill: #888888 !important;
                                     fill-opacity: 0.25 !important;
@@ -644,7 +644,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     stroke-dasharray: 4 4 !important;
                                 }}
                                 
-                                /* 👉 FORCE ALWAYS VISIBLE BLACK/WHITE CAPSULE HANDLES 👈 */
+                                /* 👉 2. FORCE ALWAYS VISIBLE HANDLES 👈 */
                                 #chart-slider .apexcharts-selection-icon {{
                                     display: block !important;
                                     visibility: visible !important;
@@ -652,8 +652,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     cursor: ew-resize !important;
                                 }}
                                 #chart-slider .apexcharts-selection-icon rect {{
-                                    fill: #222222 !important; /* Elegant black capsule */
-                                    stroke: #ffffff !important; /* White outline */
+                                    fill: #222222 !important; 
+                                    stroke: #ffffff !important; 
                                     stroke-width: 1.5px !important;
                                     width: 10px !important;
                                     height: 22px !important;
@@ -670,17 +670,24 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     visibility: visible !important;
                                 }}
                                 
-                                /* 👉 HIDE MAIN CHART TOOLBAR VISUALLY SO IT STAYS IN PAN MODE 👈 */
-                                #chart-main .apexcharts-toolbar {{
+                                /* 👉 3. HIDE RIGHT HANDLE (ONLY LEFT IS VISIBLE) 👈 */
+                                #chart-slider .apexcharts-selection-icon:last-of-type,
+                                #chart-slider .apexcharts-selection-icon:nth-of-type(2) {{
                                     display: none !important;
+                                    visibility: hidden !important;
+                                    opacity: 0 !important;
                                 }}
                                 
-                                /* 👉 KILL ANY ACCIDENTAL ZOOM BOXES ON MAIN CHART 👈 */
+                                /* 👉 4. HIDE MAIN CHART TOOLBAR & ZOOM BOX 👈 */
+                                #chart-main .apexcharts-toolbar,
                                 #chart-main .apexcharts-selection-rect {{
                                     display: none !important;
                                 }}
                                 
-                                #chart-slider, #chart-main {{ touch-action: pan-y pinch-zoom !important; }}
+                                /* 👉 5. MOBILE TOUCH HANG FIX (The Magic Trick) 👈 */
+                                #chart-main {{ touch-action: pan-y !important; }}
+                                #chart-slider {{ touch-action: none !important; }} /* Disables browser scrolling completely when touching the slider */
+                                
                             </style>
                         </head>
                         <body>
@@ -704,24 +711,24 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'mainChart',
-                                        height: 550, /* 🚀 BADA MAIN CHART (Like Photo) 🚀 */
+                                        height: 550,
                                         type: 'line',
                                         toolbar: {{ 
                                             show: true, 
                                             tools: {{
                                                 download: false,
                                                 selection: false, 
-                                                zoom: false,      /* ⛔ NO ZOOM TOOL ⛔ */
+                                                zoom: false,      
                                                 zoomin: false,
                                                 zoomout: false,
-                                                pan: true,        /* ✅ ONLY PAN ALLOWED ✅ */
+                                                pan: true,        
                                                 reset: false
                                             }},
                                             autoSelected: 'pan'   
                                         }},
                                         zoom: {{
                                             enabled: true,        
-                                            allowMouseWheelZoom: false /* ⛔ NO MOUSE WHEEL ZOOM ⛔ */
+                                            allowMouseWheelZoom: false 
                                         }},
                                         selection: {{ enabled: false }}, 
                                         animations: {{ enabled: false }}
@@ -762,7 +769,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                // 🚀 80px PERFECTLY BALANCED SLIDER 🚀
                                 var optionsSlider = {{
                                     series: [{{
                                         name: '{chart_mode}',
@@ -770,7 +776,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 80, /* 🚀 BALANCED SLIDER HEIGHT 🚀 */
+                                        height: 80, 
                                         type: 'line', 
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -804,8 +810,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        # 🚀 STREAMLIT IFRAME HEIGHT INCREASED TO PREVENT SQUISHING 🚀
-                        components.html(apex_html, height=700)
+                        # 🚀 IFRAME HEIGHT EXACTLY REDUCED TO 650px AS REQUESTED 🚀
+                        components.html(apex_html, height=650)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
