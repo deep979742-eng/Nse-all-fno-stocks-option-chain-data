@@ -603,7 +603,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 hide_index=True
             )
 
-    # 🚀 PREMIUM WAVE CHART ENGINE 🚀
     elif selected_tab == "📈 CHART":
         col_c1, col_c2 = st.columns([2, 2])
         with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
@@ -624,7 +623,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 WAVE STYLE ENABLED: `curve: 'smooth'` applied perfectly 🚀
+                        # 🚀 WAVE CHART, 120px SLIDER & BIGGER RED DOTS (HANDLES) 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -632,7 +631,16 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
                                 body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
-                                .apexcharts-selection-icon circle {{ r: 8 !important; stroke-width: 2 !important; }}
+                                
+                                /* 👉 DOT (HANDLE) ENLARGEMENT CSS 👈 */
+                                .apexcharts-selection-icon {{
+                                    transform: scale(2) !important;
+                                    transform-origin: center !important;
+                                }}
+                                .apexcharts-selection-icon rect {{
+                                    fill: #FF4D4D !important;
+                                }}
+                                
                                 #chart-slider {{ touch-action: pan-y pinch-zoom !important; }}
                             </style>
                         </head>
@@ -664,8 +672,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
-                                    /* 🌊 PERFECT WAVE CURVE FOR BOTH LINES 🌊 */
+                                    
+                                    /* 🌊 PERFECT SMOOTH WAVE CURVE 🌊 */
                                     stroke: {{ curve: 'smooth', width: [2, 2] }}, 
+                                    
                                     fill: {{
                                         type: ['gradient', 'solid'],
                                         gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }}
@@ -707,7 +717,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'sliderChart',
-                                        height: 80, 
+                                        height: 120, /* 👈 SLIDER WAPAS 120px KAR DIYA */
                                         type: 'area',
                                         brush: {{ target: 'mainChart', enabled: true }},
                                         selection: {{ 
@@ -725,8 +735,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         type: 'gradient',
                                         gradient: {{ shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.1, stops: [0, 100] }}
                                     }},
-                                    /* 🌊 SLIDER LINE WAVY TOO 🌊 */
+                                    
+                                    /* 🌊 SLIDER WAVY LINE 🌊 */
                                     stroke: {{ curve: 'smooth', width: 1 }},
+                                    
                                     dataLabels: {{ enabled: false }},
                                     grid: {{ show: false, padding: {{ left: 20, right: 20 }} }},
                                     xaxis: {{
@@ -744,7 +756,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=510)
+                        components.html(apex_html, height=550)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
