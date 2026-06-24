@@ -626,8 +626,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE ULTIMATE ENGINE WITH TOP-LEFT RESET BUTTON 🚀
+                        # 🚀 THE ULTIMATE ANTI-ZOOM SHIELD SCRIPT 🚀
                         apex_html = f"""
+                        <!-- ANTI_CACHE: {time.time()} -->
                         <!DOCTYPE html>
                         <html>
                         <head>
@@ -687,9 +688,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 }}
                                 
                                 /* 👉 5. BASE TOUCH ACTIONS 👈 */
-                                #chart-main {{ touch-action: pan-x pan-y !important; }}
+                                #chart-main {{ touch-action: pan-y !important; }}
                                 #chart-slider {{ 
-                                    touch-action: pan-x !important; 
+                                    touch-action: none !important; 
                                     -webkit-user-select: none;
                                 }}
 
@@ -718,13 +719,44 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             </style>
                         </head>
                         <body>
-                            <button id="reset-btn" onclick="resetChart()">🔄 Reset</button>
+                            <!-- 🔄 RESET BUTTON HTML (Type Button ensures NO refresh/zoom triggers) -->
+                            <button type="button" id="reset-btn" onclick="resetChart()">🔄 Reset</button>
                             
                             <div id="chart-main"></div>
                             <div id="chart-slider" style="margin-top: -10px;"></div>
                             
                             <script>
-                                /* 🚀 SMART DEVICE DETECTOR: Mobile Touch & Lag Fix 🚀 */
+                                /* ⛔ 100% DOUBLE-CLICK & TOUCH ZOOM KILL SHIELD ⛔ */
+                                var mainChartNode = document.getElementById('chart-main');
+                                
+                                // Kill Double Click on PC
+                                mainChartNode.addEventListener('dblclick', function(e) {{
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                }}, true);
+
+                                // Kill Pinch to Zoom (2 Fingers) on Mobile
+                                mainChartNode.addEventListener('touchmove', function(e) {{
+                                    if (e.touches.length > 1) {{
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }}
+                                }}, {{ passive: false }});
+
+                                // Kill Double Tap to Zoom on Mobile
+                                var lastTap = 0;
+                                mainChartNode.addEventListener('touchstart', function(e) {{
+                                    var currentTime = new Date().getTime();
+                                    var tapLength = currentTime - lastTap;
+                                    if (tapLength < 400 && tapLength > 0) {{
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                    }}
+                                    lastTap = currentTime;
+                                }}, {{ passive: false }});
+
+
+                                /* 🚀 SMART DEVICE DETECTOR: Mobile Lag Fix 🚀 */
                                 var isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
                                 
                                 if(isTouchDevice) {{
@@ -743,7 +775,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                             transform: translateZ(0); 
                                             will-change: transform; 
                                         }}
-                                        /* Make reset button slightly bigger for mobile touch */
                                         #reset-btn {{
                                             padding: 8px 12px;
                                             font-size: 14px;
@@ -853,7 +884,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
                                 chartSlider.render();
 
-                                /* 🔄 RESET CHART FUNCTION 🔄 */
+                                /* 🔄 SMOOTH RESET CHART FUNCTION 🔄 */
                                 function resetChart() {{
                                     var minT = timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0];
                                     var maxT = timeCats[timeCats.length - 1];
