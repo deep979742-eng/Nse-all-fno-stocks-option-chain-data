@@ -400,6 +400,7 @@ if app_mode == "💻 Master (Data Fetcher)":
             st.sidebar.success("Baseline Saved Successfully!")
             st.cache_data.clear() 
 
+    # --- MASTER EXECUTION LOGIC ---
     if auth_code:
         if auth_code != "AUTO_LOGGED_IN":
             try:
@@ -437,6 +438,7 @@ if app_mode == "💻 Master (Data Fetcher)":
                     json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
                 except: pass
                 
+                # 🔥 DYNAMIC BASELINE SAVE LOGIC (9:15 AM+ FIRST FETCH AUTO LOCK) 🔥
                 if datetime.time(9, 15) <= now_ist.time() <= datetime.time(15, 30):
                     last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
                     if last_save != today_str:
@@ -467,8 +469,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
     def style_indicators(val):
         if isinstance(val, str): 
-            if "Gap Up" in val: return 'color: #00AA00; font-weight: bold; text-align: center;'
-            if "Gap Down" in val: return 'color: #FF0000; font-weight: bold; text-align: center;'
+            if "Gap Up" in val: return 'background-color: rgba(0,200,0,0.15); color: #00AA00; font-weight: bold; text-align: center;'
+            if "Gap Down" in val: return 'background-color: rgba(200,0,0,0.15); color: #FF0000; font-weight: bold; text-align: center;'
             if "Same" in val: return 'color: #00BFFF; font-weight: bold; text-align: center;'
             return 'text-align: center;'
         if val > 0: return 'color: #00AA00; font-weight: bold; text-align: center;'
@@ -477,8 +479,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
     def style_pcr_columns(val):
         if isinstance(val, (int, float)):
-            if val >= 1.0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-            elif val > 0 and val < 1.0: return 'color: #FF0000; font-weight: bold; text-align: center;'
+            if val >= 1.0: return 'background-color: rgba(0,200,0,0.1); color: #00AA00; font-weight: bold; text-align: center;'
+            elif val > 0 and val < 1.0: return 'background-color: rgba(200,0,0,0.1); color: #FF0000; font-weight: bold; text-align: center;'
         return 'text-align: center;'
 
     header_styles = [
@@ -497,6 +499,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
             rem_secs = max(1, int(308 - elapsed)) 
             
+            # 🔥 THE ORIGINAL CLEAN "Fetching Natively..." LOGIC (No Opacity/Blur Crashing) 🔥
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Next Fetch: <span id="clock"></span>
@@ -506,12 +509,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 var clockTimer = setInterval(function() {{
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Reloading Natively...";
-                        if (window.parent && window.parent.document && window.parent.document.body) {{
-                            window.parent.document.body.style.transition = 'opacity 0.4s ease';
-                            window.parent.document.body.style.opacity = '0.3'; 
-                        }}
-                        setTimeout(function() {{ window.parent.location.reload(true); }}, 500);
+                        document.getElementById('clock').innerHTML = "🔄 Fetching Natively...";
+                        setTimeout(function() {{
+                            try {{ window.parent.location.reload(); }} 
+                            catch(e) {{ window.location.reload(); }}
+                        }}, 200);
                     }} else {{
                         timeLeft--;
                         var m = Math.floor(timeLeft / 60);
@@ -580,6 +582,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
+                        # 🚀 THE MASTER BRUSH APEXCHART IFRAME ENGINE (550px Fix with Visible Mobile Slider) 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -587,18 +590,32 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
                                 body {{ margin: 0; padding: 0 10px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; position: relative; }} 
-                                #chart-main .apexcharts-selection-rect, #chart-main .apexcharts-zoom-rect {{ display: none !important; opacity: 0 !important; visibility: hidden !important; }}
-                                #chart-slider .apexcharts-selection-rect {{ fill: #888888 !important; fill-opacity: 0.25 !important; stroke: #444444 !important; stroke-width: 1.5px !important; stroke-dasharray: 4 4 !important; }}
+                                #chart-main .apexcharts-selection-rect, #chart-main .apexcharts-zoom-rect {{ display: none !important; opacity: 0 !important; visibility: hidden !important; stroke-width: 0 !important; pointer-events: none !important; }}
+                                
+                                /* 👉 SLIDER TRACK DESIGN 👈 */
+                                #chart-slider .apexcharts-selection-rect {{ fill: #888888 !important; fill-opacity: 0.3 !important; stroke: #222222 !important; stroke-width: 1.5px !important; stroke-dasharray: 4 4 !important; }}
+                                
+                                /* 👉 LEFT BUTTON LAPTOP DEFAULT 👈 */
                                 #chart-slider .apexcharts-selection-icon {{ display: block !important; visibility: visible !important; opacity: 1 !important; cursor: ew-resize !important; }}
-                                #chart-slider .apexcharts-selection-icon rect {{ fill: #222222 !important; stroke: #ffffff !important; stroke-width: 1px !important; width: 12px !important; height: 24px !important; rx: 4px !important; transform: translateY(0px) !important; opacity: 1 !important; visibility: visible !important; }}
-                                #chart-slider .apexcharts-selection-icon circle {{ fill: #ffffff !important; r: 2 !important; transform: translateX(1px) translateY(12px) !important; opacity: 1 !important; visibility: visible !important; }}
+                                #chart-slider .apexcharts-selection-icon rect {{ fill: #222222 !important; stroke: #ffffff !important; stroke-width: 1px !important; width: 12px !important; height: 24px !important; rx: 4px !important; transform: translateY(10px) !important; opacity: 1 !important; visibility: visible !important; }}
+                                #chart-slider .apexcharts-selection-icon circle {{ fill: #ffffff !important; r: 2 !important; transform: translateX(1px) translateY(22px) !important; opacity: 1 !important; visibility: visible !important; }}
+                                
+                                /* 👉 KILL RIGHT BUTTON 👈 */
                                 #chart-slider .apexcharts-selection-icon ~ .apexcharts-selection-icon {{ display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }}
+                                
+                                /* 👉 TOUCH FIXES 👈 */
                                 #chart-main .apexcharts-toolbar {{ display: none !important; }}
                                 #chart-main {{ touch-action: pan-x pan-y !important; }}
-                                #chart-slider {{ touch-action: none !important; -webkit-user-select: none; }}
+                                #chart-slider {{ touch-action: pan-x !important; -webkit-user-select: none; }}
+                                
+                                /* 👉 RESET BUTTON 👈 */
                                 #reset-btn {{ position: absolute; top: 5px; left: 10px; z-index: 999; background-color: rgba(255, 255, 255, 0.9); border: 1px solid #cccccc; border-radius: 5px; padding: 5px 10px; font-size: 12px; font-weight: bold; color: #333333; cursor: pointer; box-shadow: 0px 2px 5px rgba(0,0,0,0.1); transition: all 0.2s; }}
                                 #reset-btn:hover {{ background-color: #ffffff; border-color: #999999; }}
-                                @media (max-width: 768px) {{ #reset-btn {{ top: 2px !important; left: 5px !important; padding: 4px 8px !important; font-size: 11px !important; background-color: rgba(255, 255, 255, 0.8) !important; }} }}
+                                
+                                /* 👉 MOBILE SPECIFIC CSS 👈 */
+                                @media (max-width: 768px) {{ 
+                                    #reset-btn {{ top: 2px !important; left: 5px !important; padding: 4px 8px !important; font-size: 11px !important; background-color: rgba(255, 255, 255, 0.8) !important; }} 
+                                }}
                             </style>
                         </head>
                         <body>
@@ -607,6 +624,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <div id="chart-slider" style="margin-top: -10px;"></div>
                             
                             <script>
+                                /* ⛔ 100% DOUBLE-CLICK & TOUCH ZOOM KILL SHIELD ⛔ */
                                 var mainChartNode = document.getElementById('chart-main');
                                 mainChartNode.addEventListener('dblclick', function(e) {{ e.preventDefault(); e.stopPropagation(); }}, true);
                                 mainChartNode.addEventListener('touchmove', function(e) {{ if (e.touches.length > 1) {{ e.preventDefault(); e.stopPropagation(); }} }}, {{ passive: false }});
@@ -619,15 +637,20 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     lastTap = currentTime;
                                 }}, {{ passive: false }});
 
+                                /* 🚀 MOBILE DETECTOR & SLIDER VISIBILITY FIX 🚀 */
                                 var isMobile = window.innerWidth <= 768;
                                 var mainChartHeight = isMobile ? 320 : 400; 
                                 var sliderChartHeight = isMobile ? 60 : 50;
-                                var xTicks = isMobile ? 5 : 10;
+                                var xTicks = isMobile ? 5 : 10; 
 
-                                var isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
-                                if(isTouchDevice) {{
+                                if(isMobile) {{
                                     var mobileStyle = document.createElement('style');
-                                    mobileStyle.innerHTML = `#chart-slider .apexcharts-selection-icon rect {{ width: 24px !important; height: 24px !important; transform: translateY(0px) !important; }} #chart-slider .apexcharts-selection-icon circle {{ r: 4 !important; transform: translateX(6px) translateY(12px) !important; }} #chart-slider svg, #chart-main svg {{ transform: translateZ(0); will-change: transform; }}`;
+                                    /* Adjusted translateY so it stays fully inside the slider box and doesn't get clipped! */
+                                    mobileStyle.innerHTML = `
+                                        #chart-slider .apexcharts-selection-icon rect {{ width: 20px !important; height: 30px !important; transform: translateY(10px) !important; }} 
+                                        #chart-slider .apexcharts-selection-icon circle {{ r: 3 !important; transform: translateX(4px) translateY(25px) !important; }} 
+                                        #chart-slider svg, #chart-main svg {{ transform: translateZ(0); will-change: transform; }}
+                                    `;
                                     document.head.appendChild(mobileStyle);
                                 }}
 
@@ -637,20 +660,16 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 
                                 var optionsMain = {{
                                     series: [{{ name: '{chart_mode}', type: 'area', data: dataIndicator }}, {{ name: 'LTP', type: 'line', data: dataLTP }}],
-                                    chart: {{ 
-                                        id: 'mainChart', height: mainChartHeight, type: 'line', 
-                                        toolbar: {{ show: true, tools: {{ download: false, selection: false, zoom: false, zoomin: false, zoomout: false, pan: true, reset: false }}, autoSelected: 'pan' }}, 
-                                        zoom: {{ enabled: false }}, 
-                                        selection: {{ enabled: false }}, 
-                                        animations: {{ enabled: false }} 
-                                    }},
+                                    chart: {{ id: 'mainChart', height: mainChartHeight, type: 'line', toolbar: {{ show: true, tools: {{ download: false, selection: false, zoom: false, zoomin: false, zoomout: false, pan: true, reset: false }}, autoSelected: 'pan' }}, zoom: {{ enabled: false }}, selection: {{ enabled: false }}, animations: {{ enabled: false }} }},
                                     colors: ['{indicator_color}', '#00CC66'],
                                     stroke: {{ curve: 'smooth', width: [2, 2] }},
                                     fill: {{ type: ['gradient', 'solid'], gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }} }},
+                                    dataLabels: {{ enabled: false }},
+                                    grid: {{ padding: {{ left: 5, right: 5 }} }},
                                     xaxis: {{ categories: timeCats, tickAmount: xTicks, labels: {{ style: {{ colors: '#888' }} }}, tooltip: {{ enabled: false }} }},
                                     yaxis: [{{ title: {{ text: '{chart_mode}', style: {{ color: '{indicator_color}' }} }}, labels: {{ style: {{ colors: '{indicator_color}' }} }} }}, {{ opposite: true, title: {{ text: 'LTP', style: {{ color: '#00CC66' }} }}, labels: {{ style: {{ colors: '#00CC66' }} }} }}],
-                                    legend: {{ position: 'top', horizontalAlign: 'right' }},
-                                    tooltip: {{ shared: true, intersect: false, y: {{ formatter: function(y) {{ if(typeof y !== "undefined") return y.toFixed(2); return y; }} }} }}
+                                    tooltip: {{ shared: true, intersect: false, y: {{ formatter: function (y) {{ if (typeof y !== "undefined") {{ return y.toFixed(2); }} return y; }} }} }},
+                                    legend: {{ position: 'top', horizontalAlign: 'right' }}
                                 }};
 
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
@@ -658,17 +677,12 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
                                 var optionsSlider = {{
                                     series: [{{ name: '{chart_mode}', data: dataIndicator }}],
-                                    chart: {{ 
-                                        id: 'sliderChart', height: sliderChartHeight, type: 'line', 
-                                        brush: {{ target: 'mainChart', enabled: true }}, 
-                                        selection: {{ enabled: true, xaxis: {{ min: timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0], max: timeCats[timeCats.length - 1] }} }},
-                                        toolbar: {{ show: false }}, 
-                                        animations: {{ enabled: false }} 
-                                    }},
-                                    colors: ['#dddddd'],
+                                    chart: {{ id: 'sliderChart', height: sliderChartHeight, type: 'line', brush: {{ target: 'mainChart', enabled: true }}, selection: {{ enabled: true, xaxis: {{ min: timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0], max: timeCats[timeCats.length - 1] }} }} }},
+                                    colors: ['#bbbbbb'],
                                     stroke: {{ curve: 'smooth', width: 1.5 }},
+                                    dataLabels: {{ enabled: false }},
                                     grid: {{ show: false, padding: {{ left: 10, right: 10, top: 0, bottom: 0 }} }},
-                                    xaxis: {{ categories: timeCats, labels: {{ show: false }}, axisBorder: {{ show: false }}, axisTicks: {{ show: false }}, tooltip: {{ enabled: false }} }},
+                                    xaxis: {{ categories: timeCats, tickAmount: 10, labels: {{ show: false }}, axisBorder: {{ show: false }}, axisTicks: {{ show: false }}, tooltip: {{ enabled: false }} }},
                                     yaxis: {{ show: false }}
                                 }};
 
@@ -684,7 +698,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=500)
+                        # 🚀 STREAMLIT IFRAME HEIGHT PERFECTLY BALANCED AT 550px 🚀
+                        components.html(apex_html, height=550)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
