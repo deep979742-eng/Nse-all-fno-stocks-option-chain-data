@@ -128,9 +128,11 @@ app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)"
 st.sidebar.markdown("---")
 
 if app_mode == "📱 Viewer (Mobile Client)":
+    # Viewer mode refreshes every 30 seconds
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 elif app_mode == "💻 Master (Data Fetcher)":
-    st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
+    # 🔥 SHARP 5 MINUTES TIMER TRIGGER FIXED HERE (300000 ms = 5 mins) 🔥
+    st_autorefresh(interval=300000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
 # 5. DATA SCANNER (Master Fast Engine)
@@ -244,13 +246,11 @@ def run_master_scan(token, date_str, cycle_id):
 
         if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
             chain = oc['data']['optionsChain']
-            
             c_oi, p_oi, c_v, p_v = 0.0, 0.0, 0.0, 0.0
             
             for s in chain:
                 sym_str = str(s.get('symbol', ''))
                 o_type = str(s.get('option_type', ''))
-                
                 if sym_str.endswith('CE') or o_type == 'CE':
                     c_oi += float(s.get('oi', 0))
                     c_v += float(s.get('volume', 0))
@@ -259,8 +259,7 @@ def run_master_scan(token, date_str, cycle_id):
                     p_v += float(s.get('volume', 0))
                     
                 lp_str = round(float(s.get('ltp', 0)), 2)
-                if lp_str > 0: 
-                    live_ltp_data[sym_str] = lp_str
+                if lp_str > 0: live_ltp_data[sym_str] = lp_str
 
             o_pcr = calc_opt_pcr(c_oi, p_oi)
             v_cpr = calc_vol_cpr(c_v, p_v)
@@ -277,20 +276,17 @@ def run_master_scan(token, date_str, cycle_id):
                     base = snap_950[s_name]
                     base_pcr_val = base['pcr']
                     base_vol_val = base['vol_cpr']
-                    
                     pcr_abs = o_pcr - base_pcr_val
                     vol_abs = v_cpr - base_vol_val
                     
                     def get_standard_pct(current_val, base_val):
                         if base_val == 0: return 0.0
                         return ((current_val - base_val) / base_val) * 100.0
-                        
                     pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
                     vol_pct = get_standard_pct(v_cpr, base_vol_val)
 
             def get_conv(opt_type_val):
-                if not baseline_prices: 
-                    return 0.0
+                if not baseline_prices: return 0.0
                 strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
                 tot_p, tot_m = 0, 0
                 for stk in strikes:
@@ -415,38 +411,31 @@ if app_mode == "💻 Master (Data Fetcher)":
                     st.rerun() 
                 else: st.sidebar.error(f"❌ Auth Code galat hai.")
             except Exception as e: st.sidebar.error(f"❌ Connection Error.")
-        else:
-            token = saved_token
+        else: token = saved_token
 
         if token:
             if 'fetch_cycle_id' not in st.session_state: st.session_state.fetch_cycle_id = int(time.time())
             if 'last_api_call_ts' not in st.session_state: st.session_state.last_api_call_ts = 0
-
             now_ts = time.time()
             if now_ts - st.session_state.last_api_call_ts >= 100: st.session_state.fetch_cycle_id = now_ts
 
             cached_result, last_scan_timestamp = run_master_scan(token, today_str, st.session_state.fetch_cycle_id)
 
             if cached_result is not None:
-                if st.session_state.last_api_call_ts != st.session_state.fetch_cycle_id:
-                    st.session_state.last_api_call_ts = time.time()
+                if st.session_state.last_api_call_ts != st.session_state.fetch_cycle_id: st.session_state.last_api_call_ts = time.time()
                 st.session_state.cached_data = cached_result
                 st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
-                
                 try:
                     shared_pack = {"time": last_scan_timestamp, "data": cached_result, "missing": st.session_state.get('missing_stocks_list', [])}
                     json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
                 except: pass
-                
-                # 🔥 DYNAMIC BASELINE SAVE LOGIC (9:15 AM+ FIRST FETCH AUTO LOCK) 🔥
                 if datetime.time(9, 15) <= now_ist.time() <= datetime.time(15, 30):
                     last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
                     if last_save != today_str:
                         if save_eod_data(): open(AUTO_SAVE_FILE, "w").write(today_str)
             else:
                 if 'cached_data' not in st.session_state: st.session_state.cached_data = []
-    else:
-        st.info("👈 Please enter Auth Code in sidebar to start Master Server.")
+    else: st.info("👈 Please enter Auth Code in sidebar to start Master Server.")
 
 elif app_mode == "📱 Viewer (Mobile Client)":
     st.sidebar.success("🟢 Viewer Mode Active!\n\nNo Fyers Login needed. Receiving data from Master.")
@@ -489,78 +478,67 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     ]
 
     col_menu, col_search, col_toggle, col_timer = st.columns([3, 2, 2.5, 2.5], gap="small")
-    
     with col_menu: selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
     with col_search: search_query = st.text_input("Search", placeholder="🔍 Search Stock...", label_visibility="collapsed").upper()
     with col_toggle: show_pct = st.toggle("📊 Show Checker (%)", value=True)
         
     with col_timer:
-        if app_mode == "💻 Master (Data Fetcher)":
-            elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
-            rem_secs = max(1, int(308 - elapsed)) 
-            
-            # 🔥 THE ORIGINAL CLEAN "Fetching Natively..." LOGIC (No Opacity/Blur Crashing) 🔥
-            js_code = f"""
-            <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
-                ⏱️ Next Fetch: <span id="clock"></span>
-            </div>
-            <script>
-                var timeLeft = {rem_secs};
-                var clockTimer = setInterval(function() {{
-                    if(timeLeft <= 0) {{
-                        clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Fetching Natively...";
-                        setTimeout(function() {{
-                            try {{ window.parent.location.reload(); }} 
-                            catch(e) {{ window.location.reload(); }}
-                        }}, 200);
-                    }} else {{
-                        timeLeft--;
-                        var m = Math.floor(timeLeft / 60);
-                        var s = timeLeft % 60;
-                        document.getElementById('clock').innerHTML = (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
-                    }}
-                }}, 1000);
-            </script>
-            """
-            components.html(js_code, height=40)
-        else:
-            ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
-            st.markdown(f"<div style='text-align: right; color: #888888; font-size: 12px; font-weight: bold; margin-top: 8px;'>⏱️ Last Scan: {ref_time}</div>", unsafe_allow_html=True)
+        elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
+        
+        # 🔥 EXACT 5 MINUTES TIMER ENGINE FOR BOTH DEVICES FIXED HERE 🔥
+        # Laptop Mode (Master) = 300 Sec (Exactly 5 Mins)
+        # Mobile Mode (Viewer Mode) = 120 Sec (Exactly 2 Mins to block memory leak)
+        max_limit = 300 if app_mode == "💻 Master (Data Fetcher)" else 120
+        rem_secs = max(1, int(max_limit - elapsed)) 
+        
+        js_code = f"""
+        <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
+            ⏱️ Next Fetch: <span id="clock"></span>
+        </div>
+        <script>
+            var timeLeft = {rem_secs};
+            var clockTimer = setInterval(function() {{
+                if(timeLeft <= 0) {{
+                    clearInterval(clockTimer);
+                    document.getElementById('clock').innerHTML = "🔄 Fetching Natively...";
+                    setTimeout(function() {{
+                        try {{ window.parent.location.reload(true); }} 
+                        catch(e) {{ window.location.reload(true); }}
+                    }}, 150);
+                }} else {{
+                    timeLeft--;
+                    var m = Math.floor(timeLeft / 60);
+                    var s = timeLeft % 60;
+                    document.getElementById('clock').innerHTML = (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
+                }}
+            }}, 1000);
+        </script>
+        """
+        components.html(js_code, height=40)
 
     st.divider()
 
     if selected_tab == "📊 Dashboard":
         if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
-            missing_str = ", ".join(st.session_state.missing_stocks_list)
-            st.warning(f"⚠️ Missing Data for: **{missing_str}**")
-        
+            st.warning(f"⚠️ Missing Data for: **{', '.join(st.session_state.missing_stocks_list)}**")
         checker_fmt = '{:+.2f}%' if show_pct else '{:+.2f}'
         format_dict = {
             'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 'LTP': '{:.2f}', 
             'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 'CE_CONTRACT': '{:+.1f}%', 'PE_CONTRACT': '{:+.1f}%',
             'PCR CHECKER': checker_fmt, 'VOL CHECKER': checker_fmt
         }
-        
         df = pd.DataFrame(st.session_state.cached_data)
         if search_query: df = df[df['SYMS'].str.contains(search_query, na=False)]
-            
         if not df.empty:
             df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
             df = df.sort_values(by='Conv_Rank', ascending=False)
             df['VOL CHECKER'] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
             df['PCR CHECKER'] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
-            
             df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHECKER', 'VOL CHECKER']]
             df = df.rename(columns={'SYMS':'SYMBOL','OPEN_STATUS':'OPENING','V_PCR':'VOL PCR','O_PCR':'OPTION PCR','V_CPR':'VOL CPR','LTP_CH':'LTP CHANGE','CHG_%':'CHANGE%','LTP':'LTP','CE_CON':'CE_CONTRACT','PE_CON':'PE_CONTRACT'})
-
-            styled_df = (df.style.hide(axis="index")
-                         .set_properties(**{'text-align': 'center'})
-                         .format(format_dict)
-                         .set_table_styles(header_styles)
+            styled_df = (df.style.hide(axis="index").set_properties(**{'text-align': 'center'}).format(format_dict).set_table_styles(header_styles)
                          .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
                          .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
-
             st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
     elif selected_tab == "📈 CHART":
@@ -577,12 +555,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         df_sym = df_sym.sort_values(by='Time')
                         target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
                         indicator_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF"
-                        
                         time_list = df_sym['Time'].tolist()
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE MASTER BRUSH APEXCHART IFRAME ENGINE (550px Fix with Visible Mobile Slider) 🚀
+                        # 🚀 THE MASTER BRUSH ENGINE WITH DYNAMIC RATIO AND FULL MOBILE HANDLE VISIBILITY 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -591,31 +568,17 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <style> 
                                 body {{ margin: 0; padding: 0 10px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; position: relative; }} 
                                 #chart-main .apexcharts-selection-rect, #chart-main .apexcharts-zoom-rect {{ display: none !important; opacity: 0 !important; visibility: hidden !important; stroke-width: 0 !important; pointer-events: none !important; }}
-                                
-                                /* 👉 SLIDER TRACK DESIGN 👈 */
                                 #chart-slider .apexcharts-selection-rect {{ fill: #888888 !important; fill-opacity: 0.3 !important; stroke: #222222 !important; stroke-width: 1.5px !important; stroke-dasharray: 4 4 !important; }}
-                                
-                                /* 👉 LEFT BUTTON LAPTOP DEFAULT 👈 */
                                 #chart-slider .apexcharts-selection-icon {{ display: block !important; visibility: visible !important; opacity: 1 !important; cursor: ew-resize !important; }}
                                 #chart-slider .apexcharts-selection-icon rect {{ fill: #222222 !important; stroke: #ffffff !important; stroke-width: 1px !important; width: 12px !important; height: 24px !important; rx: 4px !important; transform: translateY(10px) !important; opacity: 1 !important; visibility: visible !important; }}
                                 #chart-slider .apexcharts-selection-icon circle {{ fill: #ffffff !important; r: 2 !important; transform: translateX(1px) translateY(22px) !important; opacity: 1 !important; visibility: visible !important; }}
-                                
-                                /* 👉 KILL RIGHT BUTTON 👈 */
                                 #chart-slider .apexcharts-selection-icon ~ .apexcharts-selection-icon {{ display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }}
-                                
-                                /* 👉 TOUCH FIXES 👈 */
                                 #chart-main .apexcharts-toolbar {{ display: none !important; }}
                                 #chart-main {{ touch-action: pan-x pan-y !important; }}
                                 #chart-slider {{ touch-action: pan-x !important; -webkit-user-select: none; }}
-                                
-                                /* 👉 RESET BUTTON 👈 */
                                 #reset-btn {{ position: absolute; top: 5px; left: 10px; z-index: 999; background-color: rgba(255, 255, 255, 0.9); border: 1px solid #cccccc; border-radius: 5px; padding: 5px 10px; font-size: 12px; font-weight: bold; color: #333333; cursor: pointer; box-shadow: 0px 2px 5px rgba(0,0,0,0.1); transition: all 0.2s; }}
                                 #reset-btn:hover {{ background-color: #ffffff; border-color: #999999; }}
-                                
-                                /* 👉 MOBILE SPECIFIC CSS 👈 */
-                                @media (max-width: 768px) {{ 
-                                    #reset-btn {{ top: 2px !important; left: 5px !important; padding: 4px 8px !important; font-size: 11px !important; background-color: rgba(255, 255, 255, 0.8) !important; }} 
-                                }}
+                                @media (max-width: 768px) {{ #reset-btn {{ top: 2px !important; left: 5px !important; padding: 4px 8px !important; font-size: 11px !important; background-color: rgba(255, 255, 255, 0.8) !important; }} }}
                             </style>
                         </head>
                         <body>
@@ -637,7 +600,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     lastTap = currentTime;
                                 }}, {{ passive: false }});
 
-                                /* 🚀 MOBILE DETECTOR & SLIDER VISIBILITY FIX 🚀 */
                                 var isMobile = window.innerWidth <= 768;
                                 var mainChartHeight = isMobile ? 320 : 400; 
                                 var sliderChartHeight = isMobile ? 60 : 50;
@@ -645,7 +607,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
                                 if(isMobile) {{
                                     var mobileStyle = document.createElement('style');
-                                    /* Adjusted translateY so it stays fully inside the slider box and doesn't get clipped! */
                                     mobileStyle.innerHTML = `
                                         #chart-slider .apexcharts-selection-icon rect {{ width: 20px !important; height: 30px !important; transform: translateY(10px) !important; }} 
                                         #chart-slider .apexcharts-selection-icon circle {{ r: 3 !important; transform: translateX(4px) translateY(25px) !important; }} 
@@ -698,7 +659,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        # 🚀 STREAMLIT IFRAME HEIGHT PERFECTLY BALANCED AT 550px 🚀
+                        # 🚀 IFRAME HEIGHT 550px FOR BALANCED LAYOUT 🚀
                         components.html(apex_html, height=550)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
