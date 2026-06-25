@@ -288,8 +288,9 @@ def run_master_scan(token, date_str, cycle_id):
                     pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
                     vol_pct = get_standard_pct(v_cpr, base_vol_val)
 
+            # 🔥 DYNAMIC 9:15+ BASELINE FIX: Agar baseline mil gayi toh calculation shuru! 🔥
             def get_conv(opt_type_val):
-                if scan_time_ist.time() < datetime.time(9, 20):
+                if not baseline_prices: 
                     return 0.0
                     
                 strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
@@ -376,7 +377,7 @@ if app_mode == "💻 Master (Data Fetcher)":
             else: auth_code = raw_code
 
     st.sidebar.markdown("---")
-    st.sidebar.header("💾 9:17 AM Intraday Baseline Save")
+    st.sidebar.header("💾 Baseline Save Options")
 
     def save_eod_data():
         if 'get_live_dump' in st.session_state:
@@ -400,7 +401,7 @@ if app_mode == "💻 Master (Data Fetcher)":
             except: pass
         return False
 
-    if st.sidebar.button("Manual 9:17 AM Save"):
+    if st.sidebar.button("Manual Baseline Save"):
         if save_eod_data(): 
             st.sidebar.success("Baseline Saved Successfully!")
             st.cache_data.clear() 
@@ -447,7 +448,8 @@ if app_mode == "💻 Master (Data Fetcher)":
                     json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
                 except: pass
                 
-                if datetime.time(9, 17) <= now_ist.time() < datetime.time(9, 20):
+                # 🔥 DYNAMIC BASELINE AUTO-SAVE: 9:15 AM ke baad jab bhi script chalegi, baseline save kar legi (Din mein ek baar)! 🔥
+                if datetime.time(9, 15) <= now_ist.time() <= datetime.time(15, 30):
                     last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
                     if last_save != today_str:
                         if save_eod_data(): 
@@ -511,9 +513,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     with col_timer:
         if app_mode == "💻 Master (Data Fetcher)":
             elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
-            # Timer ko 308 seconds par set kiya gaya hai taaki Streamlit ke refresh se pehle Native reload ho!
-            rem_secs = max(1, int(308 - elapsed)) 
+            # Timer 308 seconds for Native reload before Streamlit soft refresh
+            rem_secs = max(1, int(308 - elapsed))
             
+            # 🔥 NATIVE HARD RELOAD ENGINE (FADE & FLUSH CACHE) 🔥
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Next Fetch: <span id="clock"></span>
@@ -524,13 +527,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
                         document.getElementById('clock').innerHTML = "🔄 Reloading Natively...";
-                        /* MAIN SCREEN BLUR EFFECT: Halka sa fade karke kachra saaf karta hai */
+                        /* Halka Blur Effect cache saaf hone ka visual signal deta hai */
                         if (window.parent && window.parent.document && window.parent.document.body) {{
                             window.parent.document.body.style.transition = 'opacity 0.5s ease';
                             window.parent.document.body.style.opacity = '0.3'; 
                         }}
                         setTimeout(function() {{
-                            window.parent.location.reload(true); /* 100% Hard Native Refresh */
+                            window.parent.location.reload(true); 
                         }}, 500);
                     }} else {{
                         timeLeft--;
@@ -631,7 +634,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE ULTIMATE NO-BLUE-BOX SCRIPT 🚀
+                        # 🚀 THE ULTIMATE NO-BLUE-BOX SCRIPT (With Double Tap Block & Left Handle only) 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -810,19 +813,19 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         height: 400, 
                                         type: 'line',
                                         
-                                        /* 🔥 THE MAGIC FIX: Toolbar MUST be true for Pan to work, but we hide it via CSS 🔥 */
+                                        /* 🔥 THE MAGIC FIX FOR NO BLUE BOX 🔥 */
                                         toolbar: {{ 
                                             show: true, 
                                             tools: {{
                                                 download: false,
                                                 selection: false, 
-                                                zoom: false,      /* ⛔ NO ZOOM TOOL ⛔ */
+                                                zoom: false,      
                                                 zoomin: false,
                                                 zoomout: false,
-                                                pan: true,        /* ✅ PAN TOOL IS ACTIVE ✅ */
+                                                pan: true,        
                                                 reset: false
                                             }},
-                                            autoSelected: 'pan'   /* ✅ PAN IS DEFAULT ✅ */
+                                            autoSelected: 'pan'   
                                         }},
                                         
                                         /* ⛔ ZOOM 100% DISABLED HERE TO KILL THE BLUE BOX ⛔ */
