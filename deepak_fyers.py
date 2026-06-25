@@ -121,18 +121,18 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. APP MODE SELECTION
+# 4. APP MODE SELECTION (PERFECTED TIMERS)
 # ==========================================
 st.sidebar.markdown("### 📱 APP MODE")
 app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
 st.sidebar.markdown("---")
 
 if app_mode == "📱 Viewer (Mobile Client)":
-    # Viewer mode refreshes every 30 seconds
+    # 🔥 Viewer Mode: Palak jhapakte hi 30 Seconds me update hoga 🔥
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 elif app_mode == "💻 Master (Data Fetcher)":
-    # 🔥 SHARP 5 MINUTES TIMER TRIGGER FIXED HERE (300000 ms = 5 mins) 🔥
-    st_autorefresh(interval=300000, limit=100000, key="master_fetch_loop")
+    # 🔥 Master Mode: Backend soft limit 310s (Native JS karega real 300s me refresh) 🔥
+    st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
 # 5. DATA SCANNER (Master Fast Engine)
@@ -396,7 +396,6 @@ if app_mode == "💻 Master (Data Fetcher)":
             st.sidebar.success("Baseline Saved Successfully!")
             st.cache_data.clear() 
 
-    # --- MASTER EXECUTION LOGIC ---
     if auth_code:
         if auth_code != "AUTO_LOGGED_IN":
             try:
@@ -483,38 +482,40 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     with col_toggle: show_pct = st.toggle("📊 Show Checker (%)", value=True)
         
     with col_timer:
-        elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
-        
-        # 🔥 EXACT 5 MINUTES TIMER ENGINE FOR BOTH DEVICES FIXED HERE 🔥
-        # Laptop Mode (Master) = 300 Sec (Exactly 5 Mins)
-        # Mobile Mode (Viewer Mode) = 120 Sec (Exactly 2 Mins to block memory leak)
-        max_limit = 300 if app_mode == "💻 Master (Data Fetcher)" else 120
-        rem_secs = max(1, int(max_limit - elapsed)) 
-        
-        js_code = f"""
-        <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
-            ⏱️ Next Fetch: <span id="clock"></span>
-        </div>
-        <script>
-            var timeLeft = {rem_secs};
-            var clockTimer = setInterval(function() {{
-                if(timeLeft <= 0) {{
-                    clearInterval(clockTimer);
-                    document.getElementById('clock').innerHTML = "🔄 Fetching Natively...";
-                    setTimeout(function() {{
-                        try {{ window.parent.location.reload(true); }} 
-                        catch(e) {{ window.location.reload(true); }}
-                    }}, 150);
-                }} else {{
-                    timeLeft--;
-                    var m = Math.floor(timeLeft / 60);
-                    var s = timeLeft % 60;
-                    document.getElementById('clock').innerHTML = (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
-                }}
-            }}, 1000);
-        </script>
-        """
-        components.html(js_code, height=40)
+        # 🔥 PERFECT SYNC LOGIC 🔥
+        if app_mode == "💻 Master (Data Fetcher)":
+            elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
+            rem_secs = max(1, int(300 - elapsed)) # Master runs native refresh in exactly 300 seconds
+            
+            js_code = f"""
+            <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
+                ⏱️ Next Fetch: <span id="clock"></span>
+            </div>
+            <script>
+                var timeLeft = {rem_secs};
+                var clockTimer = setInterval(function() {{
+                    if(timeLeft <= 0) {{
+                        clearInterval(clockTimer);
+                        document.getElementById('clock').innerHTML = "🔄 Fetching Natively...";
+                        setTimeout(function() {{
+                            try {{ window.parent.location.reload(true); }} 
+                            catch(e) {{ window.location.reload(true); }}
+                        }}, 200);
+                    }} else {{
+                        timeLeft--;
+                        var m = Math.floor(timeLeft / 60);
+                        var s = timeLeft % 60;
+                        document.getElementById('clock').innerHTML = (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
+                    }}
+                }}, 1000);
+            </script>
+            """
+            components.html(js_code, height=40)
+        else:
+            # Viewer Client: No Native JS Countdown Timer here to avoid loops/fluctuations.
+            # It just refreshes silently via st_autorefresh(30000)
+            ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
+            st.markdown(f"<div style='text-align: right; color: #888888; font-size: 12px; font-weight: bold; margin-top: 8px;'>⏱️ Master Data: {ref_time}</div>", unsafe_allow_html=True)
 
     st.divider()
 
@@ -559,7 +560,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 THE MASTER BRUSH ENGINE WITH DYNAMIC RATIO AND FULL MOBILE HANDLE VISIBILITY 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -587,7 +587,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <div id="chart-slider" style="margin-top: -10px;"></div>
                             
                             <script>
-                                /* ⛔ 100% DOUBLE-CLICK & TOUCH ZOOM KILL SHIELD ⛔ */
                                 var mainChartNode = document.getElementById('chart-main');
                                 mainChartNode.addEventListener('dblclick', function(e) {{ e.preventDefault(); e.stopPropagation(); }}, true);
                                 mainChartNode.addEventListener('touchmove', function(e) {{ if (e.touches.length > 1) {{ e.preventDefault(); e.stopPropagation(); }} }}, {{ passive: false }});
@@ -659,7 +658,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        # 🚀 IFRAME HEIGHT 550px FOR BALANCED LAYOUT 🚀
                         components.html(apex_html, height=550)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
