@@ -213,9 +213,9 @@ def run_master_scan(token, date_str, cycle_id):
 
     def fetch_option_chain_fast_local(q):
         sym = q['n']
-        time.sleep(0.3) 
+        time.sleep(0.1) # 🔥 OPTIMIZED: Reduced sleep to prevent timeout issues
         try:
-            # 🔥 OPTIMIZED STRIKE COUNT: 60 (covers enough active range, avoids massive dead payloads) 🔥
+            # 🔥 OPTIMIZED STRIKE COUNT: 60
             oc = fyers.optionchain(data={"symbol": sym, "strikecount": 60, "timestamp": ""})
             if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
                 time.sleep(1.0) 
@@ -223,7 +223,8 @@ def run_master_scan(token, date_str, cycle_id):
             return q, oc
         except: return q, None
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+    # 🔥 OPTIMIZED: Increased max_workers to 10 for faster parallel fetching to avoid 120s timeout
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
         future_to_q = {executor.submit(fetch_option_chain_fast_local, q): q for q in all_quotes}
         try:
             for future in concurrent.futures.as_completed(future_to_q, timeout=120):
@@ -254,16 +255,16 @@ def run_master_scan(token, date_str, cycle_id):
                 oi = float(s.get('oi', 0))
                 lp_str = round(float(s.get('ltp', 0)), 2)
                 
-                # 🔥 SMART FILTER: GHOST/DEAD STRIKES EXCLUDED 🔥
-                # Only include strikes that have an actual traded price (LTP > 0). This prevents PCR bloat.
-                if lp_str > 0.0:
-                    if sym_str.endswith('CE') or o_type == 'CE':
-                        c_oi += oi
-                        c_v += vol
-                    elif sym_str.endswith('PE') or o_type == 'PE':
-                        p_oi += oi
-                        p_v += vol
+                # 🔥 FIX: All strikes counted regardless of LTP (Solves PCR bloat issue)
+                if sym_str.endswith('CE') or o_type == 'CE':
+                    c_oi += oi
+                    c_v += vol
+                elif sym_str.endswith('PE') or o_type == 'PE':
+                    p_oi += oi
+                    p_v += vol
                         
+                # Only add to live_ltp_data if it has been traded today
+                if lp_str > 0.0:
                     live_ltp_data[sym_str] = lp_str
 
             o_pcr = calc_opt_pcr(c_oi, p_oi)
@@ -407,262 +408,13 @@ if app_mode == "💻 Master (Data Fetcher)":
                 session = fyersModel.SessionModel(client_id=APP_ID, secret_key=SECRET_ID, redirect_uri=REDIRECT_URI, response_type="code", grant_type="authorization_code")
                 session.set_token(auth_code)
                 response = session.generate_token()
-                if isinstance(response, dict) and "access_token" in response:
-                    token = response['access_token']
-                    json.dump({"date": today_str, "token": token}, open(TOKEN_STORE_FILE, 'w'))
-                    st.sidebar.success("✅ Token Saved! Page refreshing...")
-                    time.sleep(1) 
-                    st.rerun() 
-                else: st.sidebar.error(f"❌ Auth Code galat hai.")
-            except Exception as e: st.sidebar.error(f"❌ Connection Error.")
-        else: token = saved_token
-
-        if token:
-            if 'fetch_cycle_id' not in st.session_state: st.session_state.fetch_cycle_id = int(time.time())
-            if 'last_api_call_ts' not in st.session_state: st.session_state.last_api_call_ts = 0
-            now_ts = time.time()
-            if now_ts - st.session_state.last_api_call_ts >= 100: st.session_state.fetch_cycle_id = now_ts
-
-            cached_result, last_scan_timestamp = run_master_scan(token, today_str, st.session_state.fetch_cycle_id)
-
-            if cached_result is not None:
-                if st.session_state.last_api_call_ts != st.session_state.fetch_cycle_id: st.session_state.last_api_call_ts = time.time()
-                st.session_state.cached_data = cached_result
-                st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
-                try:
-                    shared_pack = {"time": last_scan_timestamp, "data": cached_result, "missing": st.session_state.get('missing_stocks_list', [])}
-                    json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
-                except: pass
-                if datetime.time(9, 15) <= now_ist.time() <= datetime.time(15, 30):
-                    last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
-                    if last_save != today_str:
-                        if save_eod_data(): open(AUTO_SAVE_FILE, "w").write(today_str)
-            else:
-                if 'cached_data' not in st.session_state: st.session_state.cached_data = []
-    else: st.info("👈 Please enter Auth Code in sidebar to start Master Server.")
-
-elif app_mode == "📱 Viewer (Mobile Client)":
-    st.sidebar.success("🟢 Viewer Mode Active!\n\nNo Fyers Login needed. Receiving data from Master.")
-    if os.path.exists(SHARED_LIVE_DATA_FILE):
-        try:
-            shared_pack = json.load(open(SHARED_LIVE_DATA_FILE, 'r'))
-            st.session_state.cached_data = shared_pack.get("data", [])
-            last_scan_timestamp = shared_pack.get("time", time.time())
-            st.session_state.last_api_call_ts = last_scan_timestamp 
-            st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
-            st.session_state.missing_stocks_list = shared_pack.get("missing", [])
-        except: pass
-    else:
-        st.info("⏳ Waiting for Master Server... Master dashboard ko running rakhein.")
-        st.session_state.cached_data = []
-
-# ==========================================
-# 7. APP RENDERING (SINGLE LINE UI & TABLES)
-# ==========================================
-if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
-    
-    def style_indicators(val):
-        if isinstance(val, str): 
-            if "Gap Up" in val: return 'background-color: rgba(0,200,0,0.15); color: #00AA00; font-weight: bold; text-align: center;'
-            if "Gap Down" in val: return 'background-color: rgba(200,0,0,0.15); color: #FF0000; font-weight: bold; text-align: center;'
-            if "Same" in val: return 'color: #00BFFF; font-weight: bold; text-align: center;'
-            return 'text-align: center;'
-        if val > 0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-        elif val < 0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-        return 'color: #888888; font-weight: bold; text-align: center;'
-
-    def style_pcr_columns(val):
-        if isinstance(val, (int, float)):
-            if val >= 1.0: return 'background-color: rgba(0,200,0,0.1); color: #00AA00; font-weight: bold; text-align: center;'
-            elif val > 0 and val < 1.0: return 'background-color: rgba(200,0,0,0.1); color: #FF0000; font-weight: bold; text-align: center;'
-        return 'text-align: center;'
-
-    header_styles = [
-        {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
-        {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
-    ]
-
-    col_menu, col_search, col_toggle, col_timer = st.columns([3, 2, 2.5, 2.5], gap="small")
-    with col_menu: selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
-    with col_search: search_query = st.text_input("Search", placeholder="🔍 Search Stock...", label_visibility="collapsed").upper()
-    with col_toggle: show_pct = st.toggle("📊 Show Checker (%)", value=True)
-        
-    with col_timer:
-        if app_mode == "💻 Master (Data Fetcher)":
-            elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
-            rem_secs = max(1, int(300 - elapsed)) 
-            
-            js_code = f"""
-            <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
-                ⏱️ Next Fetch: <span id="clock"></span>
-            </div>
-            <script>
-                var timeLeft = {rem_secs};
-                var clockTimer = setInterval(function() {{
-                    if(timeLeft <= 0) {{
-                        clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Fetching Natively...";
-                        setTimeout(function() {{
-                            try {{ window.parent.location.reload(true); }} 
-                            catch(e) {{ window.location.reload(true); }}
-                        }}, 200);
-                    }} else {{
-                        timeLeft--;
-                        var m = Math.floor(timeLeft / 60);
-                        var s = timeLeft % 60;
-                        document.getElementById('clock').innerHTML = (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
-                    }}
-                }}, 1000);
-            </script>
-            """
-            components.html(js_code, height=40)
-        else:
-            ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
-            st.markdown(f"<div style='text-align: right; color: #888888; font-size: 12px; font-weight: bold; margin-top: 8px;'>⏱️ Master Data: {ref_time}</div>", unsafe_allow_html=True)
-
-    st.divider()
-
-    if selected_tab == "📊 Dashboard":
-        if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
-            st.warning(f"⚠️ Missing Data for: **{', '.join(st.session_state.missing_stocks_list)}**")
-        checker_fmt = '{:+.2f}%' if show_pct else '{:+.2f}'
-        format_dict = {
-            'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 'LTP': '{:.2f}', 
-            'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 'CE_CONTRACT': '{:+.1f}%', 'PE_CONTRACT': '{:+.1f}%',
-            'PCR CHECKER': checker_fmt, 'VOL CHECKER': checker_fmt
-        }
-        df = pd.DataFrame(st.session_state.cached_data)
-        if search_query: df = df[df['SYMS'].str.contains(search_query, na=False)]
-        if not df.empty:
-            df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
-            df = df.sort_values(by='Conv_Rank', ascending=False)
-            df['VOL CHECKER'] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
-            df['PCR CHECKER'] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
-            df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHECKER', 'VOL CHECKER']]
-            df = df.rename(columns={'SYMS':'SYMBOL','OPEN_STATUS':'OPENING','V_PCR':'VOL PCR','O_PCR':'OPTION PCR','V_CPR':'VOL CPR','LTP_CH':'LTP CHANGE','CHG_%':'CHANGE%','LTP':'LTP','CE_CON':'CE_CONTRACT','PE_CON':'PE_CONTRACT'})
-            styled_df = (df.style.hide(axis="index").set_properties(**{'text-align': 'center'}).format(format_dict).set_table_styles(header_styles)
-                         .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
-                         .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
-            st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
-
-    elif selected_tab == "📈 CHART":
-        col_c1, col_c2 = st.columns([2, 2])
-        with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
-        with col_c2: chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True, label_visibility="collapsed")
-
-        if os.path.exists(HISTORY_FILE):
-            try:
-                hist_df = pd.read_csv(HISTORY_FILE)
-                if not hist_df.empty and 'Date' in hist_df.columns:
-                    df_sym = hist_df[(hist_df['Date'] == today_str) & (hist_df['Symbol'] == sel_stock)].copy()
-                    if not df_sym.empty:
-                        df_sym = df_sym.sort_values(by='Time')
-                        target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
-                        indicator_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF"
-                        time_list = df_sym['Time'].tolist()
-                        indicator_list = df_sym[target_col].tolist()
-                        ltp_list = df_sym['LTP'].tolist()
-
-                        apex_html = f"""
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-                            <style> 
-                                body {{ margin: 0; padding: 0 10px; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; position: relative; }} 
-                                #chart-main .apexcharts-selection-rect, #chart-main .apexcharts-zoom-rect {{ display: none !important; opacity: 0 !important; visibility: hidden !important; stroke-width: 0 !important; pointer-events: none !important; }}
-                                #chart-slider .apexcharts-selection-rect {{ fill: #888888 !important; fill-opacity: 0.3 !important; stroke: #222222 !important; stroke-width: 1.5px !important; stroke-dasharray: 4 4 !important; }}
-                                #chart-slider .apexcharts-selection-icon {{ display: block !important; visibility: visible !important; opacity: 1 !important; cursor: ew-resize !important; }}
-                                #chart-slider .apexcharts-selection-icon rect {{ fill: #222222 !important; stroke: #ffffff !important; stroke-width: 1px !important; width: 12px !important; height: 24px !important; rx: 4px !important; transform: translateY(10px) !important; opacity: 1 !important; visibility: visible !important; }}
-                                #chart-slider .apexcharts-selection-icon circle {{ fill: #ffffff !important; r: 2 !important; transform: translateX(1px) translateY(22px) !important; opacity: 1 !important; visibility: visible !important; }}
-                                #chart-slider .apexcharts-selection-icon ~ .apexcharts-selection-icon {{ display: none !important; visibility: hidden !important; opacity: 0 !important; pointer-events: none !important; }}
-                                #chart-main .apexcharts-toolbar {{ display: none !important; }}
-                                #chart-main {{ touch-action: pan-x pan-y !important; }}
-                                #chart-slider {{ touch-action: pan-x !important; -webkit-user-select: none; }}
-                                #reset-btn {{ position: absolute; top: 5px; left: 10px; z-index: 999; background-color: rgba(255, 255, 255, 0.9); border: 1px solid #cccccc; border-radius: 5px; padding: 5px 10px; font-size: 12px; font-weight: bold; color: #333333; cursor: pointer; box-shadow: 0px 2px 5px rgba(0,0,0,0.1); transition: all 0.2s; }}
-                                #reset-btn:hover {{ background-color: #ffffff; border-color: #999999; }}
-                                @media (max-width: 768px) {{ #reset-btn {{ top: 2px !important; left: 5px !important; padding: 4px 8px !important; font-size: 11px !important; background-color: rgba(255, 255, 255, 0.8) !important; }} }}
-                            </style>
-                        </head>
-                        <body>
-                            <button type="button" id="reset-btn" onclick="resetChart()">🔄 Reset</button>
-                            <div id="chart-main"></div>
-                            <div id="chart-slider" style="margin-top: -10px;"></div>
-                            
-                            <script>
-                                var mainChartNode = document.getElementById('chart-main');
-                                mainChartNode.addEventListener('dblclick', function(e) {{ e.preventDefault(); e.stopPropagation(); }}, true);
-                                mainChartNode.addEventListener('touchmove', function(e) {{ if (e.touches.length > 1) {{ e.preventDefault(); e.stopPropagation(); }} }}, {{ passive: false }});
-                                
-                                var lastTap = 0;
-                                mainChartNode.addEventListener('touchstart', function(e) {{
-                                    var currentTime = new Date().getTime();
-                                    var tapLength = currentTime - lastTap;
-                                    if (tapLength < 400 && tapLength > 0) {{ e.preventDefault(); e.stopPropagation(); }}
-                                    lastTap = currentTime;
-                                }}, {{ passive: false }});
-
-                                var isMobile = window.innerWidth <= 768;
-                                var mainChartHeight = isMobile ? 320 : 400; 
-                                var sliderChartHeight = isMobile ? 60 : 50;
-                                var xTicks = isMobile ? 5 : 10; 
-
-                                if(isMobile) {{
-                                    var mobileStyle = document.createElement('style');
-                                    mobileStyle.innerHTML = `
-                                        #chart-slider .apexcharts-selection-icon rect {{ width: 20px !important; height: 30px !important; transform: translateY(10px) !important; }} 
-                                        #chart-slider .apexcharts-selection-icon circle {{ r: 3 !important; transform: translateX(4px) translateY(25px) !important; }} 
-                                        #chart-slider svg, #chart-main svg {{ transform: translateZ(0); will-change: transform; }}
-                                    `;
-                                    document.head.appendChild(mobileStyle);
-                                }}
-
-                                var dataIndicator = {json.dumps(indicator_list)};
-                                var dataLTP = {json.dumps(ltp_list)};
-                                var timeCats = {json.dumps(time_list)};
-                                
-                                var optionsMain = {{
-                                    series: [{{ name: '{chart_mode}', type: 'area', data: dataIndicator }}, {{ name: 'LTP', type: 'line', data: dataLTP }}],
-                                    chart: {{ id: 'mainChart', height: mainChartHeight, type: 'line', toolbar: {{ show: true, tools: {{ download: false, selection: false, zoom: false, zoomin: false, zoomout: false, pan: true, reset: false }}, autoSelected: 'pan' }}, zoom: {{ enabled: false }}, selection: {{ enabled: false }}, animations: {{ enabled: false }} }},
-                                    colors: ['{indicator_color}', '#00CC66'],
-                                    stroke: {{ curve: 'smooth', width: [2, 2] }},
-                                    fill: {{ type: ['gradient', 'solid'], gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }} }},
-                                    dataLabels: {{ enabled: false }},
-                                    grid: {{ padding: {{ left: 5, right: 5 }} }},
-                                    xaxis: {{ categories: timeCats, tickAmount: xTicks, labels: {{ style: {{ colors: '#888' }} }}, tooltip: {{ enabled: false }} }},
-                                    yaxis: [{{ title: {{ text: '{chart_mode}', style: {{ color: '{indicator_color}' }} }}, labels: {{ style: {{ colors: '{indicator_color}' }} }} }}, {{ opposite: true, title: {{ text: 'LTP', style: {{ color: '#00CC66' }} }}, labels: {{ style: {{ colors: '#00CC66' }} }} }}],
-                                    tooltip: {{ shared: true, intersect: false, y: {{ formatter: function (y) {{ if (typeof y !== "undefined") {{ return y.toFixed(2); }} return y; }} }} }},
-                                    legend: {{ position: 'top', horizontalAlign: 'right' }}
-                                }};
-
-                                var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
-                                chartMain.render();
-
-                                var optionsSlider = {{
-                                    series: [{{ name: '{chart_mode}', data: dataIndicator }}],
-                                    chart: {{ id: 'sliderChart', height: sliderChartHeight, type: 'line', brush: {{ target: 'mainChart', enabled: true }}, selection: {{ enabled: true, xaxis: {{ min: timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0], max: timeCats[timeCats.length - 1] }} }} }},
-                                    colors: ['#bbbbbb'],
-                                    stroke: {{ curve: 'smooth', width: 1.5 }},
-                                    dataLabels: {{ enabled: false }},
-                                    grid: {{ show: false, padding: {{ left: 10, right: 10, top: 0, bottom: 0 }} }},
-                                    xaxis: {{ categories: timeCats, tickAmount: 10, labels: {{ show: false }}, axisBorder: {{ show: false }}, axisTicks: {{ show: false }}, tooltip: {{ enabled: false }} }},
-                                    yaxis: {{ show: false }}
-                                }};
-
-                                var chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
-                                chartSlider.render();
-
-                                function resetChart() {{
-                                    var minT = timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0];
-                                    var maxT = timeCats[timeCats.length - 1];
-                                    chartSlider.updateOptions({{ chart: {{ selection: {{ xaxis: {{ min: minT, max: maxT }} }} }} }});
-                                }}
-                            </script>
-                        </body>
-                        </html>
-                        """
-                        components.html(apex_html, height=550)
-                    else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
-                else: st.info("⏳ Market data hasn't started logging yet today.")
-            except Exception as e: st.error(f"Chart Load Error: {e}")
-        else: st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
+                if "access_token" in response:
+                    token = response["access_token"]
+                    with open(TOKEN_STORE_FILE, "w") as f:
+                        json.dump({"date": today_str, "token": token}, f)
+                    st.success("Login Successful!")
+                    st.rerun()
+                else:
+                    st.error(f"Login Failed: {response}")
+            except Exception as e:
+                st.error(f"Error during login: {e}")
