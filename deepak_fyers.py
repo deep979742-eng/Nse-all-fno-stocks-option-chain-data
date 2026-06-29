@@ -586,13 +586,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         default_device_index = 0 if app_mode == "💻 Master (Data Fetcher)" else 1
         with col_c3: device_mode = st.radio("Screen Layout:", ["💻 Laptop", "📱 Mobile"], horizontal=True, index=default_device_index, label_visibility="collapsed")
 
-        # 🚀 DYNAMIC CHART HEIGHT CALCULATION
+        # 🚀 DYNAMIC CHART HEIGHT CALCULATION 🚀
         if device_mode == "💻 Laptop":
-            c_main_h = 500      
-            c_iframe_h = 630    
+            c_main_h = 480      # 👈 Changed to 480 as requested
+            c_iframe_h = 610    # 👈 Adjusted total container height
         else:
-            c_main_h = 350      
-            c_iframe_h = 470    
+            c_main_h = 350      # Compact, 350px chart for Mobile
+            c_iframe_h = 470    # Total container height
 
         if os.path.exists(HISTORY_FILE):
             try:
@@ -620,7 +620,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 .apexcharts-toolbar {{ top: -10px !important; right: auto !important; left: 10px !important; z-index: 10 !important; }}
                                 
                                 /* Anti-Scroll Fix for Mobile Slider: Blocks vertical scroll when swiping */
-                                #chart-slider, #chart-slider * {{ touch-action: pan-x !important; }}
+                                #chart-slider, #chart-slider * {{ touch-action: none !important; }}
                             </style>
                         </head>
                         <body>
@@ -644,9 +644,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'mainChart',
-                                        height: {c_main_h},
+                                        height: {c_main_h}, 
                                         type: 'line',
-                                        /* 🚀 FIXED: Only the Reset (Refresh) icon will show here, all others are disabled 🚀 */
+                                        /* 🚀 FIXED: Only the Reset icon enabled 🚀 */
                                         toolbar: {{ 
                                             show: true, 
                                             tools: {{ download: false, selection: false, zoom: false, zoomin: false, zoomout: false, pan: false, reset: true }},
@@ -729,12 +729,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
                                 var chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
                                 chartSlider.render();
-
-                                /* Advanced JS to stop mobile browser from scrolling up/down while user slides left/right */
-                                document.getElementById('chart-slider').addEventListener('touchmove', function(e) {{
-                                    e.preventDefault();
-                                }}, {{ passive: false }});
-                                
                             </script>
                         </body>
                         </html>
