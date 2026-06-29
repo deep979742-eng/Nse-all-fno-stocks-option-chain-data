@@ -120,7 +120,6 @@ def get_raw_symbol(fyers_sym):
     s = fyers_sym.split(':')[1].replace('-EQ', '').replace('-INDEX', '')
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
-
 # ==========================================
 # 4. APP MODE SELECTION
 # ==========================================
@@ -129,6 +128,7 @@ app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)"
 st.sidebar.markdown("---")
 
 if app_mode == "📱 Viewer (Mobile Client)":
+    # Viewer relies on soft refresh every 30s to stay light and responsive
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 
 # ==========================================
@@ -417,21 +417,9 @@ if app_mode == "💻 Master (Data Fetcher)":
             token = saved_token
 
         if token:
-            if 'fetch_cycle_id' not in st.session_state: 
-                st.session_state.fetch_cycle_id = int(time.time())
-            if 'last_api_call_ts' not in st.session_state: 
-                st.session_state.last_api_call_ts = 0
-
-            now_ts = time.time()
-            if now_ts - st.session_state.last_api_call_ts >= 100: 
-                st.session_state.fetch_cycle_id = now_ts
-
-            cached_result, last_scan_timestamp = run_master_scan(token, today_str, st.session_state.fetch_cycle_id)
+            cached_result, last_scan_timestamp = run_master_scan(token, today_str, int(time.time()))
 
             if cached_result is not None:
-                if st.session_state.last_api_call_ts != st.session_state.fetch_cycle_id:
-                    st.session_state.last_api_call_ts = time.time()
-                    
                 st.session_state.cached_data = cached_result
                 st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
                 
@@ -494,8 +482,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
     with col_timer:
         if app_mode == "💻 Master (Data Fetcher)":
-            elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
-            rem_secs = max(1, int(310 - elapsed))
+            # 🚀 MASTER TIMER: 310 Seconds Fixed (5 Minutes)
+            # When this hits 0, it forces a complete URL reload, ensuring Streamlit never hangs.
+            rem_secs = 310
             
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
@@ -506,8 +495,12 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 var clockTimer = setInterval(function() {{
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Fetching...";
-                        window.parent.location.reload(); 
+                        document.getElementById('clock').innerHTML = "🔄 Hard Refreshing...";
+                        
+                        /* ADVANCED NATIVE FETCHING LOGIC */
+                        /* Strip URL parameters and force the browser to do a clean refresh */
+                        window.parent.location.href = window.parent.location.href.split('?')[0];
+                        
                     }} else {{
                         timeLeft--;
                         var m = Math.floor(timeLeft / 60);
@@ -584,9 +577,22 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             )
 
     elif selected_tab == "📈 CHART":
-        col_c1, col_c2 = st.columns([2, 2])
+        # 🚀 ADDED: Smart Toggle between Laptop and Mobile Screen Layouts 🚀
+        col_c1, col_c2, col_c3 = st.columns([1.5, 1.5, 1.5])
         with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
         with col_c2: chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True, label_visibility="collapsed")
+        
+        # It automatically sets Laptop mode if you are the Master, and Mobile mode if you are the Viewer!
+        default_device_index = 0 if app_mode == "💻 Master (Data Fetcher)" else 1
+        with col_c3: device_mode = st.radio("Screen Layout:", ["💻 Laptop", "📱 Mobile"], horizontal=True, index=default_device_index, label_visibility="collapsed")
+
+        # 🚀 DYNAMIC CHART HEIGHT CALCULATION 🚀
+        if device_mode == "💻 Laptop":
+            c_main_h = 550      # Tall, spacious chart for Laptop
+            c_iframe_h = 680    # Total container height
+        else:
+            c_main_h = 350      # Compact, 350px chart for Mobile
+            c_iframe_h = 470    # Total container height
 
         if os.path.exists(HISTORY_FILE):
             try:
@@ -603,17 +609,18 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 JS INJECTION: 350px Main Height & Horizontal Swiping Touch Support 🚀
+                        # 🚀 JS INJECTION: Dynamic Height & Super-Smooth Anti-Scroll Slider 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
                         <head>
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
-                                body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; touch-action: pan-y; }} 
+                                body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
                                 .apexcharts-toolbar {{ top: -10px !important; right: auto !important; left: 10px !important; z-index: 10 !important; }}
-                                /* Force horizontal swiping action for the slider */
-                                #chart-slider .apexcharts-inner, .apexcharts-selection-rect {{ touch-action: pan-x !important; }}
+                                
+                                /* Anti-Scroll Fix for Mobile Slider: Blocks vertical scroll when swiping */
+                                #chart-slider, #chart-slider * {{ touch-action: pan-x !important; }}
                             </style>
                         </head>
                         <body>
@@ -637,7 +644,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'mainChart',
-                                        height: 350, /* 👈 Height is now exactly 350px */
+                                        height: {c_main_h}, /* 👈 Dynamically changes based on Laptop/Mobile selection */
                                         type: 'line',
                                         toolbar: {{ 
                                             show: true, 
@@ -721,11 +728,17 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
                                 var chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
                                 chartSlider.render();
+
+                                /* Advanced JS to stop mobile browser from scrolling up/down while user slides left/right */
+                                document.getElementById('chart-slider').addEventListener('touchmove', function(e) {{
+                                    e.preventDefault();
+                                }}, {{ passive: false }});
+                                
                             </script>
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=460)
+                        components.html(apex_html, height=c_iframe_h)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
