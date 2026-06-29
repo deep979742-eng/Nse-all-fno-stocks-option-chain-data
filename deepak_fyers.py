@@ -88,28 +88,221 @@ def get_gspread_client():
 # 3. STOCK LIST & HELPER FUNCTIONS
 # ==========================================
 raw_symbols = [
-    "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
-    "ADANIPORTS", "ADANIPOWER", "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP", "ASHOKLEY", "ASIANPAINT", 
-    "ASTRAL", "AUBANK", "AUROPHARMA", "AXISBANK", "BAJAJ-AUTO", "BAJAJFINSV", "BAJAJHLDNG", "BAJFINANCE", "BANDHANBNK", "BANKBARODA", 
-    "BANKINDIA", "BDL", "BEL", "BHARATFORG", "BHARTIARTL", "BHEL", "BIOCON", "BLUESTARCO", "BOSCHLTD", "BPCL", 
-    "BRITANNIA", "BSE", "CAMS", "CANBK", "CDSL", "CGPOWER", "CHOLAFIN", "CIPLA", "COALINDIA", "COCHINSHIP", 
-    "COFORGE", "COLPAL", "CONCOR", "CROMPTON", "CUMMINSIND", "DABUR", "DALBHARAT", "DELHIVERY", "DIVISLAB", "DIXON", 
-    "DLF", "DMART", "DRREDDY", "EICHERMOT", "ETERNAL", "EXIDEIND", "FEDERALBNK", "FORCEMOT", "FORTIS", "GAIL", 
-    "GLENMARK", "GMRAIRPORT", "GODFRYPHLP", "GODREJCP", "GODREJPROP", "GRASIM", "GVT&D", "HAL", "HAVELLS", "HCLTECH", 
-    "HDFCAMC", "HDFCBANK", "HDFCLIFE", "HEROMOTOCO", "HINDALCO", "HINDPETRO", "HINDUNILVR", "HINDZINC", "HYUNDAI", "ICICIBANK", 
-    "ICICIGI", "ICICIPRULI", "IDEA", "IDFCFIRSTB", "IEX", "INDHOTEL", "INDIANB", "INDIGO", "INDUSINDBK", "INDUSTOWER", 
-    "INFY", "INOXWIND", "IOC", "IREDA", "IRFC", "ITC", "JINDALSTEL", "JIOFIN", "JSWENERGY", "JSWSTEEL", 
-    "JUBLFOOD", "KALYANKJIL", "KAYNES", "KEI", "KFINTECH", "KOTAKBANK", "KPITTECH", "LAURUSLABS", "LICHSGFIN", "LICI", 
-    "LODHA", "LT", "LTF", "LTM", "LUPIN", "M&M", "MANAPPURAM", "MANKIND", "MARICO", "MARUTI", 
-    "MAXHEALTH", "MAZDOCK", "MCX", "MFSL", "MOTHERSON", "MOTILALOFS", "MPHASIS", "MUTHOOTFIN", "NAM-INDIA", "NATIONALUM", 
-    "NAUKRI", "NBCC", "NESTLEIND", "NHPC", "NMDC", "NTPC", "NUVAMA", "NYKAA", "OBEROIRLTY", "OFSS", 
-    "OIL", "ONGC", "PAGEIND", "PATANJALI", "PAYTM", "PERSISTENT", "PETRONET", "PFC", "PGEL", "PHOENIXLTD", 
-    "PIDILITIND", "PIIND", "PNB", "PNBHOUSING", "POLICYBZR", "POLYCAB", "POWERGRID", "POWERINDIA", "PREMIERENE", "PRESTIGE", 
-    "RADICO", "RBLBANK", "RECLTD", "RELIANCE", "RVNL", "SAIL", "SAMMAANCAP", "SBICARD", "SBILIFE", "SBIN", 
-    "SHREECEM", "SHRIRAMFIN", "SIEMENS", "SOLARINDS", "SONACOMS", "SRF", "SUNPHARMA", "SUPREMEIND", "SUZLON", "SWIGGY", 
-    "TATACONSUM", "TATAELXSI", "TATAPOWER", "TATASTEEL", "TCS", "TECHM", "TIINDIA", "TITAN", "TMPV", "TORNTPHARM", 
-    "TRENT", "TVSMOTOR", "ULTRACEMCO", "UNIONBANK", "UNITDSPR", "UNOMINDA", "UPL", "VBL", "VEDL", "VMM", 
-    "VOLTAS", "WAAREEENER", "WIPRO", "YESBANK", "ZYDUSLIFE"
+    "NIFTY",
+    "BANKNIFTY",
+    "FINNIFTY",
+    "MIDCPNIFTY",
+    "360ONE",
+    "ABB",
+    "ABCAPITAL",
+    "ADANIENSOL",
+    "ADANIENT",
+    "ADANIGREEN",
+    "ADANIPORTS",
+    "ADANIPOWER",
+    "ALKEM",
+    "AMBER",
+    "AMBUJACEM",
+    "ANGELONE",
+    "APLAPOLLO",
+    "APOLLOHOSP",
+    "ASHOKLEY",
+    "ASIANPAINT",
+    "ASTRAL",
+    "AUBANK",
+    "AUROPHARMA",
+    "AXISBANK",
+    "BAJAJ-AUTO",
+    "BAJAJFINSV",
+    "BAJAJHLDNG",
+    "BAJFINANCE",
+    "BANDHANBNK",
+    "BANKBARODA",
+    "BANKINDIA",
+    "BDL",
+    "BEL",
+    "BHARATFORG",
+    "BHARTIARTL",
+    "BHEL",
+    "BIOCON",
+    "BLUESTARCO",
+    "BOSCHLTD",
+    "BPCL",
+    "BRITANNIA",
+    "BSE",
+    "CAMS",
+    "CANBK",
+    "CDSL",
+    "CGPOWER",
+    "CHOLAFIN",
+    "CIPLA",
+    "COALINDIA",
+    "COCHINSHIP",
+    "COFORGE",
+    "COLPAL",
+    "CONCOR",
+    "CROMPTON",
+    "CUMMINSIND",
+    "DABUR",
+    "DALBHARAT",
+    "DELHIVERY",
+    "DIVISLAB",
+    "DIXON",
+    "DLF",
+    "DMART",
+    "DRREDDY",
+    "EICHERMOT",
+    "ETERNAL",
+    "EXIDEIND",
+    "FEDERALBNK",
+    "FORCEMOT",
+    "FORTIS",
+    "GAIL",
+    "GLENMARK",
+    "GMRAIRPORT",
+    "GODFRYPHLP",
+    "GODREJCP",
+    "GODREJPROP",
+    "GRASIM",
+    "GVT&D",
+    "HAL",
+    "HAVELLS",
+    "HCLTECH",
+    "HDFCAMC",
+    "HDFCBANK",
+    "HDFCLIFE",
+    "HEROMOTOCO",
+    "HINDALCO",
+    "HINDPETRO",
+    "HINDUNILVR",
+    "HINDZINC",
+    "HYUNDAI",
+    "ICICIBANK",
+    "ICICIGI",
+    "ICICIPRULI",
+    "IDEA",
+    "IDFCFIRSTB",
+    "IEX",
+    "INDHOTEL",
+    "INDIANB",
+    "INDIGO",
+    "INDUSINDBK",
+    "INDUSTOWER",
+    "INFY",
+    "INOXWIND",
+    "IOC",
+    "IREDA",
+    "IRFC",
+    "ITC",
+    "JINDALSTEL",
+    "JIOFIN",
+    "JSWENERGY",
+    "JSWSTEEL",
+    "JUBLFOOD",
+    "KALYANKJIL",
+    "KAYNES",
+    "KEI",
+    "KFINTECH",
+    "KOTAKBANK",
+    "KPITTECH",
+    "LAURUSLABS",
+    "LICHSGFIN",
+    "LICI",
+    "LODHA",
+    "LT",
+    "LTF",
+    "LTM",
+    "LUPIN",
+    "M&M",
+    "MANAPPURAM",
+    "MANKIND",
+    "MARICO",
+    "MARUTI",
+    "MAXHEALTH",
+    "MAZDOCK",
+    "MCX",
+    "MFSL",
+    "MOTHERSON",
+    "MOTILALOFS",
+    "MPHASIS",
+    "MUTHOOTFIN",
+    "NAM-INDIA",
+    "NATIONALUM",
+    "NAUKRI",
+    "NBCC",
+    "NESTLEIND",
+    "NHPC",
+    "NMDC",
+    "NTPC",
+    "NUVAMA",
+    "NYKAA",
+    "OBEROIRLTY",
+    "OFSS",
+    "OIL",
+    "ONGC",
+    "PAGEIND",
+    "PATANJALI",
+    "PAYTM",
+    "PERSISTENT",
+    "PETRONET",
+    "PFC",
+    "PGEL",
+    "PHOENIXLTD",
+    "PIDILITIND",
+    "PIIND",
+    "PNB",
+    "PNBHOUSING",
+    "POLICYBZR",
+    "POLYCAB",
+    "POWERGRID",
+    "POWERINDIA",
+    "PREMIERENE",
+    "PRESTIGE",
+    "RADICO",
+    "RBLBANK",
+    "RECLTD",
+    "RELIANCE",
+    "RVNL",
+    "SAIL",
+    "SAMMAANCAP",
+    "SBICARD",
+    "SBILIFE",
+    "SBIN",
+    "SHREECEM",
+    "SHRIRAMFIN",
+    "SIEMENS",
+    "SOLARINDS",
+    "SONACOMS",
+    "SRF",
+    "SUNPHARMA",
+    "SUPREMEIND",
+    "SUZLON",
+    "SWIGGY",
+    "TATACONSUM",
+    "TATAELXSI",
+    "TATAPOWER",
+    "TATASTEEL",
+    "TCS",
+    "TECHM",
+    "TIINDIA",
+    "TITAN",
+    "TMPV",
+    "TORNTPHARM",
+    "TRENT",
+    "TVSMOTOR",
+    "ULTRACEMCO",
+    "UNIONBANK",
+    "UNITDSPR",
+    "UNOMINDA",
+    "UPL",
+    "VBL",
+    "VEDL",
+    "VMM",
+    "VOLTAS",
+    "WAAREEENER",
+    "WIPRO",
+    "YESBANK",
+    "ZYDUSLIFE"
 ]
 
 def calc_vol_pcr(ce_vol, pe_vol): return 0.0 if ce_vol == 0 else round(pe_vol / ce_vol, 2)
@@ -234,8 +427,9 @@ def run_master_scan(token, date_str, cycle_id):
                 except Exception:
                     pass
         except concurrent.futures.TimeoutError:
-            missing_stock_names.append("⚠️ Fyers Server Timeout")
+            pass
             
+    # 🔥 FIX: No-Kill Logic, loop continues even if data is missing 🔥
     for q, oc in results_list:
         s_name = get_raw_symbol(q['n'])
         v = q['v']
@@ -437,304 +631,4 @@ elif app_mode == "📱 Viewer (Mobile Client)":
     if os.path.exists(SHARED_LIVE_DATA_FILE):
         try:
             shared_pack = json.load(open(SHARED_LIVE_DATA_FILE, 'r'))
-            st.session_state.cached_data = shared_pack.get("data", [])
-            last_scan_timestamp = shared_pack.get("time", time.time())
-            st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
-            st.session_state.missing_stocks_list = shared_pack.get("missing", [])
-        except: pass
-    else:
-        st.info("⏳ Waiting for Master Server to fetch data. Master ko on rakhein...")
-        st.session_state.cached_data = []
-
-# ==========================================
-# 7. APP RENDERING (UI & TABLES)
-# ==========================================
-if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
-    
-    def style_indicators(val):
-        if isinstance(val, str): 
-            if "Gap Up" in val: return 'color: #00AA00; font-weight: bold; text-align: center;'
-            if "Gap Down" in val: return 'color: #FF0000; font-weight: bold; text-align: center;'
-            if "Same" in val: return 'color: #00BFFF; font-weight: bold; text-align: center;'
-            return 'text-align: center;'
-        if val > 0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-        elif val < 0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-        return 'color: #888888; font-weight: bold; text-align: center;'
-
-    def style_pcr_columns(val):
-        if isinstance(val, (int, float)):
-            if val >= 1.0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-            elif val > 0 and val < 1.0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-        return 'text-align: center;'
-
-    header_styles = [
-        {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
-        {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
-    ]
-
-    col_menu, col_toggle, col_timer = st.columns([4, 3, 3], vertical_alignment="center")
-    
-    with col_menu:
-        selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
-        
-    with col_toggle:
-        show_pct = st.toggle("📊 Show Checker (%)", value=True)
-        
-    with col_timer:
-        if app_mode == "💻 Master (Data Fetcher)":
-            # 🚀 MASTER TIMER: 310 Seconds Fixed (5 Minutes)
-            # When this hits 0, it forces a complete URL reload, ensuring Streamlit never hangs.
-            rem_secs = 310
-            
-            js_code = f"""
-            <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
-                ⏱️ Next Fetch: <span id="clock"></span>
-            </div>
-            <script>
-                var timeLeft = {rem_secs};
-                var clockTimer = setInterval(function() {{
-                    if(timeLeft <= 0) {{
-                        clearInterval(clockTimer);
-                        document.getElementById('clock').innerHTML = "🔄 Hard Refreshing...";
-                        
-                        /* ADVANCED NATIVE FETCHING LOGIC */
-                        /* Strip URL parameters and force the browser to do a clean refresh */
-                        window.parent.location.href = window.parent.location.href.split('?')[0];
-                        
-                    }} else {{
-                        timeLeft--;
-                        var m = Math.floor(timeLeft / 60);
-                        var s = timeLeft % 60;
-                        document.getElementById('clock').innerHTML = (m < 10 ? "0" + m : m) + ":" + (s < 10 ? "0" + s : s);
-                    }}
-                }}, 1000);
-            </script>
-            """
-            components.html(js_code, height=40)
-        else:
-            ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
-            st.markdown(f"<div style='text-align: right; color: #888888; font-size: 12px; font-weight: bold; margin-top: 8px;'>⏱️ Last: {ref_time}</div>", unsafe_allow_html=True)
-
-    st.divider()
-
-    if selected_tab == "📊 Dashboard":
-        
-        if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
-            missing_str = ", ".join(st.session_state.missing_stocks_list)
-            st.warning(f"⚠️ Fyers API ne in {len(st.session_state.missing_stocks_list)} stocks ka data nahi diya: **{missing_str}**")
-        
-        checker_fmt = '{:+.2f}%' if show_pct else '{:+.2f}'
-        
-        format_dict = {
-            'VOL PCR': '{:.2f}', 
-            'OPTION PCR': '{:.2f}',
-            'VOL CPR': '{:.2f}', 
-            'LTP': '{:.2f}', 
-            'LTP CHANGE': '{:.2f}', 
-            'CHANGE%': '{:+.2f}%', 
-            'CE_CONTRACT': '{:+.1f}%', 
-            'PE_CONTRACT': '{:+.1f}%',
-            'PCR CHECKER': checker_fmt, 
-            'VOL CHECKER': checker_fmt
-        }
-        
-        df = pd.DataFrame(st.session_state.cached_data)
-        
-        if not df.empty:
-            df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
-            df = df.sort_values(by='Conv_Rank', ascending=False)
-            
-            df['VOL CHECKER'] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
-            df['PCR CHECKER'] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
-            
-            df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHECKER', 'VOL CHECKER']]
-            
-            df = df.rename(columns={
-                'SYMS': 'SYMBOL', 
-                'OPEN_STATUS': 'OPENING',
-                'V_PCR': 'VOL PCR',
-                'O_PCR': 'OPTION PCR',
-                'V_CPR': 'VOL CPR', 
-                'LTP_CH': 'LTP CHANGE', 
-                'CHG_%': 'CHANGE%', 
-                'LTP': 'LTP', 
-                'CE_CON': 'CE_CONTRACT', 
-                'PE_CON': 'PE_CONTRACT'
-            })
-
-            styled_df = (df.style.hide(axis="index")
-                         .set_properties(**{'text-align': 'center'})
-                         .format(format_dict)
-                         .set_table_styles(header_styles)
-                         .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
-                         .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
-
-            st.dataframe(
-                styled_df, 
-                use_container_width=True, 
-                height=800, 
-                hide_index=True
-            )
-
-    elif selected_tab == "📈 CHART":
-        # 🚀 Smart Toggle between Laptop and Mobile Screen Layouts
-        col_c1, col_c2, col_c3 = st.columns([1.5, 1.5, 1.5])
-        with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
-        with col_c2: chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True, label_visibility="collapsed")
-        
-        # It automatically sets Laptop mode if you are the Master, and Mobile mode if you are the Viewer!
-        default_device_index = 0 if app_mode == "💻 Master (Data Fetcher)" else 1
-        with col_c3: device_mode = st.radio("Screen Layout:", ["💻 Laptop", "📱 Mobile"], horizontal=True, index=default_device_index, label_visibility="collapsed")
-
-        # 🚀 DYNAMIC CHART HEIGHT CALCULATION 🚀
-        if device_mode == "💻 Laptop":
-            c_main_h = 480      # 👈 Changed to 480 as requested
-            c_iframe_h = 610    # 👈 Adjusted total container height
-        else:
-            c_main_h = 350      # Compact, 350px chart for Mobile
-            c_iframe_h = 470    # Total container height
-
-        if os.path.exists(HISTORY_FILE):
-            try:
-                hist_df = pd.read_csv(HISTORY_FILE)
-                if not hist_df.empty and 'Date' in hist_df.columns:
-                    df_sym = hist_df[(hist_df['Date'] == today_str) & (hist_df['Symbol'] == sel_stock)].copy()
-                    if not df_sym.empty:
-                        df_sym = df_sym.sort_values(by='Time')
-                        
-                        target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
-                        indicator_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF"
-                        
-                        time_list = df_sym['Time'].tolist()
-                        indicator_list = df_sym[target_col].tolist()
-                        ltp_list = df_sym['LTP'].tolist()
-
-                        # 🚀 JS INJECTION: Dynamic Height, Super-Smooth Slider & Custom Toolbar Icons 🚀
-                        apex_html = f"""
-                        <!DOCTYPE html>
-                        <html>
-                        <head>
-                            <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-                            <style> 
-                                body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
-                                .apexcharts-toolbar {{ top: -10px !important; right: auto !important; left: 10px !important; z-index: 10 !important; }}
-                                
-                                /* Anti-Scroll Fix for Mobile Slider: Blocks vertical scroll when swiping */
-                                #chart-slider, #chart-slider * {{ touch-action: none !important; }}
-                            </style>
-                        </head>
-                        <body>
-                            <div id="chart-main"></div>
-                            <div id="chart-slider" style="margin-top: -15px;"></div>
-                            
-                            <script>
-                                var dataIndicator = {json.dumps(indicator_list)};
-                                var dataLTP = {json.dumps(ltp_list)};
-                                var timeCats = {json.dumps(time_list)};
-                                
-                                var optionsMain = {{
-                                    series: [{{
-                                        name: '{chart_mode}',
-                                        type: 'area',
-                                        data: dataIndicator
-                                    }}, {{
-                                        name: 'LTP',
-                                        type: 'line',
-                                        data: dataLTP
-                                    }}],
-                                    chart: {{
-                                        id: 'mainChart',
-                                        height: {c_main_h}, 
-                                        type: 'line',
-                                        /* 🚀 FIXED: Only the Reset icon enabled 🚀 */
-                                        toolbar: {{ 
-                                            show: true, 
-                                            tools: {{ download: false, selection: false, zoom: false, zoomin: false, zoomout: false, pan: false, reset: true }},
-                                            autoSelected: 'pan' 
-                                        }},
-                                        zoom: {{ enabled: true, type: 'x' }},
-                                        animations: {{ enabled: false }}
-                                    }},
-                                    colors: ['{indicator_color}', '#00CC66'],
-                                    stroke: {{ curve: 'smooth', width: [2, 2] }}, 
-                                    fill: {{
-                                        type: ['gradient', 'solid'],
-                                        gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }}
-                                    }},
-                                    dataLabels: {{ enabled: false }},
-                                    xaxis: {{
-                                        categories: timeCats,
-                                        tickAmount: 10,
-                                        labels: {{ style: {{ colors: '#888' }} }},
-                                        tooltip: {{ enabled: false }}
-                                    }},
-                                    yaxis: [
-                                        {{
-                                            title: {{ text: '{chart_mode}', style: {{ color: '{indicator_color}' }} }},
-                                            labels: {{ style: {{ colors: '{indicator_color}' }} }},
-                                        }},
-                                        {{
-                                            opposite: true,
-                                            title: {{ text: 'LTP', style: {{ color: '#00CC66' }} }},
-                                            labels: {{ style: {{ colors: '#00CC66' }} }},
-                                        }}
-                                    ],
-                                    tooltip: {{
-                                        shared: true,
-                                        intersect: false,
-                                        y: {{ formatter: function (y) {{ if (typeof y !== "undefined") {{ return y.toFixed(2); }} return y; }} }}
-                                    }},
-                                    legend: {{ position: 'top', horizontalAlign: 'right' }}
-                                }};
-
-                                var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
-                                chartMain.render();
-
-                                var optionsSlider = {{
-                                    series: [{{
-                                        name: '{chart_mode}',
-                                        data: dataIndicator
-                                    }}],
-                                    chart: {{
-                                        id: 'sliderChart',
-                                        height: 80,
-                                        type: 'area',
-                                        brush: {{ target: 'mainChart', enabled: true }},
-                                        selection: {{ 
-                                            enabled: true,
-                                            xaxis: {{
-                                                min: timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0],
-                                                max: timeCats[timeCats.length - 1]
-                                            }}
-                                        }},
-                                        toolbar: {{ show: false }},
-                                        animations: {{ enabled: false }}
-                                    }},
-                                    colors: ['{indicator_color}'],
-                                    fill: {{
-                                        type: 'gradient',
-                                        gradient: {{ shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.1, stops: [0, 100] }}
-                                    }},
-                                    stroke: {{ curve: 'smooth', width: 1 }},
-                                    dataLabels: {{ enabled: false }},
-                                    xaxis: {{
-                                        categories: timeCats,
-                                        tickAmount: 10,
-                                        labels: {{ show: false }},
-                                        tooltip: {{ enabled: false }}
-                                    }},
-                                    yaxis: {{ show: false, tickAmount: 2 }},
-                                    grid: {{ show: false }}
-                                }};
-
-                                var chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
-                                chartSlider.render();
-                            </script>
-                        </body>
-                        </html>
-                        """
-                        components.html(apex_html, height=c_iframe_h)
-                    else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
-                else: st.info("⏳ Market data hasn't started logging yet today.")
-            except Exception as e: st.error(f"Chart Load Error: {e}")
-        else: st.info("⏳ Chart History file is being prepared... Market hours me data yahan dikhega.")
+            st.session_state
