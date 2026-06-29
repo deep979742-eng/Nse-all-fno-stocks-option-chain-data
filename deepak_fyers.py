@@ -121,17 +121,15 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. APP MODE SELECTION (PERFECTED TIMERS)
+# 4. APP MODE SELECTION
 # ==========================================
 st.sidebar.markdown("### 📱 APP MODE")
 app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
 st.sidebar.markdown("---")
 
 if app_mode == "📱 Viewer (Mobile Client)":
-    # 🔥 Viewer Mode: Palak jhapakte hi 30 Seconds me update hoga 🔥
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 elif app_mode == "💻 Master (Data Fetcher)":
-    # 🔥 Master Mode: Backend soft limit 310s (Native JS karega real 300s me refresh) 🔥
     st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
@@ -217,10 +215,10 @@ def run_master_scan(token, date_str, cycle_id):
         sym = q['n']
         time.sleep(0.4) 
         try:
-            oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
+            oc = fyers.optionchain(data={"symbol": sym, "strikecount": 500, "timestamp": ""})
             if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
                 time.sleep(2.0) 
-                oc = fyers.optionchain(data={"symbol": sym, "strikecount": 150, "timestamp": ""})
+                oc = fyers.optionchain(data={"symbol": sym, "strikecount": 500, "timestamp": ""})
             return q, oc
         except: return q, None
 
@@ -443,6 +441,7 @@ elif app_mode == "📱 Viewer (Mobile Client)":
             shared_pack = json.load(open(SHARED_LIVE_DATA_FILE, 'r'))
             st.session_state.cached_data = shared_pack.get("data", [])
             last_scan_timestamp = shared_pack.get("time", time.time())
+            st.session_state.last_api_call_ts = last_scan_timestamp 
             st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
             st.session_state.missing_stocks_list = shared_pack.get("missing", [])
         except: pass
@@ -482,10 +481,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     with col_toggle: show_pct = st.toggle("📊 Show Checker (%)", value=True)
         
     with col_timer:
-        # 🔥 PERFECT SYNC LOGIC 🔥
         if app_mode == "💻 Master (Data Fetcher)":
             elapsed = time.time() - st.session_state.get('last_api_call_ts', time.time())
-            rem_secs = max(1, int(300 - elapsed)) # Master runs native refresh in exactly 300 seconds
+            rem_secs = max(1, int(300 - elapsed)) 
             
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
@@ -512,8 +510,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             """
             components.html(js_code, height=40)
         else:
-            # Viewer Client: No Native JS Countdown Timer here to avoid loops/fluctuations.
-            # It just refreshes silently via st_autorefresh(30000)
             ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
             st.markdown(f"<div style='text-align: right; color: #888888; font-size: 12px; font-weight: bold; margin-top: 8px;'>⏱️ Master Data: {ref_time}</div>", unsafe_allow_html=True)
 
