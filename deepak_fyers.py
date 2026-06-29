@@ -213,12 +213,13 @@ def run_master_scan(token, date_str, cycle_id):
 
     def fetch_option_chain_fast_local(q):
         sym = q['n']
-        time.sleep(0.4) 
+        time.sleep(0.3) 
         try:
-            oc = fyers.optionchain(data={"symbol": sym, "strikecount": 500, "timestamp": ""})
+            # 🔥 OPTIMIZED STRIKE COUNT: 60 (covers enough active range, avoids massive dead payloads) 🔥
+            oc = fyers.optionchain(data={"symbol": sym, "strikecount": 60, "timestamp": ""})
             if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
-                time.sleep(2.0) 
-                oc = fyers.optionchain(data={"symbol": sym, "strikecount": 500, "timestamp": ""})
+                time.sleep(1.0) 
+                oc = fyers.optionchain(data={"symbol": sym, "strikecount": 60, "timestamp": ""})
             return q, oc
         except: return q, None
 
@@ -249,15 +250,21 @@ def run_master_scan(token, date_str, cycle_id):
             for s in chain:
                 sym_str = str(s.get('symbol', ''))
                 o_type = str(s.get('option_type', ''))
-                if sym_str.endswith('CE') or o_type == 'CE':
-                    c_oi += float(s.get('oi', 0))
-                    c_v += float(s.get('volume', 0))
-                elif sym_str.endswith('PE') or o_type == 'PE':
-                    p_oi += float(s.get('oi', 0))
-                    p_v += float(s.get('volume', 0))
-                    
+                vol = float(s.get('volume', 0))
+                oi = float(s.get('oi', 0))
                 lp_str = round(float(s.get('ltp', 0)), 2)
-                if lp_str > 0: live_ltp_data[sym_str] = lp_str
+                
+                # 🔥 SMART FILTER: GHOST/DEAD STRIKES EXCLUDED 🔥
+                # Only include strikes that have an actual traded price (LTP > 0). This prevents PCR bloat.
+                if lp_str > 0.0:
+                    if sym_str.endswith('CE') or o_type == 'CE':
+                        c_oi += oi
+                        c_v += vol
+                    elif sym_str.endswith('PE') or o_type == 'PE':
+                        p_oi += oi
+                        p_v += vol
+                        
+                    live_ltp_data[sym_str] = lp_str
 
             o_pcr = calc_opt_pcr(c_oi, p_oi)
             v_cpr = calc_vol_cpr(c_v, p_v)
