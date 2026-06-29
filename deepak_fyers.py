@@ -577,7 +577,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             )
 
     elif selected_tab == "📈 CHART":
-        # 🚀 ADDED: Smart Toggle between Laptop and Mobile Screen Layouts 🚀
+        # 🚀 Smart Toggle between Laptop and Mobile Screen Layouts
         col_c1, col_c2, col_c3 = st.columns([1.5, 1.5, 1.5])
         with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
         with col_c2: chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True, label_visibility="collapsed")
@@ -586,13 +586,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         default_device_index = 0 if app_mode == "💻 Master (Data Fetcher)" else 1
         with col_c3: device_mode = st.radio("Screen Layout:", ["💻 Laptop", "📱 Mobile"], horizontal=True, index=default_device_index, label_visibility="collapsed")
 
-        # 🚀 DYNAMIC CHART HEIGHT CALCULATION 🚀
+        # 🚀 DYNAMIC CHART HEIGHT CALCULATION
         if device_mode == "💻 Laptop":
-            c_main_h = 550      # Tall, spacious chart for Laptop
-            c_iframe_h = 680    # Total container height
+            c_main_h = 500      
+            c_iframe_h = 630    
         else:
-            c_main_h = 350      # Compact, 350px chart for Mobile
-            c_iframe_h = 470    # Total container height
+            c_main_h = 350      
+            c_iframe_h = 470    
 
         if os.path.exists(HISTORY_FILE):
             try:
@@ -609,7 +609,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 JS INJECTION: Dynamic Height & Super-Smooth Anti-Scroll Slider 🚀
+                        # 🚀 JS INJECTION: Dynamic Height, Super-Smooth Slider & Custom Toolbar Icons 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -644,11 +644,12 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'mainChart',
-                                        height: {c_main_h}, /* 👈 Dynamically changes based on Laptop/Mobile selection */
+                                        height: {c_main_h},
                                         type: 'line',
+                                        /* 🚀 FIXED: Only the Reset (Refresh) icon will show here, all others are disabled 🚀 */
                                         toolbar: {{ 
                                             show: true, 
-                                            tools: {{ download: false, selection: true, zoom: true, pan: true }},
+                                            tools: {{ download: false, selection: false, zoom: false, zoomin: false, zoomout: false, pan: false, reset: true }},
                                             autoSelected: 'pan' 
                                         }},
                                         zoom: {{ enabled: true, type: 'x' }},
