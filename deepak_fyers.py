@@ -22,7 +22,7 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# CSS - FULLY MOBILE RESPONSIVE, ALIGNMENT & CHART TOUCH FIXES
+# CSS - FULLY MOBILE RESPONSIVE & LAPTOP SCREEN FIT
 css_str = """<style>
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
@@ -46,8 +46,7 @@ css_str = """<style>
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
 
-/* Fix Radio button menu vertical alignment for mobile */
-div[role="radiogroup"] { margin-top: 0px !important; margin-bottom: 0px !important; }
+div[role="radiogroup"] { margin-top: 5px !important; }
 
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
@@ -64,6 +63,7 @@ today_str = now_ist.strftime("%Y-%m-%d")
 HISTORY_FILE = "chart_history.csv"
 SNAPSHOT_FILE = "snapshot_950.json" 
 TOKEN_STORE_FILE = "fyers_token_store.json"
+AUTO_SAVE_FILE = "auto_save_tracker.txt"
 SHARED_LIVE_DATA_FILE = "shared_live_data.json" 
 
 if 'live_base_date' not in st.session_state or st.session_state.live_base_date != today_str:
@@ -81,228 +81,35 @@ def get_gspread_client():
             creds_dict = dict(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
             return gspread.authorize(creds)
-    except Exception: pass
+    except: pass
     return None
 
 # ==========================================
 # 3. STOCK LIST & HELPER FUNCTIONS
 # ==========================================
 raw_symbols = [
-    "NIFTY",
-    "BANKNIFTY",
-    "FINNIFTY",
-    "MIDCPNIFTY",
-    "360ONE",
-    "ABB",
-    "ABCAPITAL",
-    "ADANIENSOL",
-    "ADANIENT",
-    "ADANIGREEN",
-    "ADANIPORTS",
-    "ADANIPOWER",
-    "ALKEM",
-    "AMBER",
-    "AMBUJACEM",
-    "ANGELONE",
-    "APLAPOLLO",
-    "APOLLOHOSP",
-    "ASHOKLEY",
-    "ASIANPAINT",
-    "ASTRAL",
-    "AUBANK",
-    "AUROPHARMA",
-    "AXISBANK",
-    "BAJAJ-AUTO",
-    "BAJAJFINSV",
-    "BAJAJHLDNG",
-    "BAJFINANCE",
-    "BANDHANBNK",
-    "BANKBARODA",
-    "BANKINDIA",
-    "BDL",
-    "BEL",
-    "BHARATFORG",
-    "BHARTIARTL",
-    "BHEL",
-    "BIOCON",
-    "BLUESTARCO",
-    "BOSCHLTD",
-    "BPCL",
-    "BRITANNIA",
-    "BSE",
-    "CAMS",
-    "CANBK",
-    "CDSL",
-    "CGPOWER",
-    "CHOLAFIN",
-    "CIPLA",
-    "COALINDIA",
-    "COCHINSHIP",
-    "COFORGE",
-    "COLPAL",
-    "CONCOR",
-    "CROMPTON",
-    "CUMMINSIND",
-    "DABUR",
-    "DALBHARAT",
-    "DELHIVERY",
-    "DIVISLAB",
-    "DIXON",
-    "DLF",
-    "DMART",
-    "DRREDDY",
-    "EICHERMOT",
-    "ETERNAL",
-    "EXIDEIND",
-    "FEDERALBNK",
-    "FORCEMOT",
-    "FORTIS",
-    "GAIL",
-    "GLENMARK",
-    "GMRAIRPORT",
-    "GODFRYPHLP",
-    "GODREJCP",
-    "GODREJPROP",
-    "GRASIM",
-    "GVT&D",
-    "HAL",
-    "HAVELLS",
-    "HCLTECH",
-    "HDFCAMC",
-    "HDFCBANK",
-    "HDFCLIFE",
-    "HEROMOTOCO",
-    "HINDALCO",
-    "HINDPETRO",
-    "HINDUNILVR",
-    "HINDZINC",
-    "HYUNDAI",
-    "ICICIBANK",
-    "ICICIGI",
-    "ICICIPRULI",
-    "IDEA",
-    "IDFCFIRSTB",
-    "IEX",
-    "INDHOTEL",
-    "INDIANB",
-    "INDIGO",
-    "INDUSINDBK",
-    "INDUSTOWER",
-    "INFY",
-    "INOXWIND",
-    "IOC",
-    "IREDA",
-    "IRFC",
-    "ITC",
-    "JINDALSTEL",
-    "JIOFIN",
-    "JSWENERGY",
-    "JSWSTEEL",
-    "JUBLFOOD",
-    "KALYANKJIL",
-    "KAYNES",
-    "KEI",
-    "KFINTECH",
-    "KOTAKBANK",
-    "KPITTECH",
-    "LAURUSLABS",
-    "LICHSGFIN",
-    "LICI",
-    "LODHA",
-    "LT",
-    "LTF",
-    "LTM",
-    "LUPIN",
-    "M&M",
-    "MANAPPURAM",
-    "MANKIND",
-    "MARICO",
-    "MARUTI",
-    "MAXHEALTH",
-    "MAZDOCK",
-    "MCX",
-    "MFSL",
-    "MOTHERSON",
-    "MOTILALOFS",
-    "MPHASIS",
-    "MUTHOOTFIN",
-    "NAM-INDIA",
-    "NATIONALUM",
-    "NAUKRI",
-    "NBCC",
-    "NESTLEIND",
-    "NHPC",
-    "NMDC",
-    "NTPC",
-    "NUVAMA",
-    "NYKAA",
-    "OBEROIRLTY",
-    "OFSS",
-    "OIL",
-    "ONGC",
-    "PAGEIND",
-    "PATANJALI",
-    "PAYTM",
-    "PERSISTENT",
-    "PETRONET",
-    "PFC",
-    "PGEL",
-    "PHOENIXLTD",
-    "PIDILITIND",
-    "PIIND",
-    "PNB",
-    "PNBHOUSING",
-    "POLICYBZR",
-    "POLYCAB",
-    "POWERGRID",
-    "POWERINDIA",
-    "PREMIERENE",
-    "PRESTIGE",
-    "RADICO",
-    "RBLBANK",
-    "RECLTD",
-    "RELIANCE",
-    "RVNL",
-    "SAIL",
-    "SAMMAANCAP",
-    "SBICARD",
-    "SBILIFE",
-    "SBIN",
-    "SHREECEM",
-    "SHRIRAMFIN",
-    "SIEMENS",
-    "SOLARINDS",
-    "SONACOMS",
-    "SRF",
-    "SUNPHARMA",
-    "SUPREMEIND",
-    "SUZLON",
-    "SWIGGY",
-    "TATACONSUM",
-    "TATAELXSI",
-    "TATAPOWER",
-    "TATASTEEL",
-    "TCS",
-    "TECHM",
-    "TIINDIA",
-    "TITAN",
-    "TMPV",
-    "TORNTPHARM",
-    "TRENT",
-    "TVSMOTOR",
-    "ULTRACEMCO",
-    "UNIONBANK",
-    "UNITDSPR",
-    "UNOMINDA",
-    "UPL",
-    "VBL",
-    "VEDL",
-    "VMM",
-    "VOLTAS",
-    "WAAREEENER",
-    "WIPRO",
-    "YESBANK",
-    "ZYDUSLIFE"
+    "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
+    "ADANIPORTS", "ADANIPOWER", "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP", "ASHOKLEY", "ASIANPAINT", 
+    "ASTRAL", "AUBANK", "AUROPHARMA", "AXISBANK", "BAJAJ-AUTO", "BAJAJFINSV", "BAJAJHLDNG", "BAJFINANCE", "BANDHANBNK", "BANKBARODA", 
+    "BANKINDIA", "BDL", "BEL", "BHARATFORG", "BHARTIARTL", "BHEL", "BIOCON", "BLUESTARCO", "BOSCHLTD", "BPCL", 
+    "BRITANNIA", "BSE", "CAMS", "CANBK", "CDSL", "CGPOWER", "CHOLAFIN", "CIPLA", "COALINDIA", "COCHINSHIP", 
+    "COFORGE", "COLPAL", "CONCOR", "CROMPTON", "CUMMINSIND", "DABUR", "DALBHARAT", "DELHIVERY", "DIVISLAB", "DIXON", 
+    "DLF", "DMART", "DRREDDY", "EICHERMOT", "ETERNAL", "EXIDEIND", "FEDERALBNK", "FORCEMOT", "FORTIS", "GAIL", 
+    "GLENMARK", "GMRAIRPORT", "GODFRYPHLP", "GODREJCP", "GODREJPROP", "GRASIM", "GVT&D", "HAL", "HAVELLS", "HCLTECH", 
+    "HDFCAMC", "HDFCBANK", "HDFCLIFE", "HEROMOTOCO", "HINDALCO", "HINDPETRO", "HINDUNILVR", "HINDZINC", "HYUNDAI", "ICICIBANK", 
+    "ICICIGI", "ICICIPRULI", "IDEA", "IDFCFIRSTB", "IEX", "INDHOTEL", "INDIANB", "INDIGO", "INDUSINDBK", "INDUSTOWER", 
+    "INFY", "INOXWIND", "IOC", "IREDA", "IRFC", "ITC", "JINDALSTEL", "JIOFIN", "JSWENERGY", "JSWSTEEL", 
+    "JUBLFOOD", "KALYANKJIL", "KAYNES", "KEI", "KFINTECH", "KOTAKBANK", "KPITTECH", "LAURUSLABS", "LICHSGFIN", "LICI", 
+    "LODHA", "LT", "LTF", "LTM", "LUPIN", "M&M", "MANAPPURAM", "MANKIND", "MARICO", "MARUTI", 
+    "MAXHEALTH", "MAZDOCK", "MCX", "MFSL", "MOTHERSON", "MOTILALOFS", "MPHASIS", "MUTHOOTFIN", "NAM-INDIA", "NATIONALUM", 
+    "NAUKRI", "NBCC", "NESTLEIND", "NHPC", "NMDC", "NTPC", "NUVAMA", "NYKAA", "OBEROIRLTY", "OFSS", 
+    "OIL", "ONGC", "PAGEIND", "PATANJALI", "PAYTM", "PERSISTENT", "PETRONET", "PFC", "PGEL", "PHOENIXLTD", 
+    "PIDILITIND", "PIIND", "PNB", "PNBHOUSING", "POLICYBZR", "POLYCAB", "POWERGRID", "POWERINDIA", "PREMIERENE", "PRESTIGE", 
+    "RADICO", "RBLBANK", "RECLTD", "RELIANCE", "RVNL", "SAIL", "SAMMAANCAP", "SBICARD", "SBILIFE", "SBIN", 
+    "SHREECEM", "SHRIRAMFIN", "SIEMENS", "SOLARINDS", "SONACOMS", "SRF", "SUNPHARMA", "SUPREMEIND", "SUZLON", "SWIGGY", 
+    "TATACONSUM", "TATAELXSI", "TATAPOWER", "TATASTEEL", "TCS", "TECHM", "TIINDIA", "TITAN", "TMPV", "TORNTPHARM", 
+    "TRENT", "TVSMOTOR", "ULTRACEMCO", "UNIONBANK", "UNITDSPR", "UNOMINDA", "UPL", "VBL", "VEDL", "VMM", 
+    "VOLTAS", "WAAREEENER", "WIPRO", "YESBANK", "ZYDUSLIFE"
 ]
 
 def calc_vol_pcr(ce_vol, pe_vol): return 0.0 if ce_vol == 0 else round(pe_vol / ce_vol, 2)
@@ -322,6 +129,8 @@ st.sidebar.markdown("---")
 
 if app_mode == "📱 Viewer (Mobile Client)":
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
+elif app_mode == "💻 Master (Data Fetcher)":
+    st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
 # 5. DATA SCANNER (Master Fast Engine)
@@ -361,24 +170,27 @@ def run_master_scan(token, date_str, cycle_id):
                             ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
                             ws2.batch_clear(["A2:A100"])
                             saved_date = date_str
-            except Exception: pass
+            except: pass
 
             try:
                 if saved_date == date_str:
                     col_vals = ws2.col_values(1)[1:]
-                    if col_vals:
-                        full_str = "".join(col_vals)
-                        decoded_str = base64.b64decode(full_str).decode('utf-8')
-                        loaded_prices = json.loads(decoded_str)
-                        for k, v in loaded_prices.items():
-                            baseline_prices[k] = round(float(v), 2)
-            except Exception: pass
+                else:
+                    col_vals = ws1.col_values(1)
+                    
+                if col_vals:
+                    full_str = "".join(col_vals)
+                    decoded_str = base64.b64decode(full_str).decode('utf-8')
+                    loaded_prices = json.loads(decoded_str)
+                    for k, v in loaded_prices.items():
+                        baseline_prices[k] = round(float(v), 2)
+            except: pass
 
             try:
                 snap_val = ws2.cell(1, 2).value
                 if snap_val: snap_950 = json.loads(snap_val)
-            except Exception: pass
-        except Exception: pass
+            except: pass
+        except: pass
 
     st.session_state.baseline_count = len(baseline_prices)
     st.session_state.has_snapshot = bool(snap_950)
@@ -403,13 +215,13 @@ def run_master_scan(token, date_str, cycle_id):
         sym = q['n']
         time.sleep(0.3) 
         try:
+            # 🔥 OPTIMIZED STRIKE COUNT: 60 (covers enough active range, avoids massive dead payloads) 🔥
             oc = fyers.optionchain(data={"symbol": sym, "strikecount": 60, "timestamp": ""})
             if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
                 time.sleep(1.0) 
                 oc = fyers.optionchain(data={"symbol": sym, "strikecount": 60, "timestamp": ""})
             return q, oc
-        except Exception: 
-            return q, None
+        except: return q, None
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         future_to_q = {executor.submit(fetch_option_chain_fast_local, q): q for q in all_quotes}
@@ -433,22 +245,25 @@ def run_master_scan(token, date_str, cycle_id):
 
         if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
             chain = oc['data']['optionsChain']
-            
             c_oi, p_oi, c_v, p_v = 0.0, 0.0, 0.0, 0.0
             
             for s in chain:
                 sym_str = str(s.get('symbol', ''))
                 o_type = str(s.get('option_type', ''))
-                
-                if sym_str.endswith('CE') or o_type == 'CE':
-                    c_oi += float(s.get('oi', 0))
-                    c_v += float(s.get('volume', 0))
-                elif sym_str.endswith('PE') or o_type == 'PE':
-                    p_oi += float(s.get('oi', 0))
-                    p_v += float(s.get('volume', 0))
-                    
+                vol = float(s.get('volume', 0))
+                oi = float(s.get('oi', 0))
                 lp_str = round(float(s.get('ltp', 0)), 2)
-                if lp_str > 0: 
+                
+                # 🔥 SMART FILTER: GHOST/DEAD STRIKES EXCLUDED 🔥
+                # Only include strikes that have an actual traded price (LTP > 0). This prevents PCR bloat.
+                if lp_str > 0.0:
+                    if sym_str.endswith('CE') or o_type == 'CE':
+                        c_oi += oi
+                        c_v += vol
+                    elif sym_str.endswith('PE') or o_type == 'PE':
+                        p_oi += oi
+                        p_v += vol
+                        
                     live_ltp_data[sym_str] = lp_str
 
             o_pcr = calc_opt_pcr(c_oi, p_oi)
@@ -466,35 +281,27 @@ def run_master_scan(token, date_str, cycle_id):
                     base = snap_950[s_name]
                     base_pcr_val = base['pcr']
                     base_vol_val = base['vol_cpr']
-                    
                     pcr_abs = o_pcr - base_pcr_val
                     vol_abs = v_cpr - base_vol_val
                     
                     def get_standard_pct(current_val, base_val):
                         if base_val == 0: return 0.0
                         return ((current_val - base_val) / base_val) * 100.0
-                        
                     pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
                     vol_pct = get_standard_pct(v_cpr, base_vol_val)
 
             def get_conv(opt_type_val):
-                if not baseline_prices:
-                    return 0.0
-                    
+                if not baseline_prices: return 0.0
                 strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
                 tot_p, tot_m = 0, 0
                 for stk in strikes:
                     sym = str(stk.get('symbol', ''))
                     lp = round(float(stk.get('ltp', 0)), 2)
                     if lp == 0: continue
-                    
                     diff = 0.0
-                    if sym in baseline_prices:
-                        diff = round(lp - baseline_prices[sym], 2)
-                            
+                    if sym in baseline_prices: diff = round(lp - baseline_prices[sym], 2)
                     if diff > 0.00: tot_p += 1 
                     elif diff < 0.00: tot_m += 1 
-
                 act = tot_p + tot_m
                 if act == 0: return 0.0
                 return round((tot_p / act) * 100, 2) if tot_p >= tot_m else -round((tot_m / act) * 100, 2)
@@ -518,26 +325,10 @@ def run_master_scan(token, date_str, cycle_id):
             ss = client.open("Fyers_EOD_Data")
             ws2 = ss.worksheet("Sheet2")
             ws2.update_cell(1, 2, json.dumps(snap_950))
-        except Exception: pass
+        except: pass
 
     st.session_state.get_live_dump = live_ltp_data
     st.session_state.missing_stocks_list = missing_stock_names 
-
-    if client and not baseline_prices and scan_time_ist.time() >= datetime.time(9, 15) and live_ltp_data:
-        try:
-            ss = client.open("Fyers_EOD_Data")
-            ws2 = ss.worksheet("Sheet2")
-            locked_live_data = {k: round(float(v), 2) for k, v in live_ltp_data.items()}
-            json_str = json.dumps(locked_live_data)
-            b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
-            chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
-            ws2.batch_clear(["A2:A100"])
-            clist2 = ws2.range(f'A2:A{len(chunks)+1}')
-            for i, cell in enumerate(clist2): cell.value = chunks[i]
-            ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
-            ws2.update_cells(clist2)
-        except Exception:
-            pass
 
     if new_csv_rows:
         new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
@@ -561,7 +352,7 @@ if app_mode == "💻 Master (Data Fetcher)":
         try:
             td = json.load(open(TOKEN_STORE_FILE))
             if td.get("date") == today_str: saved_token = td.get("token")
-        except Exception: pass
+        except: pass
 
     if saved_token:
         auth_code = "AUTO_LOGGED_IN"
@@ -581,6 +372,34 @@ if app_mode == "💻 Master (Data Fetcher)":
             else: auth_code = raw_code
 
     st.sidebar.markdown("---")
+    st.sidebar.header("💾 Baseline Save Options")
+
+    def save_eod_data():
+        if 'get_live_dump' in st.session_state:
+            try:
+                live_data = st.session_state.get_live_dump
+                if live_data:
+                    client = get_gspread_client()
+                    if not client: return False
+                    ss = client.open("Fyers_EOD_Data")
+                    ws2 = ss.worksheet("Sheet2")
+                    locked_live_data = {k: round(float(v), 2) for k, v in live_data.items()}
+                    json_str = json.dumps(locked_live_data)
+                    b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+                    chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
+                    ws2.batch_clear(["A2:A100"])
+                    clist2 = ws2.range(f'A2:A{len(chunks)+1}')
+                    for i, cell in enumerate(clist2): cell.value = chunks[i]
+                    ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
+                    ws2.update_cells(clist2)
+                    return True
+            except: pass
+        return False
+
+    if st.sidebar.button("Manual Baseline Save"):
+        if save_eod_data(): 
+            st.sidebar.success("Baseline Saved Successfully!")
+            st.cache_data.clear() 
 
     if auth_code:
         if auth_code != "AUTO_LOGGED_IN":
@@ -609,7 +428,7 @@ if app_mode == "💻 Master (Data Fetcher)":
                 try:
                     shared_pack = {"time": last_scan_timestamp, "data": cached_result, "missing": st.session_state.get('missing_stocks_list', [])}
                     json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
-                except Exception: pass
+                except: pass
             else:
                 if 'cached_data' not in st.session_state: st.session_state.cached_data = []
     else:
@@ -624,7 +443,7 @@ elif app_mode == "📱 Viewer (Mobile Client)":
             last_scan_timestamp = shared_pack.get("time", time.time())
             st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
             st.session_state.missing_stocks_list = shared_pack.get("missing", [])
-        except Exception: pass
+        except: pass
     else:
         st.info("⏳ Waiting for Master Server to fetch data. Master ko on rakhein...")
         st.session_state.cached_data = []
@@ -675,7 +494,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
                         document.getElementById('clock').innerHTML = "RELOADING...";
-                        window.top.location.reload(true);
+                        window.parent.location.href = window.parent.location.href.split('?')[0];
                     }} else {{
                         timeLeft--;
                         var m = Math.floor(timeLeft / 60);
@@ -781,37 +600,23 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🔥 FIX 1 & 2: MAIN CHART ZOOM DISABLED & SMOOTH HARDWARE-ACCELERATED SLIDER 🔥
+                        # 🔥 APPLYING ONLY THE REQUESTED FIXES TO YOUR CODE 🔥
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
                         <head>
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
-                                body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; position: relative; }} 
+                                body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
                                 
-                                .apexcharts-toolbar {{ display: none !important; }} /* Old toolbar disabled */
+                                /* Toolbar pushed slightly down so Reset button does not cut */
+                                .apexcharts-toolbar {{ top: 5px !important; right: 15px !important; z-index: 10 !important; }}
                                 
-                                /* 🔥 SUPER SMOOTH MOBILE SLIDER 🔥: Completely blocks page scrolling when using slider */
-                                #chart-slider, #chart-slider * {{ 
-                                    touch-action: none !important; 
-                                    -webkit-touch-callout: none !important; 
-                                    user-select: none !important; 
-                                    -webkit-user-select: none !important;
-                                }}
-                                
-                                /* Custom Reset Button */
-                                #custom-reset-btn {{
-                                    position: absolute; top: 10px; right: 15px; z-index: 9999;
-                                    background-color: #f1f1f1; border: 1px solid #ccc; border-radius: 4px;
-                                    padding: 4px 8px; font-size: 12px; font-weight: bold; color: #333;
-                                    cursor: pointer; box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
-                                }}
-                                #custom-reset-btn:hover {{ background-color: #e0e0e0; }}
+                                /* 🔥 SLIDER HANG FIX: Pure CSS touch-action to prevent jitter/hanging on mobile */
+                                #chart-slider .apexcharts-inner {{ touch-action: none !important; }}
                             </style>
                         </head>
                         <body>
-                            <button id="custom-reset-btn">🔄 Reset</button>
                             <div id="chart-main"></div>
                             <div id="chart-slider" style="margin-top: -15px;"></div>
                             
@@ -834,13 +639,32 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         id: 'mainChart',
                                         height: {c_main_h}, 
                                         type: 'line',
-                                        toolbar: {{ show: false }},
-                                        
-                                        /* 🔥 FIX 1: JAD SE ZOOM BAND (Chart on top will not zoom on touch) 🔥 */
-                                        zoom: {{ enabled: false }}, 
-                                        selection: {{ enabled: false }},
-                                        
-                                        animations: {{ enabled: false }}
+                                        /* 🚀 FIXED: Only the Reset icon enabled 🚀 */
+                                        toolbar: {{ 
+                                            show: true, 
+                                            tools: {{ download: false, selection: false, zoom: false, zoomin: false, zoomout: false, pan: false, reset: true }},
+                                            autoSelected: 'pan' 
+                                        }},
+                                        /* 🔥 MAIN CHART ZOOM DISABLED SO IT DOES NOT ZOOM ON TOUCH 🔥 */
+                                        zoom: {{ enabled: false }},
+                                        animations: {{ enabled: false }},
+                                        events: {{
+                                            /* 🟢 Perfect Reset Logic - Only resets Chart, not the Webpage */
+                                            beforeResetZoom: function(chartContext, opts) {{
+                                                if(window.chartSlider) {{
+                                                    window.chartSlider.updateOptions({{
+                                                        chart: {{
+                                                            selection: {{
+                                                                xaxis: {{
+                                                                    min: timeCats[0],
+                                                                    max: timeCats[timeCats.length - 1]
+                                                                }}
+                                                            }}
+                                                        }}
+                                                    }});
+                                                }}
+                                            }}
+                                        }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
                                     stroke: {{ curve: 'smooth', width: [2, 2] }}, 
@@ -916,22 +740,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
                                 window.chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
                                 window.chartSlider.render();
-                                
-                                /* 🔄 Custom Reset Button Logic */
-                                document.getElementById('custom-reset-btn').addEventListener('click', function() {{
-                                    if(window.chartSlider) {{
-                                        window.chartSlider.updateOptions({{
-                                            chart: {{
-                                                selection: {{
-                                                    xaxis: {{
-                                                        min: timeCats[0],
-                                                        max: timeCats[timeCats.length - 1]
-                                                    }}
-                                                }}
-                                            }}
-                                        }});
-                                    }}
-                                }});
                             </script>
                         </body>
                         </html>
