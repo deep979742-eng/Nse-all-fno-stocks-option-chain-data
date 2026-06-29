@@ -22,7 +22,7 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# CSS - FULLY MOBILE RESPONSIVE & LAPTOP SCREEN FIT
+# CSS - FULLY MOBILE RESPONSIVE, ALIGNMENT & CHART TOUCH FIXES
 css_str = """<style>
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
@@ -46,7 +46,8 @@ css_str = """<style>
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
 
-div[role="radiogroup"] { margin-top: 5px !important; }
+/* Fix Radio button menu vertical alignment for mobile */
+div[role="radiogroup"] { margin-top: 0px !important; margin-bottom: 0px !important; }
 
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
@@ -63,7 +64,6 @@ today_str = now_ist.strftime("%Y-%m-%d")
 HISTORY_FILE = "chart_history.csv"
 SNAPSHOT_FILE = "snapshot_950.json" 
 TOKEN_STORE_FILE = "fyers_token_store.json"
-AUTO_SAVE_FILE = "auto_save_tracker.txt"
 SHARED_LIVE_DATA_FILE = "shared_live_data.json" 
 
 if 'live_base_date' not in st.session_state or st.session_state.live_base_date != today_str:
@@ -145,6 +145,9 @@ def run_master_scan(token, date_str, cycle_id):
     snapshot_changed = False
     saved_date = None
     
+    # ---------------------------------------------------------
+    # GOOGLE SHEETS READ LOGIC
+    # ---------------------------------------------------------
     client = get_gspread_client()
     if client:
         try:
@@ -174,15 +177,12 @@ def run_master_scan(token, date_str, cycle_id):
             try:
                 if saved_date == date_str:
                     col_vals = ws2.col_values(1)[1:]
-                else:
-                    col_vals = ws1.col_values(1)
-                    
-                if col_vals:
-                    full_str = "".join(col_vals)
-                    decoded_str = base64.b64decode(full_str).decode('utf-8')
-                    loaded_prices = json.loads(decoded_str)
-                    for k, v in loaded_prices.items():
-                        baseline_prices[k] = round(float(v), 2)
+                    if col_vals:
+                        full_str = "".join(col_vals)
+                        decoded_str = base64.b64decode(full_str).decode('utf-8')
+                        loaded_prices = json.loads(decoded_str)
+                        for k, v in loaded_prices.items():
+                            baseline_prices[k] = round(float(v), 2)
             except: pass
 
             try:
@@ -194,6 +194,9 @@ def run_master_scan(token, date_str, cycle_id):
     st.session_state.baseline_count = len(baseline_prices)
     st.session_state.has_snapshot = bool(snap_950)
 
+    # ---------------------------------------------------------
+    # FYERS DATA FETCHING
+    # ---------------------------------------------------------
     all_quotes = []
     for i in range(0, len(raw_symbols), 50):
         batch = raw_symbols[i:i+50]
@@ -288,7 +291,7 @@ def run_master_scan(token, date_str, cycle_id):
                     vol_pct = get_standard_pct(v_cpr, base_vol_val)
 
             def get_conv(opt_type_val):
-                if scan_time_ist.time() < datetime.time(9, 20):
+                if not baseline_prices:
                     return 0.0
                     
                 strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
@@ -333,6 +336,25 @@ def run_master_scan(token, date_str, cycle_id):
     st.session_state.get_live_dump = live_ltp_data
     st.session_state.missing_stocks_list = missing_stock_names 
 
+    # ---------------------------------------------------------
+    # 🔥 AUTOMATIC CE/PE BASELINE SAVE LOGIC (9:15 AM+)
+    # ---------------------------------------------------------
+    if client and not baseline_prices and scan_time_ist.time() >= datetime.time(9, 15) and live_ltp_data:
+        try:
+            ss = client.open("Fyers_EOD_Data")
+            ws2 = ss.worksheet("Sheet2")
+            locked_live_data = {k: round(float(v), 2) for k, v in live_ltp_data.items()}
+            json_str = json.dumps(locked_live_data)
+            b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+            chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
+            ws2.batch_clear(["A2:A100"])
+            clist2 = ws2.range(f'A2:A{len(chunks)+1}')
+            for i, cell in enumerate(clist2): cell.value = chunks[i]
+            ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
+            ws2.update_cells(clist2)
+        except Exception:
+            pass
+
     if new_csv_rows:
         new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
         if not os.path.isfile(HISTORY_FILE): new_df.to_csv(HISTORY_FILE, index=False)
@@ -375,34 +397,6 @@ if app_mode == "💻 Master (Data Fetcher)":
             else: auth_code = raw_code
 
     st.sidebar.markdown("---")
-    st.sidebar.header("💾 9:17 AM Intraday Baseline Save")
-
-    def save_eod_data():
-        if 'get_live_dump' in st.session_state:
-            try:
-                live_data = st.session_state.get_live_dump
-                if live_data:
-                    client = get_gspread_client()
-                    if not client: return False
-                    ss = client.open("Fyers_EOD_Data")
-                    ws2 = ss.worksheet("Sheet2")
-                    locked_live_data = {k: round(float(v), 2) for k, v in live_data.items()}
-                    json_str = json.dumps(locked_live_data)
-                    b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
-                    chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
-                    ws2.batch_clear(["A2:A100"])
-                    clist2 = ws2.range(f'A2:A{len(chunks)+1}')
-                    for i, cell in enumerate(clist2): cell.value = chunks[i]
-                    ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
-                    ws2.update_cells(clist2)
-                    return True
-            except: pass
-        return False
-
-    if st.sidebar.button("Manual 9:17 AM Save"):
-        if save_eod_data(): 
-            st.sidebar.success("Baseline Saved Successfully!")
-            st.cache_data.clear() 
 
     # --- MASTER EXECUTION LOGIC ---
     if auth_code:
@@ -445,12 +439,6 @@ if app_mode == "💻 Master (Data Fetcher)":
                     shared_pack = {"time": last_scan_timestamp, "data": cached_result, "missing": st.session_state.get('missing_stocks_list', [])}
                     json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
                 except: pass
-                
-                if datetime.time(9, 17) <= now_ist.time() < datetime.time(9, 20):
-                    last_save = open(AUTO_SAVE_FILE, "r").read().strip() if os.path.exists(AUTO_SAVE_FILE) else ""
-                    if last_save != today_str:
-                        if save_eod_data(): 
-                            open(AUTO_SAVE_FILE, "w").write(today_str)
             else:
                 if 'cached_data' not in st.session_state: st.session_state.cached_data = []
     else:
@@ -471,7 +459,7 @@ elif app_mode == "📱 Viewer (Mobile Client)":
         st.session_state.cached_data = []
 
 # ==========================================
-# 7. APP RENDERING (SINGLE LINE UI & TABLES)
+# 7. APP RENDERING (UI & TABLES)
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
@@ -496,13 +484,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
     ]
 
-    col_menu, col_search, col_toggle, col_timer = st.columns([3, 2, 2.5, 2.5], gap="small")
+    col_menu, col_toggle, col_timer = st.columns([4, 3, 3], vertical_alignment="center")
     
     with col_menu:
-        selected_tab = st.radio("Menu", ["📊 Dashboard", "🌐 NiftyTrader", "📈 CHART"], horizontal=True, label_visibility="collapsed")
-        
-    with col_search:
-        search_query = st.text_input("Search", placeholder="🔍 Search Stock...", label_visibility="collapsed").upper()
+        selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
         
     with col_toggle:
         show_pct = st.toggle("📊 Show Checker (%)", value=True)
@@ -534,7 +519,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             """
             components.html(js_code, height=40)
         else:
-            mode_text = "Viewer"
             ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
             st.markdown(f"<div style='text-align: right; color: #888888; font-size: 12px; font-weight: bold; margin-top: 8px;'>⏱️ Last: {ref_time}</div>", unsafe_allow_html=True)
 
@@ -563,9 +547,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
         df = pd.DataFrame(st.session_state.cached_data)
         
-        if search_query: 
-            df = df[df['SYMS'].str.contains(search_query, na=False)]
-            
         if not df.empty:
             df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
             df = df.sort_values(by='Conv_Rank', ascending=False)
@@ -602,13 +583,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 hide_index=True
             )
 
-    elif selected_tab == "🌐 NiftyTrader":
-        st.markdown("### 🌐 NiftyTrader Live Options Chart")
-        selected_nt_stock = st.selectbox("Select Stock for Chart:", raw_symbols, index=0, key="nt_stock")
-        nt_url = f"https://www.niftytrader.in/stock-options-chart/{selected_nt_stock.lower()}"
-        st.markdown("<br>", unsafe_allow_html=True)
-        st.markdown(f"### **[👉 Click Here to Open {selected_nt_stock} NiftyTrader Chart]({nt_url})**")
-
     elif selected_tab == "📈 CHART":
         col_c1, col_c2 = st.columns([2, 2])
         with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
@@ -629,15 +603,17 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 JS INJECTION: 80px Slider Height & Pan Default (No Auto-Zoom on Touch) 🚀
+                        # 🚀 JS INJECTION: 350px Main Height & Horizontal Swiping Touch Support 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
                         <head>
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
-                                body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
+                                body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; touch-action: pan-y; }} 
                                 .apexcharts-toolbar {{ top: -10px !important; right: auto !important; left: 10px !important; z-index: 10 !important; }}
+                                /* Force horizontal swiping action for the slider */
+                                #chart-slider .apexcharts-inner, .apexcharts-selection-rect {{ touch-action: pan-x !important; }}
                             </style>
                         </head>
                         <body>
@@ -661,13 +637,14 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }}],
                                     chart: {{
                                         id: 'mainChart',
-                                        height: 400,
+                                        height: 350, /* 👈 Height is now exactly 350px */
                                         type: 'line',
                                         toolbar: {{ 
                                             show: true, 
                                             tools: {{ download: false, selection: true, zoom: true, pan: true }},
-                                            autoSelected: 'pan' /* 👈 FIXED: Prevents auto-zoom box on mobile touch */
+                                            autoSelected: 'pan' 
                                         }},
+                                        zoom: {{ enabled: true, type: 'x' }},
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
@@ -705,7 +682,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                // 🚀 FIXED: Height set to exactly 80px 🚀
                                 var optionsSlider = {{
                                     series: [{{
                                         name: '{chart_mode}',
@@ -749,7 +725,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </body>
                         </html>
                         """
-                        components.html(apex_html, height=510)
+                        components.html(apex_html, height=460)
                     else: st.info(f"⏳ Waiting for Market Data for {sel_stock}. Today's data starts logging at 9:15 AM.")
                 else: st.info("⏳ Market data hasn't started logging yet today.")
             except Exception as e: st.error(f"Chart Load Error: {e}")
