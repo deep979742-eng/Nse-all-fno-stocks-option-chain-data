@@ -22,7 +22,7 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# CSS - FULLY MOBILE RESPONSIVE, ALIGNMENT & CHART TOUCH FIXES
+# CSS - FULLY MOBILE RESPONSIVE
 css_str = """<style>
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
@@ -81,36 +81,228 @@ def get_gspread_client():
             creds_dict = dict(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
             return gspread.authorize(creds)
-    except Exception: 
-        pass
+    except Exception: pass
     return None
 
 # ==========================================
 # 3. STOCK LIST & HELPER FUNCTIONS
 # ==========================================
 raw_symbols = [
-    "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
-    "ADANIPORTS", "ADANIPOWER", "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP", "ASHOKLEY", "ASIANPAINT", 
-    "ASTRAL", "AUBANK", "AUROPHARMA", "AXISBANK", "BAJAJ-AUTO", "BAJAJFINSV", "BAJAJHLDNG", "BAJFINANCE", "BANDHANBNK", "BANKBARODA", 
-    "BANKINDIA", "BDL", "BEL", "BHARATFORG", "BHARTIARTL", "BHEL", "BIOCON", "BLUESTARCO", "BOSCHLTD", "BPCL", 
-    "BRITANNIA", "BSE", "CAMS", "CANBK", "CDSL", "CGPOWER", "CHOLAFIN", "CIPLA", "COALINDIA", "COCHINSHIP", 
-    "COFORGE", "COLPAL", "CONCOR", "CROMPTON", "CUMMINSIND", "DABUR", "DALBHARAT", "DELHIVERY", "DIVISLAB", "DIXON", 
-    "DLF", "DMART", "DRREDDY", "EICHERMOT", "ETERNAL", "EXIDEIND", "FEDERALBNK", "FORCEMOT", "FORTIS", "GAIL", 
-    "GLENMARK", "GMRAIRPORT", "GODFRYPHLP", "GODREJCP", "GODREJPROP", "GRASIM", "GVT&D", "HAL", "HAVELLS", "HCLTECH", 
-    "HDFCAMC", "HDFCBANK", "HDFCLIFE", "HEROMOTOCO", "HINDALCO", "HINDPETRO", "HINDUNILVR", "HINDZINC", "HYUNDAI", "ICICIBANK", 
-    "ICICIGI", "ICICIPRULI", "IDEA", "IDFCFIRSTB", "IEX", "INDHOTEL", "INDIANB", "INDIGO", "INDUSINDBK", "INDUSTOWER", 
-    "INFY", "INOXWIND", "IOC", "IREDA", "IRFC", "ITC", "JINDALSTEL", "JIOFIN", "JSWENERGY", "JSWSTEEL", 
-    "JUBLFOOD", "KALYANKJIL", "KAYNES", "KEI", "KFINTECH", "KOTAKBANK", "KPITTECH", "LAURUSLABS", "LICHSGFIN", "LICI", 
-    "LODHA", "LT", "LTF", "LTM", "LUPIN", "M&M", "MANAPPURAM", "MANKIND", "MARICO", "MARUTI", 
-    "MAXHEALTH", "MAZDOCK", "MCX", "MFSL", "MOTHERSON", "MOTILALOFS", "MPHASIS", "MUTHOOTFIN", "NAM-INDIA", "NATIONALUM", 
-    "NAUKRI", "NBCC", "NESTLEIND", "NHPC", "NMDC", "NTPC", "NUVAMA", "NYKAA", "OBEROIRLTY", "OFSS", 
-    "OIL", "ONGC", "PAGEIND", "PATANJALI", "PAYTM", "PERSISTENT", "PETRONET", "PFC", "PGEL", "PHOENIXLTD", 
-    "PIDILITIND", "PIIND", "PNB", "PNBHOUSING", "POLICYBZR", "POLYCAB", "POWERGRID", "POWERINDIA", "PREMIERENE", "PRESTIGE", 
-    "RADICO", "RBLBANK", "RECLTD", "RELIANCE", "RVNL", "SAIL", "SAMMAANCAP", "SBICARD", "SBILIFE", "SBIN", 
-    "SHREECEM", "SHRIRAMFIN", "SIEMENS", "SOLARINDS", "SONACOMS", "SRF", "SUNPHARMA", "SUPREMEIND", "SUZLON", "SWIGGY", 
-    "TATACONSUM", "TATAELXSI", "TATAPOWER", "TATASTEEL", "TCS", "TECHM", "TIINDIA", "TITAN", "TMPV", "TORNTPHARM", 
-    "TRENT", "TVSMOTOR", "ULTRACEMCO", "UNIONBANK", "UNITDSPR", "UNOMINDA", "UPL", "VBL", "VEDL", "VMM", 
-    "VOLTAS", "WAAREEENER", "WIPRO", "YESBANK", "ZYDUSLIFE"
+    "NIFTY",
+    "BANKNIFTY",
+    "FINNIFTY",
+    "MIDCPNIFTY",
+    "360ONE",
+    "ABB",
+    "ABCAPITAL",
+    "ADANIENSOL",
+    "ADANIENT",
+    "ADANIGREEN",
+    "ADANIPORTS",
+    "ADANIPOWER",
+    "ALKEM",
+    "AMBER",
+    "AMBUJACEM",
+    "ANGELONE",
+    "APLAPOLLO",
+    "APOLLOHOSP",
+    "ASHOKLEY",
+    "ASIANPAINT",
+    "ASTRAL",
+    "AUBANK",
+    "AUROPHARMA",
+    "AXISBANK",
+    "BAJAJ-AUTO",
+    "BAJAJFINSV",
+    "BAJAJHLDNG",
+    "BAJFINANCE",
+    "BANDHANBNK",
+    "BANKBARODA",
+    "BANKINDIA",
+    "BDL",
+    "BEL",
+    "BHARATFORG",
+    "BHARTIARTL",
+    "BHEL",
+    "BIOCON",
+    "BLUESTARCO",
+    "BOSCHLTD",
+    "BPCL",
+    "BRITANNIA",
+    "BSE",
+    "CAMS",
+    "CANBK",
+    "CDSL",
+    "CGPOWER",
+    "CHOLAFIN",
+    "CIPLA",
+    "COALINDIA",
+    "COCHINSHIP",
+    "COFORGE",
+    "COLPAL",
+    "CONCOR",
+    "CROMPTON",
+    "CUMMINSIND",
+    "DABUR",
+    "DALBHARAT",
+    "DELHIVERY",
+    "DIVISLAB",
+    "DIXON",
+    "DLF",
+    "DMART",
+    "DRREDDY",
+    "EICHERMOT",
+    "ETERNAL",
+    "EXIDEIND",
+    "FEDERALBNK",
+    "FORCEMOT",
+    "FORTIS",
+    "GAIL",
+    "GLENMARK",
+    "GMRAIRPORT",
+    "GODFRYPHLP",
+    "GODREJCP",
+    "GODREJPROP",
+    "GRASIM",
+    "GVT&D",
+    "HAL",
+    "HAVELLS",
+    "HCLTECH",
+    "HDFCAMC",
+    "HDFCBANK",
+    "HDFCLIFE",
+    "HEROMOTOCO",
+    "HINDALCO",
+    "HINDPETRO",
+    "HINDUNILVR",
+    "HINDZINC",
+    "HYUNDAI",
+    "ICICIBANK",
+    "ICICIGI",
+    "ICICIPRULI",
+    "IDEA",
+    "IDFCFIRSTB",
+    "IEX",
+    "INDHOTEL",
+    "INDIANB",
+    "INDIGO",
+    "INDUSINDBK",
+    "INDUSTOWER",
+    "INFY",
+    "INOXWIND",
+    "IOC",
+    "IREDA",
+    "IRFC",
+    "ITC",
+    "JINDALSTEL",
+    "JIOFIN",
+    "JSWENERGY",
+    "JSWSTEEL",
+    "JUBLFOOD",
+    "KALYANKJIL",
+    "KAYNES",
+    "KEI",
+    "KFINTECH",
+    "KOTAKBANK",
+    "KPITTECH",
+    "LAURUSLABS",
+    "LICHSGFIN",
+    "LICI",
+    "LODHA",
+    "LT",
+    "LTF",
+    "LTM",
+    "LUPIN",
+    "M&M",
+    "MANAPPURAM",
+    "MANKIND",
+    "MARICO",
+    "MARUTI",
+    "MAXHEALTH",
+    "MAZDOCK",
+    "MCX",
+    "MFSL",
+    "MOTHERSON",
+    "MOTILALOFS",
+    "MPHASIS",
+    "MUTHOOTFIN",
+    "NAM-INDIA",
+    "NATIONALUM",
+    "NAUKRI",
+    "NBCC",
+    "NESTLEIND",
+    "NHPC",
+    "NMDC",
+    "NTPC",
+    "NUVAMA",
+    "NYKAA",
+    "OBEROIRLTY",
+    "OFSS",
+    "OIL",
+    "ONGC",
+    "PAGEIND",
+    "PATANJALI",
+    "PAYTM",
+    "PERSISTENT",
+    "PETRONET",
+    "PFC",
+    "PGEL",
+    "PHOENIXLTD",
+    "PIDILITIND",
+    "PIIND",
+    "PNB",
+    "PNBHOUSING",
+    "POLICYBZR",
+    "POLYCAB",
+    "POWERGRID",
+    "POWERINDIA",
+    "PREMIERENE",
+    "PRESTIGE",
+    "RADICO",
+    "RBLBANK",
+    "RECLTD",
+    "RELIANCE",
+    "RVNL",
+    "SAIL",
+    "SAMMAANCAP",
+    "SBICARD",
+    "SBILIFE",
+    "SBIN",
+    "SHREECEM",
+    "SHRIRAMFIN",
+    "SIEMENS",
+    "SOLARINDS",
+    "SONACOMS",
+    "SRF",
+    "SUNPHARMA",
+    "SUPREMEIND",
+    "SUZLON",
+    "SWIGGY",
+    "TATACONSUM",
+    "TATAELXSI",
+    "TATAPOWER",
+    "TATASTEEL",
+    "TCS",
+    "TECHM",
+    "TIINDIA",
+    "TITAN",
+    "TMPV",
+    "TORNTPHARM",
+    "TRENT",
+    "TVSMOTOR",
+    "ULTRACEMCO",
+    "UNIONBANK",
+    "UNITDSPR",
+    "UNOMINDA",
+    "UPL",
+    "VBL",
+    "VEDL",
+    "VMM",
+    "VOLTAS",
+    "WAAREEENER",
+    "WIPRO",
+    "YESBANK",
+    "ZYDUSLIFE"
 ]
 
 def calc_vol_pcr(ce_vol, pe_vol): return 0.0 if ce_vol == 0 else round(pe_vol / ce_vol, 2)
@@ -129,7 +321,6 @@ app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)"
 st.sidebar.markdown("---")
 
 if app_mode == "📱 Viewer (Mobile Client)":
-    # Viewer relies on soft refresh every 30s to stay light and responsive
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 
 # ==========================================
@@ -146,9 +337,6 @@ def run_master_scan(token, date_str, cycle_id):
     snapshot_changed = False
     saved_date = None
     
-    # ---------------------------------------------------------
-    # GOOGLE SHEETS READ LOGIC
-    # ---------------------------------------------------------
     client = get_gspread_client()
     if client:
         try:
@@ -173,8 +361,7 @@ def run_master_scan(token, date_str, cycle_id):
                             ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
                             ws2.batch_clear(["A2:A100"])
                             saved_date = date_str
-            except Exception: 
-                pass
+            except Exception: pass
 
             try:
                 if saved_date == date_str:
@@ -185,23 +372,17 @@ def run_master_scan(token, date_str, cycle_id):
                         loaded_prices = json.loads(decoded_str)
                         for k, v in loaded_prices.items():
                             baseline_prices[k] = round(float(v), 2)
-            except Exception: 
-                pass
+            except Exception: pass
 
             try:
                 snap_val = ws2.cell(1, 2).value
                 if snap_val: snap_950 = json.loads(snap_val)
-            except Exception: 
-                pass
-        except Exception: 
-            pass
+            except Exception: pass
+        except Exception: pass
 
     st.session_state.baseline_count = len(baseline_prices)
     st.session_state.has_snapshot = bool(snap_950)
 
-    # ---------------------------------------------------------
-    # FYERS DATA FETCHING
-    # ---------------------------------------------------------
     all_quotes = []
     for i in range(0, len(raw_symbols), 50):
         batch = raw_symbols[i:i+50]
@@ -230,7 +411,6 @@ def run_master_scan(token, date_str, cycle_id):
         except Exception: 
             return q, None
 
-    # NO-KILL LOGIC: ThreadPool keeps going even if one fetch timeouts
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         future_to_q = {executor.submit(fetch_option_chain_fast_local, q): q for q in all_quotes}
         try:
@@ -241,7 +421,7 @@ def run_master_scan(token, date_str, cycle_id):
                 except Exception:
                     pass
         except concurrent.futures.TimeoutError:
-            missing_stock_names.append("⚠️ Fyers Server Timeout")
+            missing_stock_names.append("⚠️ Fyers Timeout")
             
     for q, oc in results_list:
         s_name = get_raw_symbol(q['n'])
@@ -251,7 +431,6 @@ def run_master_scan(token, date_str, cycle_id):
         float_c = float(v.get('prev_close_price', 0))
         open_status = "NA" if open_p == 0 or float_c == 0 else "Gap Up 🔼" if open_p > float_c else "Gap Down 🔽" if open_p < float_c else "Same ➖"
 
-        # NO-KILL LOGIC: Safely appends missing stocks with NA instead of crashing
         if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
             chain = oc['data']['optionsChain']
             
@@ -334,21 +513,16 @@ def run_master_scan(token, date_str, cycle_id):
             missing_stock_names.append(s_name) 
             final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
 
-    # 🔥 FIX: PROPER INDENTATION FOR TRY/EXCEPT SO PYTHON PARSER DOES NOT THROW ERROR 🔥
     if snapshot_changed and client:
         try:
             ss = client.open("Fyers_EOD_Data")
             ws2 = ss.worksheet("Sheet2")
             ws2.update_cell(1, 2, json.dumps(snap_950))
-        except Exception:
-            pass
+        except Exception: pass
 
     st.session_state.get_live_dump = live_ltp_data
     st.session_state.missing_stocks_list = missing_stock_names 
 
-    # ---------------------------------------------------------
-    # 🔥 AUTOMATIC CE/PE BASELINE SAVE LOGIC (9:15 AM+)
-    # ---------------------------------------------------------
     if client and not baseline_prices and scan_time_ist.time() >= datetime.time(9, 15) and live_ltp_data:
         try:
             ss = client.open("Fyers_EOD_Data")
@@ -362,8 +536,7 @@ def run_master_scan(token, date_str, cycle_id):
             for i, cell in enumerate(clist2): cell.value = chunks[i]
             ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
             ws2.update_cells(clist2)
-        except Exception:
-            pass
+        except Exception: pass
 
     if new_csv_rows:
         new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
@@ -387,8 +560,7 @@ if app_mode == "💻 Master (Data Fetcher)":
         try:
             td = json.load(open(TOKEN_STORE_FILE))
             if td.get("date") == today_str: saved_token = td.get("token")
-        except Exception: 
-            pass
+        except Exception: pass
 
     if saved_token:
         auth_code = "AUTO_LOGGED_IN"
@@ -409,7 +581,6 @@ if app_mode == "💻 Master (Data Fetcher)":
 
     st.sidebar.markdown("---")
 
-    # --- MASTER EXECUTION LOGIC ---
     if auth_code:
         if auth_code != "AUTO_LOGGED_IN":
             try:
@@ -437,8 +608,7 @@ if app_mode == "💻 Master (Data Fetcher)":
                 try:
                     shared_pack = {"time": last_scan_timestamp, "data": cached_result, "missing": st.session_state.get('missing_stocks_list', [])}
                     json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
-                except Exception: 
-                    pass
+                except Exception: pass
             else:
                 if 'cached_data' not in st.session_state: st.session_state.cached_data = []
     else:
@@ -453,8 +623,7 @@ elif app_mode == "📱 Viewer (Mobile Client)":
             last_scan_timestamp = shared_pack.get("time", time.time())
             st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
             st.session_state.missing_stocks_list = shared_pack.get("missing", [])
-        except Exception: 
-            pass
+        except Exception: pass
     else:
         st.info("⏳ Waiting for Master Server to fetch data. Master ko on rakhein...")
         st.session_state.cached_data = []
@@ -495,7 +664,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
     with col_timer:
         if app_mode == "💻 Master (Data Fetcher)":
-            # 🔥 FIX 1: Ultimate Non-Hanging Hard Reload - window.top.location.reload(true) 🔥
+            # 🚀 MASTER TIMER: 310 Seconds Fixed (5 Minutes) Native Hard Reload
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Fetching Natively: <span id="clock"></span>
@@ -507,7 +676,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         clearInterval(clockTimer);
                         document.getElementById('clock').innerHTML = "RELOADING...";
                         
-                        /* Deep Refresh: Bypasses browser cache, fully clears memory! */
+                        /* Deep Native Reload to prevent Hanging */
                         window.top.location.reload(true);
                         
                     }} else {{
@@ -586,21 +755,18 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             )
 
     elif selected_tab == "📈 CHART":
-        # 🚀 Smart Toggle between Laptop and Mobile Screen Layouts
         col_c1, col_c2, col_c3 = st.columns([1.5, 1.5, 1.5])
         with col_c1: sel_stock = st.selectbox("Select Stock for Trend:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
         with col_c2: chart_mode = st.radio("SWITCH CHART VIEW:", ["Vol CPR", "Option PCR"], horizontal=True, label_visibility="collapsed")
         
-        # It automatically sets Laptop mode if you are the Master, and Mobile mode if you are the Viewer!
         default_device_index = 0 if app_mode == "💻 Master (Data Fetcher)" else 1
         with col_c3: device_mode = st.radio("Screen Layout:", ["💻 Laptop", "📱 Mobile"], horizontal=True, index=default_device_index, label_visibility="collapsed")
 
-        # 🚀 DYNAMIC CHART HEIGHT CALCULATION 🚀
         if device_mode == "💻 Laptop":
-            c_main_h = 480      # 👈 480px Laptop Height
+            c_main_h = 480      
             c_iframe_h = 610    
         else:
-            c_main_h = 350      # 👈 350px Mobile Height
+            c_main_h = 350      
             c_iframe_h = 470    
 
         if os.path.exists(HISTORY_FILE):
@@ -618,25 +784,36 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🔥 FIX 2 & 3: Reset Button inside Chart, Smooth Jitter-Free CSS Slider 🔥
+                        # 🚀 CUSTOM HTML RESET BUTTON & PURE CSS SMOOTH SLIDER 🚀
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
                         <head>
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
-                                body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; }} 
+                                body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; position: relative; }} 
                                 
-                                /* 🟢 FIX 2: Reset button positioned correctly to be fully visible */
-                                .apexcharts-toolbar {{ top: 15px !important; right: 20px !important; z-index: 10 !important; }}
+                                /* Hide Native Buggy Toolbar */
+                                .apexcharts-toolbar {{ display: none !important; }}
                                 
-                                /* 🟢 FIX 3: Pure CSS Pan-X for Smooth Mobile Slider (No Javascript Jitter) */
-                                #chart-slider {{ touch-action: pan-x !important; }}
-                                .apexcharts-selection-rect {{ cursor: grab !important; touch-action: pan-x !important; }}
+                                /* 🚀 PURE CSS FOR SMOOTH MOBILE SLIDER (No JS Jitter) */
+                                #chart-slider {{ touch-action: none !important; }}
+                                .apexcharts-selection-rect {{ cursor: grab !important; touch-action: none !important; }}
                                 .apexcharts-selection-rect:active {{ cursor: grabbing !important; }}
+                                
+                                /* Custom Solid Reset Button */
+                                #custom-reset-btn {{
+                                    position: absolute; top: 10px; right: 10px; z-index: 9999;
+                                    background-color: #f1f1f1; border: 1px solid #ccc; border-radius: 4px;
+                                    padding: 4px 8px; font-size: 12px; font-weight: bold; color: #333;
+                                    cursor: pointer; box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
+                                }}
+                                #custom-reset-btn:hover {{ background-color: #e0e0e0; }}
                             </style>
                         </head>
                         <body>
+                            <button id="custom-reset-btn">🔄 Reset</button>
+                            
                             <div id="chart-main"></div>
                             <div id="chart-slider" style="margin-top: -15px;"></div>
                             
@@ -659,30 +836,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         id: 'mainChart',
                                         height: {c_main_h}, 
                                         type: 'line',
-                                        toolbar: {{ 
-                                            show: true, 
-                                            tools: {{ download: false, selection: false, zoom: false, zoomin: false, zoomout: false, pan: false, reset: true }},
-                                            autoSelected: 'pan' 
-                                        }},
+                                        toolbar: {{ show: false }},
                                         zoom: {{ enabled: true, type: 'x' }},
-                                        animations: {{ enabled: false }},
-                                        events: {{
-                                            /* 🟢 FIX 2: Perfect Reset Logic - ONLY Resets the Chart/Slider */
-                                            beforeResetZoom: function(chartContext, opts) {{
-                                                if(window.chartSlider) {{
-                                                    window.chartSlider.updateOptions({{
-                                                        chart: {{
-                                                            selection: {{
-                                                                xaxis: {{
-                                                                    min: timeCats[0],
-                                                                    max: timeCats[timeCats.length - 1]
-                                                                }}
-                                                            }}
-                                                        }}
-                                                    }});
-                                                }}
-                                            }}
-                                        }}
+                                        animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
                                     stroke: {{ curve: 'smooth', width: [2, 2] }}, 
@@ -756,8 +912,23 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     grid: {{ show: false }}
                                 }};
 
-                                window.chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
-                                window.chartSlider.render();
+                                var chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
+                                chartSlider.render();
+                                
+                                /* 🚀 CUSTOM RESET LOGIC: 100% Guaranteed to Reset the Chart Only 🚀 */
+                                document.getElementById('custom-reset-btn').addEventListener('click', function() {{
+                                    chartMain.zoomX(timeCats[0], timeCats[timeCats.length - 1]);
+                                    chartSlider.updateOptions({{
+                                        chart: {{
+                                            selection: {{
+                                                xaxis: {{
+                                                    min: timeCats[0],
+                                                    max: timeCats[timeCats.length - 1]
+                                                }}
+                                            }}
+                                        }}
+                                    }});
+                                }});
                             </script>
                         </body>
                         </html>
