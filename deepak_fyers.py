@@ -22,7 +22,7 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# CSS - FULLY MOBILE RESPONSIVE
+# CSS - FULLY MOBILE RESPONSIVE, ALIGNMENT & CHART TOUCH FIXES
 css_str = """<style>
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
@@ -321,7 +321,6 @@ app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)"
 st.sidebar.markdown("---")
 
 if app_mode == "📱 Viewer (Mobile Client)":
-    # Viewer relies on soft refresh every 30s to stay light and responsive
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 
 # ==========================================
@@ -338,9 +337,6 @@ def run_master_scan(token, date_str, cycle_id):
     snapshot_changed = False
     saved_date = None
     
-    # ---------------------------------------------------------
-    # GOOGLE SHEETS READ LOGIC
-    # ---------------------------------------------------------
     client = get_gspread_client()
     if client:
         try:
@@ -387,9 +383,6 @@ def run_master_scan(token, date_str, cycle_id):
     st.session_state.baseline_count = len(baseline_prices)
     st.session_state.has_snapshot = bool(snap_950)
 
-    # ---------------------------------------------------------
-    # FYERS DATA FETCHING
-    # ---------------------------------------------------------
     all_quotes = []
     for i in range(0, len(raw_symbols), 50):
         batch = raw_symbols[i:i+50]
@@ -430,7 +423,6 @@ def run_master_scan(token, date_str, cycle_id):
         except concurrent.futures.TimeoutError:
             missing_stock_names.append("⚠️ Fyers Server Timeout")
             
-    # NO-KILL LOGIC: Loop safely appends missing stocks
     for q, oc in results_list:
         s_name = get_raw_symbol(q['n'])
         v = q['v']
@@ -531,9 +523,6 @@ def run_master_scan(token, date_str, cycle_id):
     st.session_state.get_live_dump = live_ltp_data
     st.session_state.missing_stocks_list = missing_stock_names 
 
-    # ---------------------------------------------------------
-    # 🔥 AUTOMATIC CE/PE BASELINE SAVE LOGIC (9:15 AM+)
-    # ---------------------------------------------------------
     if client and not baseline_prices and scan_time_ist.time() >= datetime.time(9, 15) and live_ltp_data:
         try:
             ss = client.open("Fyers_EOD_Data")
@@ -676,10 +665,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
     with col_timer:
         if app_mode == "💻 Master (Data Fetcher)":
-            # 🚀 MASTER TIMER: 310 Seconds Fixed (5 Minutes) Native Hard Reload
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
-                ⏱️ Fetching Natively: <span id="clock"></span>
+                ⏱️ Next Fetch: <span id="clock"></span>
             </div>
             <script>
                 var timeLeft = 310;
@@ -687,10 +675,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
                         document.getElementById('clock').innerHTML = "RELOADING...";
-                        
-                        /* Deep Native Reload */
                         window.top.location.reload(true);
-                        
                     }} else {{
                         timeLeft--;
                         var m = Math.floor(timeLeft / 60);
@@ -796,7 +781,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🔥 FIX 1, 2 & 3: Custom Reset Button, Main Chart Zoom Disabled, and Smooth Slider 🔥
+                        # 🔥 FIX 1 & 2: MAIN CHART ZOOM DISABLED & SMOOTH HARDWARE-ACCELERATED SLIDER 🔥
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -805,22 +790,19 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <style> 
                                 body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; position: relative; }} 
                                 
-                                /* Hide Native Buggy Toolbar completely */
-                                .apexcharts-toolbar {{ display: none !important; }}
+                                .apexcharts-toolbar {{ display: none !important; }} /* Old toolbar disabled */
                                 
-                                /* 🟢 FIX 2: Allow Main Chart to be scrolled vertically without triggering anything */
-                                #chart-main {{ touch-action: pan-y !important; }}
-                                
-                                /* 🟢 FIX 3: Pure CSS Pan-Y for Smooth Mobile Slider (Captures X swipes, allows Y scrolls) */
-                                #chart-slider, #chart-slider .apexcharts-inner, .apexcharts-selection-rect {{ 
-                                    touch-action: pan-y !important; 
+                                /* 🔥 SUPER SMOOTH MOBILE SLIDER 🔥: Completely blocks page scrolling when using slider */
+                                #chart-slider, #chart-slider * {{ 
+                                    touch-action: none !important; 
+                                    -webkit-touch-callout: none !important; 
+                                    user-select: none !important; 
+                                    -webkit-user-select: none !important;
                                 }}
-                                .apexcharts-selection-rect {{ cursor: grab !important; }}
-                                .apexcharts-selection-rect:active {{ cursor: grabbing !important; }}
                                 
-                                /* 🟢 FIX 1: Custom Solid Reset Button (Always visible, works 100%) */
+                                /* Custom Reset Button */
                                 #custom-reset-btn {{
-                                    position: absolute; top: 15px; right: 20px; z-index: 9999;
+                                    position: absolute; top: 10px; right: 15px; z-index: 9999;
                                     background-color: #f1f1f1; border: 1px solid #ccc; border-radius: 4px;
                                     padding: 4px 8px; font-size: 12px; font-weight: bold; color: #333;
                                     cursor: pointer; box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
@@ -829,8 +811,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             </style>
                         </head>
                         <body>
-                            <button id="custom-reset-btn">🔄 Reset Chart</button>
-                            
+                            <button id="custom-reset-btn">🔄 Reset</button>
                             <div id="chart-main"></div>
                             <div id="chart-slider" style="margin-top: -15px;"></div>
                             
@@ -854,8 +835,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         height: {c_main_h}, 
                                         type: 'line',
                                         toolbar: {{ show: false }},
-                                        /* 🟢 FIX 2: Main Chart Zoom is Disabled. Touching it will not zoom! */
+                                        
+                                        /* 🔥 FIX 1: JAD SE ZOOM BAND (Chart on top will not zoom on touch) 🔥 */
                                         zoom: {{ enabled: false }}, 
+                                        selection: {{ enabled: false }},
+                                        
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
@@ -933,7 +917,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 window.chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
                                 window.chartSlider.render();
                                 
-                                /* 🚀 100% WORKING CUSTOM RESET BUTTON LOGIC 🚀 */
+                                /* 🔄 Custom Reset Button Logic */
                                 document.getElementById('custom-reset-btn').addEventListener('click', function() {{
                                     if(window.chartSlider) {{
                                         window.chartSlider.updateOptions({{
