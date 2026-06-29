@@ -213,7 +213,7 @@ def run_master_scan(token, date_str, cycle_id):
 
     def fetch_option_chain_fast_local(q):
         sym = q['n']
-        time.sleep(0.1) # 🔥 OPTIMIZED: Reduced sleep to prevent timeout issues
+        time.sleep(0.3) 
         try:
             # 🔥 OPTIMIZED STRIKE COUNT: 60
             oc = fyers.optionchain(data={"symbol": sym, "strikecount": 60, "timestamp": ""})
@@ -223,8 +223,7 @@ def run_master_scan(token, date_str, cycle_id):
             return q, oc
         except: return q, None
 
-    # 🔥 OPTIMIZED: Increased max_workers to 10 for faster parallel fetching to avoid 120s timeout
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         future_to_q = {executor.submit(fetch_option_chain_fast_local, q): q for q in all_quotes}
         try:
             for future in concurrent.futures.as_completed(future_to_q, timeout=120):
@@ -255,7 +254,7 @@ def run_master_scan(token, date_str, cycle_id):
                 oi = float(s.get('oi', 0))
                 lp_str = round(float(s.get('ltp', 0)), 2)
                 
-                # 🔥 FIX: All strikes counted regardless of LTP (Solves PCR bloat issue)
+                # 🔥 FIX: All strikes counted regardless of LTP (Solves PCR bloat issue for illiquid stocks)
                 if sym_str.endswith('CE') or o_type == 'CE':
                     c_oi += oi
                     c_v += vol
@@ -263,7 +262,7 @@ def run_master_scan(token, date_str, cycle_id):
                     p_oi += oi
                     p_v += vol
                         
-                # Only add to live_ltp_data if it has been traded today
+                # Live LTP Data is only updated if it actually traded today
                 if lp_str > 0.0:
                     live_ltp_data[sym_str] = lp_str
 
