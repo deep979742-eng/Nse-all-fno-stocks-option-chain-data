@@ -23,7 +23,6 @@ REDIRECT_URI = "https://www.google.com/"
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
 # CSS - FULLY MOBILE RESPONSIVE & LAPTOP SCREEN FIT
-# FIXED: Using simple string formatting to avoid SyntaxError with decimals
 css_str = """
 <style>
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } 
@@ -632,6 +631,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
+                        # 🔥 100% FIXED: X-AXIS NOW USES ACTUAL TIME LABELS INSTEAD OF 1,2,3... 🔥
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -650,7 +650,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 }}
                                 #custom-reset-btn:hover {{ background-color: #e0e0e0; }}
 
-                                /* NiftyTrader Style Wrapper & Labels */
                                 .slider-wrapper {{
                                     padding: 10px 25px;
                                     margin-top: -10px;
@@ -665,7 +664,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     margin-bottom: 5px;
                                 }}
                                 
-                                /* Pure Native HTML Slider CSS */
                                 input[type=range] {{
                                     -webkit-appearance: none;
                                     width: 100%;
@@ -711,7 +709,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <script>
                                 var dataIndicator = {json.dumps(indicator_list)};
                                 var dataLTP = {json.dumps(ltp_list)};
-                                var timeCats = {json.dumps(time_list)};
+                                var timeCats = {json.dumps(time_list)}; // ACTUALLY contains ["09:17", "09:22"...]
                                 
                                 var optionsMain = {{
                                     series: [{{
@@ -740,7 +738,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }},
                                     dataLabels: {{ enabled: false }},
                                     xaxis: {{
-                                        categories: timeCats,
+                                        categories: timeCats, /* Categories properly mapped */
                                         tickAmount: 10,
                                         labels: {{ style: {{ colors: '#888' }} }},
                                         tooltip: {{ enabled: false }}
@@ -774,40 +772,30 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var lblEnd = document.getElementById('lbl-end');
 
                                 if(totalPoints > 0) {{
-                                    // Set slider steps exactly equal to the number of data points
                                     slider.max = totalPoints - 1; 
-                                    slider.value = 0; // Default: start from index 0
+                                    slider.value = 0; 
                                     
-                                    lblEnd.innerText = "Live: " + timeCats[totalPoints - 1]; // Right label is ALWAYS the latest time
+                                    lblEnd.innerText = "Live: " + timeCats[totalPoints - 1]; 
                                     
                                     function updateChartAndUI() {{
                                         var startIdx = parseInt(slider.value);
                                         
-                                        // Update Left Label to show selected Start Time EXACTLY from the data
                                         lblStart.innerText = "From: " + timeCats[startIdx];
                                         
-                                        // Update Slider Track Color (Blue on left, grey on right)
                                         var percentage = slider.max > 0 ? (slider.value / slider.max) * 100 : 0;
                                         slider.style.background = 'linear-gradient(to right, #2962FF ' + percentage + '%, #e0e0e0 ' + percentage + '%)';
                                         
-                                        // Update Chart: Hides everything BEFORE startIdx, shows everything AFTER
-                                        chartMain.updateOptions({{
-                                            xaxis: {{
-                                                min: startIdx + 1,
-                                                max: totalPoints
-                                            }}
-                                        }});
+                                        // 🔥 THE FIX: zoomX expects the EXACT categorical string values (like "09:17"), NOT indices!
+                                        chartMain.zoomX(timeCats[startIdx], timeCats[totalPoints - 1]);
                                     }}
                                     
                                     slider.addEventListener('input', updateChartAndUI);
                                     
-                                    // Run once on load to sync everything
                                     setTimeout(updateChartAndUI, 500);
 
-                                    /* Reset Button Logic */
                                     document.getElementById('custom-reset-btn').addEventListener('click', function() {{
-                                        slider.value = 0; // Reset slider to beginning
-                                        updateChartAndUI(); // Re-sync chart
+                                        slider.value = 0; 
+                                        updateChartAndUI(); 
                                     }});
                                 }} else {{
                                     lblStart.innerText = "No Data";
