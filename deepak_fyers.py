@@ -22,7 +22,7 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# CSS - FULLY MOBILE RESPONSIVE & LAPTOP SCREEN FIT
+# CSS - FULLY MOBILE RESPONSIVE
 css_str = """<style>
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
@@ -81,7 +81,7 @@ def get_gspread_client():
             creds_dict = dict(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
             return gspread.authorize(creds)
-    except Exception:
+    except Exception as e:
         pass
     return None
 
@@ -171,7 +171,7 @@ def run_master_scan(token, date_str, cycle_id):
                             ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
                             ws2.batch_clear(["A2:A100"])
                             saved_date = date_str
-            except Exception:
+            except Exception as e:
                 pass
 
             try:
@@ -186,15 +186,15 @@ def run_master_scan(token, date_str, cycle_id):
                     loaded_prices = json.loads(decoded_str)
                     for k, v in loaded_prices.items():
                         baseline_prices[k] = round(float(v), 2)
-            except Exception:
+            except Exception as e:
                 pass
 
             try:
                 snap_val = ws2.cell(1, 2).value
                 if snap_val: snap_950 = json.loads(snap_val)
-            except Exception:
+            except Exception as e:
                 pass
-        except Exception:
+        except Exception as e:
             pass
 
     st.session_state.baseline_count = len(baseline_prices)
@@ -225,7 +225,7 @@ def run_master_scan(token, date_str, cycle_id):
                 time.sleep(1.0) 
                 oc = fyers.optionchain(data={"symbol": sym, "strikecount": 60, "timestamp": ""})
             return q, oc
-        except Exception: 
+        except Exception as e: 
             return q, None
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
@@ -235,7 +235,7 @@ def run_master_scan(token, date_str, cycle_id):
                 try:
                     res = future.result()
                     if res: results_list.append(res)
-                except Exception:
+                except Exception as e:
                     pass
         except concurrent.futures.TimeoutError:
             missing_stock_names.append("⚠️ Fyers Server Timeout")
@@ -324,15 +324,16 @@ def run_master_scan(token, date_str, cycle_id):
             else:
                 missing_stock_names.append(s_name) 
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
-        except Exception:
+        except Exception as e:
             missing_stock_names.append(s_name)
 
+    # 🔥 FIX: Added 'as e' and properly indented try/except block to eliminate SyntaxError 🔥
     if snapshot_changed and client:
         try:
             ss = client.open("Fyers_EOD_Data")
             ws2 = ss.worksheet("Sheet2")
             ws2.update_cell(1, 2, json.dumps(snap_950))
-        except Exception:
+        except Exception as e:
             pass
 
     st.session_state.get_live_dump = live_ltp_data
@@ -351,7 +352,7 @@ def run_master_scan(token, date_str, cycle_id):
             for i, cell in enumerate(clist2): cell.value = chunks[i]
             ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
             ws2.update_cells(clist2)
-        except Exception:
+        except Exception as e:
             pass
 
     if new_csv_rows:
@@ -376,7 +377,7 @@ if app_mode == "💻 Master (Data Fetcher)":
         try:
             td = json.load(open(TOKEN_STORE_FILE))
             if td.get("date") == today_str: saved_token = td.get("token")
-        except Exception:
+        except Exception as e:
             pass
 
     if saved_token:
@@ -418,7 +419,7 @@ if app_mode == "💻 Master (Data Fetcher)":
                     ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
                     ws2.update_cells(clist2)
                     return True
-            except Exception:
+            except Exception as e:
                 pass
         return False
 
@@ -455,7 +456,7 @@ if app_mode == "💻 Master (Data Fetcher)":
                 try:
                     shared_pack = {"time": last_scan_timestamp, "data": cached_result, "missing": st.session_state.get('missing_stocks_list', [])}
                     json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
-                except Exception:
+                except Exception as e:
                     pass
             else:
                 if 'cached_data' not in st.session_state: st.session_state.cached_data = []
@@ -471,7 +472,7 @@ elif app_mode == "📱 Viewer (Mobile Client)":
             last_scan_timestamp = shared_pack.get("time", time.time())
             st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
             st.session_state.missing_stocks_list = shared_pack.get("missing", [])
-        except Exception:
+        except Exception as e:
             pass
     else:
         st.info("⏳ Waiting for Master Server to fetch data. Master ko on rakhein...")
@@ -648,34 +649,30 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 }}
                                 #custom-reset-btn:hover {{ background-color: #e0e0e0; }}
                                 
-                                /* 🔥 THE FIX: Block ALL accidental background touches on the slider 🔥 */
-                                #chart-slider svg {{
-                                    pointer-events: none !important; 
-                                }}
-
-                                /* 🚀 ENABLE TOUCH ONLY ON SLIDER BOX & HANDLES 🚀 */
-                                #chart-slider .apexcharts-selection-rect,
-                                #chart-slider .apexcharts-selection-icon {{
-                                    pointer-events: auto !important;
+                                /* 🔥 SLN Style: Thin line with huge dragging dots, and absolutely no background random clicks 🔥 */
+                                
+                                /* 1. Block clicks on background to stop jitter */
+                                #chart-slider .apexcharts-brush { touch-action: pan-x !important; }
+                                
+                                /* 2. The Selection Box (Thin Line) */
+                                .apexcharts-selection-rect {{ 
+                                    cursor: grab !important; 
+                                    fill: rgba(0, 191, 255, 0.15) !important; 
+                                    stroke: #00BFFF !important;
+                                    stroke-width: 1px !important; /* Thin border */
                                     touch-action: pan-x !important;
                                 }}
+                                .apexcharts-selection-rect:active {{ cursor: grabbing !important; }}
 
-                                /* 🟢 THIN LINE for the selection box 🟢 */
-                                #chart-slider .apexcharts-selection-rect {{ 
-                                    cursor: grab !important; 
-                                    fill: rgba(0, 191, 255, 0.2) !important; 
-                                    stroke: #00BFFF !important; /* Blue line */
-                                    stroke-width: 1px !important; /* THIN LINE */
+                                /* 3. The Handles/Dots (BIG 3.5x size for easy touch) */
+                                .apexcharts-selection-icon {{
+                                    cursor: ew-resize !important;
+                                    transform: scale(3.5) !important; /* Make dots massive */
+                                    transform-origin: center center !important;
+                                    touch-action: pan-x !important;
                                 }}
-                                #chart-slider .apexcharts-selection-rect:active {{ cursor: grabbing !important; }}
-
-                                /* 🔴 BIG DOTS (3.5x size) FOR EASY TOUCH (SLN Academy Style) 🔴 */
-                                #chart-slider .apexcharts-selection-icon {{
-                                    transform: scale(3.5) !important; /* Uniform 3.5x Big Dot */
-                                    transform-origin: center !important;
-                                }}
-                                #chart-slider .apexcharts-selection-icon circle {{
-                                    fill: #FF4D4D !important; /* Red dot */
+                                .apexcharts-selection-icon circle {{
+                                    fill: #FF4D4D !important; /* Red handle dots */
                                     stroke: #ffffff !important;
                                     stroke-width: 1px !important;
                                 }}
