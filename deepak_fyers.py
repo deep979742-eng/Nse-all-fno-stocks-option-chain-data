@@ -629,7 +629,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🔥 100% NATIVE HTML RANGE SLIDER - ONE DOT, NO APEX BUG, PURE SMOOTHNESS 🔥
+                        # 🔥 100% NATIVE HTML RANGE SLIDER - ONE DOT, NIFTYTRADER STYLE 🔥
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -662,7 +662,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     background: #e0e0e0;
                                     border-radius: 5px;
                                     outline: none;
-                                    accent-color: #2962FF; /* Native blue track color like NiftyTrader */
                                 }}
                                 input[type=range]::-webkit-slider-thumb {{
                                     -webkit-appearance: none;
@@ -753,11 +752,12 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                /* 🔥 NATIVE SLIDER LOGIC 🔥 */
+                                /* 🔥 NATIVE SLIDER DYNAMIC LOGIC 🔥 */
                                 var totalPoints = timeCats.length;
-                                var windowSize = 30; // Number of candles to show at once
                                 
-                                if(totalPoints <= windowSize) {{
+                                // Make windowSize small enough so slider always has room to move even with less data
+                                var windowSize = Math.max(3, Math.floor(totalPoints / 3)); 
+                                if (totalPoints <= 3) {{
                                     windowSize = totalPoints;
                                 }}
                                 
@@ -766,8 +766,15 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 slider.max = maxVal > 0 ? maxVal : 0;
                                 slider.value = slider.max; // Start at the rightmost edge (latest data)
                                 
+                                // Color the track dynamically (Blue on left, Grey on right)
+                                function updateSliderUI(el) {{
+                                    var percentage = slider.max > 0 ? (el.value / slider.max) * 100 : 100;
+                                    el.style.background = 'linear-gradient(to right, #2962FF ' + percentage + '%, #e0e0e0 ' + percentage + '%)';
+                                }}
+                                
                                 // Pan chart when sliding
                                 slider.addEventListener('input', function(e) {{
+                                    updateSliderUI(e.target);
                                     var startIdx = parseInt(e.target.value);
                                     var endIdx = startIdx + windowSize - 1;
                                     if(endIdx >= totalPoints) endIdx = totalPoints - 1;
@@ -775,7 +782,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     chartMain.zoomX(timeCats[startIdx], timeCats[endIdx]);
                                 }});
                                 
-                                // Initial zoom to match slider
+                                // Initial setup
+                                updateSliderUI(slider);
                                 setTimeout(function() {{
                                     if(maxVal > 0) {{
                                         chartMain.zoomX(timeCats[parseInt(slider.value)], timeCats[parseInt(slider.value) + windowSize - 1]);
@@ -786,6 +794,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 document.getElementById('custom-reset-btn').addEventListener('click', function() {{
                                     chartMain.zoomX(timeCats[0], timeCats[timeCats.length - 1]);
                                     slider.value = slider.max; // Visually put dot at the end
+                                    updateSliderUI(slider);
                                 }});
                             </script>
                         </body>
