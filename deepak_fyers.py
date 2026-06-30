@@ -609,10 +609,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
         if device_mode == "💻 Laptop":
             c_main_h = 480      
-            c_iframe_h = 610    
+            c_iframe_h = 550    
         else:
             c_main_h = 350      
-            c_iframe_h = 470    
+            c_iframe_h = 420    
 
         if os.path.exists(HISTORY_FILE):
             try:
@@ -629,16 +629,19 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
+                        # 🔥 100% NATIVE HTML RANGE SLIDER - ONE DOT, NO APEX BUG, PURE SMOOTHNESS 🔥
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
                         <head>
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
                             <style> 
-                                body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; position: relative; }} 
+                                body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; position: relative; overflow: hidden; }} 
                                 
+                                /* Hide Native Buggy Toolbar */
                                 .apexcharts-toolbar {{ display: none !important; }}
                                 
+                                /* 🚀 Custom Solid Reset Button (Left Aligned) 🚀 */
                                 #custom-reset-btn {{
                                     position: absolute; top: 10px; left: 15px; z-index: 9999;
                                     background-color: #f1f1f1; border: 1px solid #ccc; border-radius: 4px;
@@ -646,29 +649,39 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     cursor: pointer; box-shadow: 0px 2px 4px rgba(0,0,0,0.1);
                                 }}
                                 #custom-reset-btn:hover {{ background-color: #e0e0e0; }}
-                                
-                                /* 🔥 FIXED: Double Braces added to fix the Python NameError 🔥 */
-                                #chart-slider .apexcharts-brush {{ touch-action: pan-x !important; }}
-                                
-                                .apexcharts-selection-rect {{ 
-                                    cursor: grab !important; 
-                                    fill: rgba(0, 191, 255, 0.15) !important; 
-                                    stroke: #00BFFF !important;
-                                    stroke-width: 1px !important; 
-                                    touch-action: pan-x !important;
-                                }}
-                                .apexcharts-selection-rect:active {{ cursor: grabbing !important; }}
 
-                                .apexcharts-selection-icon {{
-                                    cursor: ew-resize !important;
-                                    transform: scale(3.5) !important; 
-                                    transform-origin: center center !important;
-                                    touch-action: pan-x !important;
+                                /* 🔥 NIFTYTRADER STYLE NATIVE HTML SLIDER CSS 🔥 */
+                                .slider-wrapper {{
+                                    padding: 10px 20px;
+                                    margin-top: -5px;
                                 }}
-                                .apexcharts-selection-icon circle {{
-                                    fill: #FF4D4D !important; 
-                                    stroke: #ffffff !important;
-                                    stroke-width: 1px !important;
+                                input[type=range] {{
+                                    -webkit-appearance: none;
+                                    width: 100%;
+                                    height: 6px;
+                                    background: #e0e0e0;
+                                    border-radius: 5px;
+                                    outline: none;
+                                    accent-color: #2962FF; /* Native blue track color like NiftyTrader */
+                                }}
+                                input[type=range]::-webkit-slider-thumb {{
+                                    -webkit-appearance: none;
+                                    appearance: none;
+                                    width: 24px;
+                                    height: 24px;
+                                    border-radius: 50%;
+                                    background: #2962FF; /* Single big blue dot */
+                                    cursor: pointer;
+                                    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+                                }}
+                                input[type=range]::-moz-range-thumb {{
+                                    width: 24px;
+                                    height: 24px;
+                                    border-radius: 50%;
+                                    background: #2962FF;
+                                    cursor: pointer;
+                                    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+                                    border: none;
                                 }}
                             </style>
                         </head>
@@ -676,7 +689,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <button id="custom-reset-btn">🔄 Reset</button>
                             
                             <div id="chart-main"></div>
-                            <div id="chart-slider" style="margin-top: -15px;"></div>
+                            
+                            <div class="slider-wrapper">
+                                <input type="range" id="native-slider" min="0" value="0">
+                            </div>
                             
                             <script>
                                 var dataIndicator = {json.dumps(indicator_list)};
@@ -737,59 +753,39 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                var optionsSlider = {{
-                                    series: [{{
-                                        name: '{chart_mode}',
-                                        data: dataIndicator
-                                    }}],
-                                    chart: {{
-                                        id: 'sliderChart',
-                                        height: 80,
-                                        type: 'area',
-                                        brush: {{ target: 'mainChart', enabled: true }},
-                                        selection: {{ 
-                                            enabled: true,
-                                            xaxis: {{
-                                                min: timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0],
-                                                max: timeCats[timeCats.length - 1]
-                                            }}
-                                        }},
-                                        toolbar: {{ show: false }},
-                                        animations: {{ enabled: false }}
-                                    }},
-                                    colors: ['{indicator_color}'],
-                                    fill: {{
-                                        type: 'gradient',
-                                        gradient: {{ shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.1, stops: [0, 100] }}
-                                    }},
-                                    stroke: {{ curve: 'smooth', width: 1 }},
-                                    dataLabels: {{ enabled: false }},
-                                    xaxis: {{
-                                        categories: timeCats,
-                                        tickAmount: 10,
-                                        labels: {{ show: false }},
-                                        tooltip: {{ enabled: false }}
-                                    }},
-                                    yaxis: {{ show: false, tickAmount: 2 }},
-                                    grid: {{ show: false }}
-                                }};
-
-                                window.chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
-                                window.chartSlider.render();
+                                /* 🔥 NATIVE SLIDER LOGIC 🔥 */
+                                var totalPoints = timeCats.length;
+                                var windowSize = 30; // Number of candles to show at once
                                 
-                                document.getElementById('custom-reset-btn').addEventListener('click', function() {{
-                                    if(window.chartSlider) {{
-                                        window.chartSlider.updateOptions({{
-                                            chart: {{
-                                                selection: {{
-                                                    xaxis: {{
-                                                        min: timeCats[0],
-                                                        max: timeCats[timeCats.length - 1]
-                                                    }}
-                                                }}
-                                            }}
-                                        }});
+                                if(totalPoints <= windowSize) {{
+                                    windowSize = totalPoints;
+                                }}
+                                
+                                var slider = document.getElementById('native-slider');
+                                var maxVal = totalPoints - windowSize;
+                                slider.max = maxVal > 0 ? maxVal : 0;
+                                slider.value = slider.max; // Start at the rightmost edge (latest data)
+                                
+                                // Pan chart when sliding
+                                slider.addEventListener('input', function(e) {{
+                                    var startIdx = parseInt(e.target.value);
+                                    var endIdx = startIdx + windowSize - 1;
+                                    if(endIdx >= totalPoints) endIdx = totalPoints - 1;
+                                    
+                                    chartMain.zoomX(timeCats[startIdx], timeCats[endIdx]);
+                                }});
+                                
+                                // Initial zoom to match slider
+                                setTimeout(function() {{
+                                    if(maxVal > 0) {{
+                                        chartMain.zoomX(timeCats[parseInt(slider.value)], timeCats[parseInt(slider.value) + windowSize - 1]);
                                     }}
+                                }}, 500);
+
+                                /* Reset button shows all data */
+                                document.getElementById('custom-reset-btn').addEventListener('click', function() {{
+                                    chartMain.zoomX(timeCats[0], timeCats[timeCats.length - 1]);
+                                    slider.value = slider.max; // Visually put dot at the end
                                 }});
                             </script>
                         </body>
