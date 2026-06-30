@@ -22,7 +22,7 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# CSS - FULLY MOBILE RESPONSIVE & LAPTOP SCREEN FIT
+# CSS - FULLY MOBILE RESPONSIVE
 css_str = """<style>
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
@@ -46,7 +46,7 @@ css_str = """<style>
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
 
-div[role="radiogroup"] { margin-top: 5px !important; }
+div[role="radiogroup"] { margin-top: 0px !important; margin-bottom: 0px !important; }
 
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
@@ -63,7 +63,6 @@ today_str = now_ist.strftime("%Y-%m-%d")
 HISTORY_FILE = "chart_history.csv"
 SNAPSHOT_FILE = "snapshot_950.json" 
 TOKEN_STORE_FILE = "fyers_token_store.json"
-AUTO_SAVE_FILE = "auto_save_tracker.txt"
 SHARED_LIVE_DATA_FILE = "shared_live_data.json" 
 
 if 'live_base_date' not in st.session_state or st.session_state.live_base_date != today_str:
@@ -81,7 +80,7 @@ def get_gspread_client():
             creds_dict = dict(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
             return gspread.authorize(creds)
-    except: pass
+    except Exception: pass
     return None
 
 # ==========================================
@@ -130,7 +129,7 @@ st.sidebar.markdown("---")
 if app_mode == "📱 Viewer (Mobile Client)":
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 elif app_mode == "💻 Master (Data Fetcher)":
-    st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
+    st_autorefresh(interval=300000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
 # 5. DATA SCANNER (Master Fast Engine)
@@ -170,7 +169,7 @@ def run_master_scan(token, date_str, cycle_id):
                             ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
                             ws2.batch_clear(["A2:A100"])
                             saved_date = date_str
-            except: pass
+            except Exception: pass
 
             try:
                 if saved_date == date_str:
@@ -184,13 +183,13 @@ def run_master_scan(token, date_str, cycle_id):
                     loaded_prices = json.loads(decoded_str)
                     for k, v in loaded_prices.items():
                         baseline_prices[k] = round(float(v), 2)
-            except: pass
+            except Exception: pass
 
             try:
                 snap_val = ws2.cell(1, 2).value
                 if snap_val: snap_950 = json.loads(snap_val)
-            except: pass
-        except: pass
+            except Exception: pass
+        except Exception: pass
 
     st.session_state.baseline_count = len(baseline_prices)
     st.session_state.has_snapshot = bool(snap_950)
@@ -220,7 +219,8 @@ def run_master_scan(token, date_str, cycle_id):
                 time.sleep(1.0) 
                 oc = fyers.optionchain(data={"symbol": sym, "strikecount": 60, "timestamp": ""})
             return q, oc
-        except: return q, None
+        except Exception: 
+            return q, None
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         future_to_q = {executor.submit(fetch_option_chain_fast_local, q): q for q in all_quotes}
@@ -242,90 +242,108 @@ def run_master_scan(token, date_str, cycle_id):
         float_c = float(v.get('prev_close_price', 0))
         open_status = "NA" if open_p == 0 or float_c == 0 else "Gap Up 🔼" if open_p > float_c else "Gap Down 🔽" if open_p < float_c else "Same ➖"
 
-        if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
-            chain = oc['data']['optionsChain']
-            c_oi, p_oi, c_v, p_v = 0.0, 0.0, 0.0, 0.0
-            
-            for s in chain:
-                sym_str = str(s.get('symbol', ''))
-                o_type = str(s.get('option_type', ''))
-                vol = float(s.get('volume', 0))
-                oi = float(s.get('oi', 0))
-                lp_str = round(float(s.get('ltp', 0)), 2)
+        try:
+            if oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']:
+                chain = oc['data']['optionsChain']
                 
-                if lp_str > 0.0:
+                c_oi, p_oi, c_v, p_v = 0.0, 0.0, 0.0, 0.0
+                
+                for s in chain:
+                    sym_str = str(s.get('symbol', ''))
+                    o_type = str(s.get('option_type', ''))
+                    
                     if sym_str.endswith('CE') or o_type == 'CE':
-                        c_oi += oi
-                        c_v += vol
+                        c_oi += float(s.get('oi', 0))
+                        c_v += float(s.get('volume', 0))
                     elif sym_str.endswith('PE') or o_type == 'PE':
-                        p_oi += oi
-                        p_v += vol
+                        p_oi += float(s.get('oi', 0))
+                        p_v += float(s.get('volume', 0))
                         
-                    live_ltp_data[sym_str] = lp_str
+                    lp_str = round(float(s.get('ltp', 0)), 2)
+                    if lp_str > 0.0:
+                        live_ltp_data[sym_str] = lp_str
 
-            o_pcr = calc_opt_pcr(c_oi, p_oi)
-            v_cpr = calc_vol_cpr(c_v, p_v)
-            v_pcr = calc_vol_pcr(c_v, p_v)
+                o_pcr = calc_opt_pcr(c_oi, p_oi)
+                v_cpr = calc_vol_cpr(c_v, p_v)
+                v_pcr = calc_vol_pcr(c_v, p_v)
 
-            if scan_time_ist.time() < datetime.time(9, 50):
-                pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
-            else:
-                if s_name not in snap_950:
-                    snap_950[s_name] = {'pcr': o_pcr, 'vol_cpr': v_cpr}
-                    snapshot_changed = True
+                # 9:50 AM snapshot logic retained
+                if scan_time_ist.time() < datetime.time(9, 50):
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
-                    base = snap_950[s_name]
-                    base_pcr_val = base['pcr']
-                    base_vol_val = base['vol_cpr']
-                    pcr_abs = o_pcr - base_pcr_val
-                    vol_abs = v_cpr - base_vol_val
-                    
-                    def get_standard_pct(current_val, base_val):
-                        if base_val == 0: return 0.0
-                        return ((current_val - base_val) / base_val) * 100.0
-                    pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
-                    vol_pct = get_standard_pct(v_cpr, base_vol_val)
+                    if s_name not in snap_950:
+                        snap_950[s_name] = {'pcr': o_pcr, 'vol_cpr': v_cpr}
+                        snapshot_changed = True
+                        pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
+                    else:
+                        base = snap_950[s_name]
+                        base_pcr_val = base['pcr']
+                        base_vol_val = base['vol_cpr']
+                        pcr_abs = o_pcr - base_pcr_val
+                        vol_abs = v_cpr - base_vol_val
+                        
+                        def get_standard_pct(current_val, base_val):
+                            if base_val == 0: return 0.0
+                            return ((current_val - base_val) / base_val) * 100.0
+                        pcr_pct = get_standard_pct(o_pcr, base_pcr_val)
+                        vol_pct = get_standard_pct(v_cpr, base_vol_val)
 
-            def get_conv(opt_type_val):
-                if not baseline_prices: return 0.0
-                strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
-                tot_p, tot_m = 0, 0
-                for stk in strikes:
-                    sym = str(stk.get('symbol', ''))
-                    lp = round(float(stk.get('ltp', 0)), 2)
-                    if lp == 0: continue
-                    diff = 0.0
-                    if sym in baseline_prices: diff = round(lp - baseline_prices[sym], 2)
-                    if diff > 0.00: tot_p += 1 
-                    elif diff < 0.00: tot_m += 1 
-                act = tot_p + tot_m
-                if act == 0: return 0.0
-                return round((tot_p / act) * 100, 2) if tot_p >= tot_m else -round((tot_m / act) * 100, 2)
-            
-            final_list.append({
-                'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
-                'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp,
-                'VOL_ABS': round(vol_abs, 2), 'PCR_ABS': round(pcr_abs, 2), 
-                'VOL_PCT': round(vol_pct, 2), 'PCR_PCT': round(pcr_pct, 2),
-                'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
-            })
+                def get_conv(opt_type_val):
+                    if not baseline_prices: return 0.0
+                    strikes = [stk for stk in chain if stk.get('option_type') == opt_type_val.upper() or str(stk.get('symbol', '')).endswith(opt_type_val.upper())]
+                    tot_p, tot_m = 0, 0
+                    for stk in strikes:
+                        sym = str(stk.get('symbol', ''))
+                        lp = round(float(stk.get('ltp', 0)), 2)
+                        if lp == 0: continue
+                        diff = 0.0
+                        if sym in baseline_prices: diff = round(lp - baseline_prices[sym], 2)
+                        if diff > 0.00: tot_p += 1 
+                        elif diff < 0.00: tot_m += 1 
+                    act = tot_p + tot_m
+                    if act == 0: return 0.0
+                    return round((tot_p / act) * 100, 2) if tot_p >= tot_m else -round((tot_m / act) * 100, 2)
+                
+                final_list.append({
+                    'SYMS': s_name, 'OPEN_STATUS': open_status, 'V_PCR': v_pcr, 'O_PCR': o_pcr, 'V_CPR': v_cpr, 
+                    'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp,
+                    'VOL_ABS': round(vol_abs, 2), 'PCR_ABS': round(pcr_abs, 2), 
+                    'VOL_PCT': round(vol_pct, 2), 'PCR_PCT': round(pcr_pct, 2),
+                    'CE_CON': get_conv('CE'), 'PE_CON': get_conv('PE')
+                })
 
-            if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
-                new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': spot_ltp, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
-        else:
-            missing_stock_names.append(s_name) 
-            final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
+                if datetime.time(9, 15) <= scan_time_ist.time() <= datetime.time(15, 30):
+                    new_csv_rows.append({'Date': date_str, 'Symbol': s_name, 'Time': time_str, 'LTP': spot_ltp, 'VOL PCR': v_pcr, 'OPT PCR': o_pcr, 'VOL CPR': v_cpr})
+            else:
+                missing_stock_names.append(s_name) 
+                final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
+        except Exception: missing_stock_names.append(s_name)
 
     if snapshot_changed and client:
         try:
             ss = client.open("Fyers_EOD_Data")
             ws2 = ss.worksheet("Sheet2")
             ws2.update_cell(1, 2, json.dumps(snap_950))
-        except: pass
+        except Exception: pass
 
     st.session_state.get_live_dump = live_ltp_data
     st.session_state.missing_stocks_list = missing_stock_names 
+
+    # 🟢 9:15 AM Baseline Logic preserved 🟢
+    if client and not baseline_prices and scan_time_ist.time() >= datetime.time(9, 15) and live_ltp_data:
+        try:
+            ss = client.open("Fyers_EOD_Data")
+            ws2 = ss.worksheet("Sheet2")
+            locked_live_data = {k: round(float(v), 2) for k, v in live_ltp_data.items()}
+            json_str = json.dumps(locked_live_data)
+            b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+            chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
+            ws2.batch_clear(["A2:A100"])
+            clist2 = ws2.range(f'A2:A{len(chunks)+1}')
+            for i, cell in enumerate(clist2): cell.value = chunks[i]
+            ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
+            ws2.update_cells(clist2)
+        except Exception: pass
 
     if new_csv_rows:
         new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
@@ -349,7 +367,7 @@ if app_mode == "💻 Master (Data Fetcher)":
         try:
             td = json.load(open(TOKEN_STORE_FILE))
             if td.get("date") == today_str: saved_token = td.get("token")
-        except: pass
+        except Exception: pass
 
     if saved_token:
         auth_code = "AUTO_LOGGED_IN"
@@ -369,34 +387,6 @@ if app_mode == "💻 Master (Data Fetcher)":
             else: auth_code = raw_code
 
     st.sidebar.markdown("---")
-    st.sidebar.header("💾 Baseline Save Options")
-
-    def save_eod_data():
-        if 'get_live_dump' in st.session_state:
-            try:
-                live_data = st.session_state.get_live_dump
-                if live_data:
-                    client = get_gspread_client()
-                    if not client: return False
-                    ss = client.open("Fyers_EOD_Data")
-                    ws2 = ss.worksheet("Sheet2")
-                    locked_live_data = {k: round(float(v), 2) for k, v in live_data.items()}
-                    json_str = json.dumps(locked_live_data)
-                    b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
-                    chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
-                    ws2.batch_clear(["A2:A100"])
-                    clist2 = ws2.range(f'A2:A{len(chunks)+1}')
-                    for i, cell in enumerate(clist2): cell.value = chunks[i]
-                    ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
-                    ws2.update_cells(clist2)
-                    return True
-            except: pass
-        return False
-
-    if st.sidebar.button("Manual Baseline Save"):
-        if save_eod_data(): 
-            st.sidebar.success("Baseline Saved Successfully!")
-            st.cache_data.clear() 
 
     if auth_code:
         if auth_code != "AUTO_LOGGED_IN":
@@ -425,7 +415,7 @@ if app_mode == "💻 Master (Data Fetcher)":
                 try:
                     shared_pack = {"time": last_scan_timestamp, "data": cached_result, "missing": st.session_state.get('missing_stocks_list', [])}
                     json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
-                except: pass
+                except Exception: pass
             else:
                 if 'cached_data' not in st.session_state: st.session_state.cached_data = []
     else:
@@ -440,7 +430,7 @@ elif app_mode == "📱 Viewer (Mobile Client)":
             last_scan_timestamp = shared_pack.get("time", time.time())
             st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
             st.session_state.missing_stocks_list = shared_pack.get("missing", [])
-        except: pass
+        except Exception: pass
     else:
         st.info("⏳ Waiting for Master Server to fetch data. Master ko on rakhein...")
         st.session_state.cached_data = []
@@ -481,7 +471,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
     with col_timer:
         if app_mode == "💻 Master (Data Fetcher)":
-            # 🚀 MASTER TIMER SET TO 300 SECONDS EXACTLY 🚀
+            # 🚀 TIMER SET TO EXACTLY 300 SECONDS AS REQUESTED 🚀
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Next Fetch: <span id="clock"></span>
@@ -578,10 +568,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
         if device_mode == "💻 Laptop":
             c_main_h = 480      
-            c_iframe_h = 550    
+            c_iframe_h = 610    
         else:
             c_main_h = 350      
-            c_iframe_h = 420    
+            c_iframe_h = 470    
 
         if os.path.exists(HISTORY_FILE):
             try:
@@ -598,7 +588,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🔥 THE "MAGIC TOUCH" LOGIC: NO SLIDER, PURE FAST NATIVE PANNING 🔥
+                        # 🔥 APPLYING THE REQUESTED "SMOOTH ADVANCED SLIDER" (NO SLIDER VISIBLE, BUT FULL TOUCH PANNING) 🔥
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -607,10 +597,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <style> 
                                 body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; position: relative; }} 
                                 
-                                /* Hide Native Buggy Toolbar */
-                                .apexcharts-toolbar {{ display: none !important; }}
+                                /* Toolbar pushed slightly down so Reset button does not cut */
+                                .apexcharts-toolbar {{ top: 5px !important; right: 15px !important; z-index: 10 !important; }}
                                 
-                                /* 🚀 Custom Solid Reset Button (Left Aligned as requested) 🚀 */
+                                /* 🚀 CUSTOM RESET BUTTON LEFT ALIGNED 🚀 */
                                 #custom-reset-btn {{
                                     position: absolute; top: 10px; left: 15px; z-index: 9999;
                                     background-color: #f1f1f1; border: 1px solid #ccc; border-radius: 4px;
@@ -619,11 +609,12 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 }}
                                 #custom-reset-btn:hover {{ background-color: #e0e0e0; }}
                                 
-                                /* 🔥 Super Smooth Main Chart Touch Action (No slider needed) 🔥 */
+                                /* 🚀 ADVANCED SMOOTH TOUCH ACTION (Mobile-friendly panning) 🚀 */
                                 #chart-main {{ touch-action: pan-x pan-y !important; }}
                             </style>
                         </head>
                         <body>
+                            <!-- Left Aligned Reset Button -->
                             <button id="custom-reset-btn">🔄 Reset</button>
                             
                             <div id="chart-main"></div>
@@ -647,12 +638,14 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         id: 'mainChart',
                                         height: {c_main_h}, 
                                         type: 'line',
-                                        toolbar: {{ show: false }},
-                                        
-                                        /* 🔥 MAGIC TOUCH: Enables smooth dragging, disables buggy zoom 🔥 */
+                                        /* 🚀 FIXED: AutoSelected Pan for native smooth movement 🚀 */
+                                        toolbar: {{ 
+                                            show: true, 
+                                            tools: {{ download: false, selection: false, zoom: false, zoomin: false, zoomout: false, pan: false, reset: true }},
+                                            autoSelected: 'pan' 
+                                        }},
                                         zoom: {{ enabled: false }}, 
                                         selection: {{ enabled: false }},
-                                        
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
@@ -690,7 +683,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                /* 🚀 CUSTOM RESET LOGIC: Resets the Main Chart to default view 🚀 */
+                                /* Reset Button logic - resets view to show all data */
                                 document.getElementById('custom-reset-btn').addEventListener('click', function() {{
                                     chartMain.zoomX(timeCats[0], timeCats[timeCats.length - 1]);
                                 }});
