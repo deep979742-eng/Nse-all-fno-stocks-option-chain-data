@@ -22,7 +22,7 @@ REDIRECT_URI = "https://www.google.com/"
 
 st.set_page_config(page_title="F&O Dashboard", layout="wide")
 
-# CSS - FULLY MOBILE RESPONSIVE, ALIGNMENT & CHART TOUCH FIXES
+# CSS - FULLY MOBILE RESPONSIVE & LAPTOP SCREEN FIT
 css_str = """<style>
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], [data-testid='stSidebar'], .stApp, .stApp > div { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
@@ -46,8 +46,7 @@ css_str = """<style>
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
 
-/* Fix Radio button menu vertical alignment for mobile */
-div[role="radiogroup"] { margin-top: 0px !important; margin-bottom: 0px !important; }
+div[role="radiogroup"] { margin-top: 5px !important; }
 
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.1rem !important; padding-right: 0.1rem !important; } 
@@ -64,6 +63,7 @@ today_str = now_ist.strftime("%Y-%m-%d")
 HISTORY_FILE = "chart_history.csv"
 SNAPSHOT_FILE = "snapshot_950.json" 
 TOKEN_STORE_FILE = "fyers_token_store.json"
+AUTO_SAVE_FILE = "auto_save_tracker.txt"
 SHARED_LIVE_DATA_FILE = "shared_live_data.json" 
 
 if 'live_base_date' not in st.session_state or st.session_state.live_base_date != today_str:
@@ -81,7 +81,8 @@ def get_gspread_client():
             creds_dict = dict(st.secrets["gcp_service_account"])
             creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
             return gspread.authorize(creds)
-    except Exception: pass
+    except Exception:
+        pass
     return None
 
 # ==========================================
@@ -170,7 +171,8 @@ def run_master_scan(token, date_str, cycle_id):
                             ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
                             ws2.batch_clear(["A2:A100"])
                             saved_date = date_str
-            except Exception: pass
+            except Exception:
+                pass
 
             try:
                 if saved_date == date_str:
@@ -184,13 +186,16 @@ def run_master_scan(token, date_str, cycle_id):
                     loaded_prices = json.loads(decoded_str)
                     for k, v in loaded_prices.items():
                         baseline_prices[k] = round(float(v), 2)
-            except Exception: pass
+            except Exception:
+                pass
 
             try:
                 snap_val = ws2.cell(1, 2).value
                 if snap_val: snap_950 = json.loads(snap_val)
-            except Exception: pass
-        except Exception: pass
+            except Exception:
+                pass
+        except Exception:
+            pass
 
     st.session_state.baseline_count = len(baseline_prices)
     st.session_state.has_snapshot = bool(snap_950)
@@ -319,14 +324,16 @@ def run_master_scan(token, date_str, cycle_id):
             else:
                 missing_stock_names.append(s_name) 
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
-        except Exception: missing_stock_names.append(s_name)
+        except Exception:
+            missing_stock_names.append(s_name)
 
     if snapshot_changed and client:
         try:
             ss = client.open("Fyers_EOD_Data")
             ws2 = ss.worksheet("Sheet2")
             ws2.update_cell(1, 2, json.dumps(snap_950))
-        except Exception: pass
+        except Exception:
+            pass
 
     st.session_state.get_live_dump = live_ltp_data
     st.session_state.missing_stocks_list = missing_stock_names 
@@ -344,7 +351,8 @@ def run_master_scan(token, date_str, cycle_id):
             for i, cell in enumerate(clist2): cell.value = chunks[i]
             ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
             ws2.update_cells(clist2)
-        except Exception: pass
+        except Exception:
+            pass
 
     if new_csv_rows:
         new_df = pd.DataFrame(new_csv_rows)[['Date', 'Symbol', 'Time', 'LTP', 'VOL PCR', 'OPT PCR', 'VOL CPR']]
@@ -368,7 +376,8 @@ if app_mode == "💻 Master (Data Fetcher)":
         try:
             td = json.load(open(TOKEN_STORE_FILE))
             if td.get("date") == today_str: saved_token = td.get("token")
-        except Exception: pass
+        except Exception:
+            pass
 
     if saved_token:
         auth_code = "AUTO_LOGGED_IN"
@@ -388,6 +397,35 @@ if app_mode == "💻 Master (Data Fetcher)":
             else: auth_code = raw_code
 
     st.sidebar.markdown("---")
+    st.sidebar.header("💾 Baseline Save Options")
+
+    def save_eod_data():
+        if 'get_live_dump' in st.session_state:
+            try:
+                live_data = st.session_state.get_live_dump
+                if live_data:
+                    client = get_gspread_client()
+                    if not client: return False
+                    ss = client.open("Fyers_EOD_Data")
+                    ws2 = ss.worksheet("Sheet2")
+                    locked_live_data = {k: round(float(v), 2) for k, v in live_data.items()}
+                    json_str = json.dumps(locked_live_data)
+                    b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+                    chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
+                    ws2.batch_clear(["A2:A100"])
+                    clist2 = ws2.range(f'A2:A{len(chunks)+1}')
+                    for i, cell in enumerate(clist2): cell.value = chunks[i]
+                    ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
+                    ws2.update_cells(clist2)
+                    return True
+            except Exception:
+                pass
+        return False
+
+    if st.sidebar.button("Manual Baseline Save"):
+        if save_eod_data(): 
+            st.sidebar.success("Baseline Saved Successfully!")
+            st.cache_data.clear() 
 
     if auth_code:
         if auth_code != "AUTO_LOGGED_IN":
@@ -402,7 +440,8 @@ if app_mode == "💻 Master (Data Fetcher)":
                     time.sleep(1) 
                     st.rerun() 
                 else: st.sidebar.error(f"❌ Auth Code purana hai ya URL galat hai.")
-            except Exception as e: st.sidebar.error(f"❌ Error: Kripya dobara link par click karke naya URL layein.")
+            except Exception as e:
+                st.sidebar.error(f"❌ Error: Kripya dobara link par click karke naya URL layein.")
         else:
             token = saved_token
 
@@ -416,7 +455,8 @@ if app_mode == "💻 Master (Data Fetcher)":
                 try:
                     shared_pack = {"time": last_scan_timestamp, "data": cached_result, "missing": st.session_state.get('missing_stocks_list', [])}
                     json.dump(shared_pack, open(SHARED_LIVE_DATA_FILE, 'w'))
-                except Exception: pass
+                except Exception:
+                    pass
             else:
                 if 'cached_data' not in st.session_state: st.session_state.cached_data = []
     else:
@@ -431,7 +471,8 @@ elif app_mode == "📱 Viewer (Mobile Client)":
             last_scan_timestamp = shared_pack.get("time", time.time())
             st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
             st.session_state.missing_stocks_list = shared_pack.get("missing", [])
-        except Exception: pass
+        except Exception:
+            pass
     else:
         st.info("⏳ Waiting for Master Server to fetch data. Master ko on rakhein...")
         st.session_state.cached_data = []
@@ -588,7 +629,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🔥 FIX: Block accidental background touches, enlarge drag handles (buttons) 🔥
+                        # 🔥 SLN ACADEMY STYLE: THIN LINE, BIG 3.5X DOTS, NO BACKGROUND TOUCH 🔥
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -612,26 +653,32 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     pointer-events: none !important; 
                                 }}
 
-                                /* 🚀 ENLARGE BUTTONS (HANDLES) & ENABLE TOUCH ONLY ON THEM 🚀 */
+                                /* 🚀 ENABLE TOUCH ONLY ON SLIDER BOX & HANDLES 🚀 */
                                 #chart-slider .apexcharts-selection-rect,
                                 #chart-slider .apexcharts-selection-icon {{
                                     pointer-events: auto !important;
                                     touch-action: pan-x !important;
                                 }}
 
-                                /* Make handles huge (Full height buttons) */
+                                /* 🟢 THIN LINE for the selection box 🟢 */
+                                #chart-slider .apexcharts-selection-rect {{ 
+                                    cursor: grab !important; 
+                                    fill: rgba(0, 191, 255, 0.2) !important; 
+                                    stroke: #00BFFF !important; /* Blue line */
+                                    stroke-width: 1px !important; /* THIN LINE */
+                                }}
+                                #chart-slider .apexcharts-selection-rect:active {{ cursor: grabbing !important; }}
+
+                                /* 🔴 BIG DOTS (3.5x size) FOR EASY TOUCH (SLN Academy Style) 🔴 */
                                 #chart-slider .apexcharts-selection-icon {{
-                                    transform: scaleY(4) scaleX(3) !important;
+                                    transform: scale(3.5) !important; /* Uniform 3.5x Big Dot */
                                     transform-origin: center !important;
                                 }}
                                 #chart-slider .apexcharts-selection-icon circle {{
-                                    fill: #FF4D4D !important;
-                                    stroke: #fff !important;
+                                    fill: #FF4D4D !important; /* Red dot */
+                                    stroke: #ffffff !important;
                                     stroke-width: 1px !important;
                                 }}
-                                
-                                .apexcharts-selection-rect {{ cursor: grab !important; fill: rgba(0, 191, 255, 0.2) !important; }}
-                                .apexcharts-selection-rect:active {{ cursor: grabbing !important; }}
                             </style>
                         </head>
                         <body>
