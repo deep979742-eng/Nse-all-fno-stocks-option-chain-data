@@ -87,221 +87,28 @@ def get_gspread_client():
 # 3. STOCK LIST & HELPER FUNCTIONS
 # ==========================================
 raw_symbols = [
-    "NIFTY",
-    "BANKNIFTY",
-    "FINNIFTY",
-    "MIDCPNIFTY",
-    "360ONE",
-    "ABB",
-    "ABCAPITAL",
-    "ADANIENSOL",
-    "ADANIENT",
-    "ADANIGREEN",
-    "ADANIPORTS",
-    "ADANIPOWER",
-    "ALKEM",
-    "AMBER",
-    "AMBUJACEM",
-    "ANGELONE",
-    "APLAPOLLO",
-    "APOLLOHOSP",
-    "ASHOKLEY",
-    "ASIANPAINT",
-    "ASTRAL",
-    "AUBANK",
-    "AUROPHARMA",
-    "AXISBANK",
-    "BAJAJ-AUTO",
-    "BAJAJFINSV",
-    "BAJAJHLDNG",
-    "BAJFINANCE",
-    "BANDHANBNK",
-    "BANKBARODA",
-    "BANKINDIA",
-    "BDL",
-    "BEL",
-    "BHARATFORG",
-    "BHARTIARTL",
-    "BHEL",
-    "BIOCON",
-    "BLUESTARCO",
-    "BOSCHLTD",
-    "BPCL",
-    "BRITANNIA",
-    "BSE",
-    "CAMS",
-    "CANBK",
-    "CDSL",
-    "CGPOWER",
-    "CHOLAFIN",
-    "CIPLA",
-    "COALINDIA",
-    "COCHINSHIP",
-    "COFORGE",
-    "COLPAL",
-    "CONCOR",
-    "CROMPTON",
-    "CUMMINSIND",
-    "DABUR",
-    "DALBHARAT",
-    "DELHIVERY",
-    "DIVISLAB",
-    "DIXON",
-    "DLF",
-    "DMART",
-    "DRREDDY",
-    "EICHERMOT",
-    "ETERNAL",
-    "EXIDEIND",
-    "FEDERALBNK",
-    "FORCEMOT",
-    "FORTIS",
-    "GAIL",
-    "GLENMARK",
-    "GMRAIRPORT",
-    "GODFRYPHLP",
-    "GODREJCP",
-    "GODREJPROP",
-    "GRASIM",
-    "GVT&D",
-    "HAL",
-    "HAVELLS",
-    "HCLTECH",
-    "HDFCAMC",
-    "HDFCBANK",
-    "HDFCLIFE",
-    "HEROMOTOCO",
-    "HINDALCO",
-    "HINDPETRO",
-    "HINDUNILVR",
-    "HINDZINC",
-    "HYUNDAI",
-    "ICICIBANK",
-    "ICICIGI",
-    "ICICIPRULI",
-    "IDEA",
-    "IDFCFIRSTB",
-    "IEX",
-    "INDHOTEL",
-    "INDIANB",
-    "INDIGO",
-    "INDUSINDBK",
-    "INDUSTOWER",
-    "INFY",
-    "INOXWIND",
-    "IOC",
-    "IREDA",
-    "IRFC",
-    "ITC",
-    "JINDALSTEL",
-    "JIOFIN",
-    "JSWENERGY",
-    "JSWSTEEL",
-    "JUBLFOOD",
-    "KALYANKJIL",
-    "KAYNES",
-    "KEI",
-    "KFINTECH",
-    "KOTAKBANK",
-    "KPITTECH",
-    "LAURUSLABS",
-    "LICHSGFIN",
-    "LICI",
-    "LODHA",
-    "LT",
-    "LTF",
-    "LTM",
-    "LUPIN",
-    "M&M",
-    "MANAPPURAM",
-    "MANKIND",
-    "MARICO",
-    "MARUTI",
-    "MAXHEALTH",
-    "MAZDOCK",
-    "MCX",
-    "MFSL",
-    "MOTHERSON",
-    "MOTILALOFS",
-    "MPHASIS",
-    "MUTHOOTFIN",
-    "NAM-INDIA",
-    "NATIONALUM",
-    "NAUKRI",
-    "NBCC",
-    "NESTLEIND",
-    "NHPC",
-    "NMDC",
-    "NTPC",
-    "NUVAMA",
-    "NYKAA",
-    "OBEROIRLTY",
-    "OFSS",
-    "OIL",
-    "ONGC",
-    "PAGEIND",
-    "PATANJALI",
-    "PAYTM",
-    "PERSISTENT",
-    "PETRONET",
-    "PFC",
-    "PGEL",
-    "PHOENIXLTD",
-    "PIDILITIND",
-    "PIIND",
-    "PNB",
-    "PNBHOUSING",
-    "POLICYBZR",
-    "POLYCAB",
-    "POWERGRID",
-    "POWERINDIA",
-    "PREMIERENE",
-    "PRESTIGE",
-    "RADICO",
-    "RBLBANK",
-    "RECLTD",
-    "RELIANCE",
-    "RVNL",
-    "SAIL",
-    "SAMMAANCAP",
-    "SBICARD",
-    "SBILIFE",
-    "SBIN",
-    "SHREECEM",
-    "SHRIRAMFIN",
-    "SIEMENS",
-    "SOLARINDS",
-    "SONACOMS",
-    "SRF",
-    "SUNPHARMA",
-    "SUPREMEIND",
-    "SUZLON",
-    "SWIGGY",
-    "TATACONSUM",
-    "TATAELXSI",
-    "TATAPOWER",
-    "TATASTEEL",
-    "TCS",
-    "TECHM",
-    "TIINDIA",
-    "TITAN",
-    "TMPV",
-    "TORNTPHARM",
-    "TRENT",
-    "TVSMOTOR",
-    "ULTRACEMCO",
-    "UNIONBANK",
-    "UNITDSPR",
-    "UNOMINDA",
-    "UPL",
-    "VBL",
-    "VEDL",
-    "VMM",
-    "VOLTAS",
-    "WAAREEENER",
-    "WIPRO",
-    "YESBANK",
-    "ZYDUSLIFE"
+    "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
+    "ADANIPORTS", "ADANIPOWER", "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP", "ASHOKLEY", "ASIANPAINT", 
+    "ASTRAL", "AUBANK", "AUROPHARMA", "AXISBANK", "BAJAJ-AUTO", "BAJAJFINSV", "BAJAJHLDNG", "BAJFINANCE", "BANDHANBNK", "BANKBARODA", 
+    "BANKINDIA", "BDL", "BEL", "BHARATFORG", "BHARTIARTL", "BHEL", "BIOCON", "BLUESTARCO", "BOSCHLTD", "BPCL", 
+    "BRITANNIA", "BSE", "CAMS", "CANBK", "CDSL", "CGPOWER", "CHOLAFIN", "CIPLA", "COALINDIA", "COCHINSHIP", 
+    "COFORGE", "COLPAL", "CONCOR", "CROMPTON", "CUMMINSIND", "DABUR", "DALBHARAT", "DELHIVERY", "DIVISLAB", "DIXON", 
+    "DLF", "DMART", "DRREDDY", "EICHERMOT", "ETERNAL", "EXIDEIND", "FEDERALBNK", "FORCEMOT", "FORTIS", "GAIL", 
+    "GLENMARK", "GMRAIRPORT", "GODFRYPHLP", "GODREJCP", "GODREJPROP", "GRASIM", "GVT&D", "HAL", "HAVELLS", "HCLTECH", 
+    "HDFCAMC", "HDFCBANK", "HDFCLIFE", "HEROMOTOCO", "HINDALCO", "HINDPETRO", "HINDUNILVR", "HINDZINC", "HYUNDAI", "ICICIBANK", 
+    "ICICIGI", "ICICIPRULI", "IDEA", "IDFCFIRSTB", "IEX", "INDHOTEL", "INDIANB", "INDIGO", "INDUSINDBK", "INDUSTOWER", 
+    "INFY", "INOXWIND", "IOC", "IREDA", "IRFC", "ITC", "JINDALSTEL", "JIOFIN", "JSWENERGY", "JSWSTEEL", 
+    "JUBLFOOD", "KALYANKJIL", "KAYNES", "KEI", "KFINTECH", "KOTAKBANK", "KPITTECH", "LAURUSLABS", "LICHSGFIN", "LICI", 
+    "LODHA", "LT", "LTF", "LTM", "LUPIN", "M&M", "MANAPPURAM", "MANKIND", "MARICO", "MARUTI", 
+    "MAXHEALTH", "MAZDOCK", "MCX", "MFSL", "MOTHERSON", "MOTILALOFS", "MPHASIS", "MUTHOOTFIN", "NAM-INDIA", "NATIONALUM", 
+    "NAUKRI", "NBCC", "NESTLEIND", "NHPC", "NMDC", "NTPC", "NUVAMA", "NYKAA", "OBEROIRLTY", "OFSS", 
+    "OIL", "ONGC", "PAGEIND", "PATANJALI", "PAYTM", "PERSISTENT", "PETRONET", "PFC", "PGEL", "PHOENIXLTD", 
+    "PIDILITIND", "PIIND", "PNB", "PNBHOUSING", "POLICYBZR", "POLYCAB", "POWERGRID", "POWERINDIA", "PREMIERENE", "PRESTIGE", 
+    "RADICO", "RBLBANK", "RECLTD", "RELIANCE", "RVNL", "SAIL", "SAMMAANCAP", "SBICARD", "SBILIFE", "SBIN", 
+    "SHREECEM", "SHRIRAMFIN", "SIEMENS", "SOLARINDS", "SONACOMS", "SRF", "SUNPHARMA", "SUPREMEIND", "SUZLON", "SWIGGY", 
+    "TATACONSUM", "TATAELXSI", "TATAPOWER", "TATASTEEL", "TCS", "TECHM", "TIINDIA", "TITAN", "TMPV", "TORNTPHARM", 
+    "TRENT", "TVSMOTOR", "ULTRACEMCO", "UNIONBANK", "UNITDSPR", "UNOMINDA", "UPL", "VBL", "VEDL", "VMM", 
+    "VOLTAS", "WAAREEENER", "WIPRO", "YESBANK", "ZYDUSLIFE"
 ]
 
 def calc_vol_pcr(ce_vol, pe_vol): return 0.0 if ce_vol == 0 else round(pe_vol / ce_vol, 2)
@@ -322,7 +129,7 @@ st.sidebar.markdown("---")
 if app_mode == "📱 Viewer (Mobile Client)":
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 elif app_mode == "💻 Master (Data Fetcher)":
-    st_autorefresh(interval=310000, limit=100000, key="master_fetch_loop")
+    st_autorefresh(interval=300000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
 # 5. DATA SCANNER (Master Fast Engine)
@@ -460,7 +267,8 @@ def run_master_scan(token, date_str, cycle_id):
                 v_cpr = calc_vol_cpr(c_v, p_v)
                 v_pcr = calc_vol_pcr(c_v, p_v)
 
-                if scan_time_ist.time() < datetime.time(9, 50):
+                # 🔥 9:15 AM Baseline Logic 🔥
+                if scan_time_ist.time() < datetime.time(9, 15):
                     pcr_abs, vol_abs, pcr_pct, vol_pct = 0.0, 0.0, 0.0, 0.0
                 else:
                     if s_name not in snap_950:
@@ -511,8 +319,7 @@ def run_master_scan(token, date_str, cycle_id):
             else:
                 missing_stock_names.append(s_name) 
                 final_list.append({'SYMS': s_name + " (NA)", 'OPEN_STATUS': open_status, 'V_PCR': 0.0, 'O_PCR': 0.0, 'V_CPR': 0.0, 'LTP_CH': float(v.get('ch', 0)), 'CHG_%': float(v.get('chp', 0)), 'LTP': spot_ltp, 'VOL_ABS': 0.0, 'PCR_ABS': 0.0, 'VOL_PCT': 0.0, 'PCR_PCT': 0.0, 'CE_CON': 0.0, 'PE_CON': 0.0})
-        except Exception:
-            missing_stock_names.append(s_name)
+        except Exception: missing_stock_names.append(s_name)
 
     if snapshot_changed and client:
         try:
@@ -581,6 +388,34 @@ if app_mode == "💻 Master (Data Fetcher)":
             else: auth_code = raw_code
 
     st.sidebar.markdown("---")
+    st.sidebar.header("💾 Baseline Save Options")
+
+    def save_eod_data():
+        if 'get_live_dump' in st.session_state:
+            try:
+                live_data = st.session_state.get_live_dump
+                if live_data:
+                    client = get_gspread_client()
+                    if not client: return False
+                    ss = client.open("Fyers_EOD_Data")
+                    ws2 = ss.worksheet("Sheet2")
+                    locked_live_data = {k: round(float(v), 2) for k, v in live_data.items()}
+                    json_str = json.dumps(locked_live_data)
+                    b64_str = base64.b64encode(json_str.encode('utf-8')).decode('utf-8')
+                    chunks = [b64_str[i:i+40000] for i in range(0, len(b64_str), 40000)]
+                    ws2.batch_clear(["A2:A100"])
+                    clist2 = ws2.range(f'A2:A{len(chunks)+1}')
+                    for i, cell in enumerate(clist2): cell.value = chunks[i]
+                    ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {today_str}")
+                    ws2.update_cells(clist2)
+                    return True
+            except: pass
+        return False
+
+    if st.sidebar.button("Manual Baseline Save"):
+        if save_eod_data(): 
+            st.sidebar.success("Baseline Saved Successfully!")
+            st.cache_data.clear() 
 
     if auth_code:
         if auth_code != "AUTO_LOGGED_IN":
@@ -665,7 +500,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
     with col_timer:
         if app_mode == "💻 Master (Data Fetcher)":
-            # 🚀 Changed Timer to exactly 300 Seconds 🚀
+            # 🚀 TIMER SET TO EXACTLY 300 SECONDS AS REQUESTED 🚀
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Fetching Natively: <span id="clock"></span>
@@ -676,10 +511,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
                         document.getElementById('clock').innerHTML = "RELOADING...";
-                        
-                        /* Deep Native Reload */
                         window.top.location.reload(true);
-                        
                     }} else {{
                         timeLeft--;
                         var m = Math.floor(timeLeft / 60);
@@ -785,7 +617,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🚀 RESTORED SLIDER + BUTTON ON LEFT + SMOOTH PANNING 🚀
+                        # 🔥 THE "MAGIC TOUCH" LOGIC: NO SLIDER, PURE FAST NATIVE PANNING 🔥
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -794,10 +626,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <style> 
                                 body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; position: relative; }} 
                                 
-                                /* Hide original toolbar to avoid confusion */
+                                /* Hide Native Buggy Toolbar */
                                 .apexcharts-toolbar {{ display: none !important; }}
                                 
-                                /* 🚀 Custom Reset Button shifted to LEFT 🚀 */
+                                /* 🔥 Custom Reset Button shifted to LEFT as requested 🔥 */
                                 #custom-reset-btn {{
                                     position: absolute; top: 10px; left: 15px; z-index: 9999;
                                     background-color: #f1f1f1; border: 1px solid #ccc; border-radius: 4px;
@@ -806,18 +638,16 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 }}
                                 #custom-reset-btn:hover {{ background-color: #e0e0e0; }}
                                 
-                                /* 🚀 CSS Magic to make the slider smooth and non-jittery on mobile 🚀 */
-                                #chart-slider, #chart-slider * {{ touch-action: pan-x !important; }}
-                                .apexcharts-selection-rect {{ cursor: grab !important; touch-action: pan-x !important; }}
-                                .apexcharts-selection-rect:active {{ cursor: grabbing !important; }}
+                                /* 🔥 Super Smooth Main Chart Touch Action (No slider needed) 🔥 */
+                                #chart-main {{ touch-action: pan-x pan-y !important; }}
                             </style>
                         </head>
                         <body>
+                            <!-- CUSTOM RESET BUTTON -->
                             <button id="custom-reset-btn">🔄 Reset</button>
                             
+                            <!-- ONLY ONE MAIN CHART (No Slider) -->
                             <div id="chart-main"></div>
-                            
-                            <div id="chart-slider" style="margin-top: -15px;"></div>
                             
                             <script>
                                 var dataIndicator = {json.dumps(indicator_list)};
@@ -840,7 +670,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         type: 'line',
                                         toolbar: {{ show: false }},
                                         
-                                        /* 🚀 NO ACCIDENTAL ZOOM on main chart, Pan only 🚀 */
+                                        /* 🔥 MAGIC TOUCH: Enables smooth dragging, disables buggy zoom 🔥 */
                                         zoom: {{ enabled: false }}, 
                                         selection: {{ enabled: false }},
                                         
@@ -881,61 +711,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                /* 🚀 Slider is enabled just like you wanted 🚀 */
-                                var optionsSlider = {{
-                                    series: [{{
-                                        name: '{chart_mode}',
-                                        data: dataIndicator
-                                    }}],
-                                    chart: {{
-                                        id: 'sliderChart',
-                                        height: 80,
-                                        type: 'area',
-                                        brush: {{ target: 'mainChart', enabled: true }},
-                                        selection: {{ 
-                                            enabled: true,
-                                            xaxis: {{
-                                                min: timeCats.length > 30 ? timeCats[timeCats.length - 30] : timeCats[0],
-                                                max: timeCats[timeCats.length - 1]
-                                            }}
-                                        }},
-                                        toolbar: {{ show: false }},
-                                        animations: {{ enabled: false }}
-                                    }},
-                                    colors: ['{indicator_color}'],
-                                    fill: {{
-                                        type: 'gradient',
-                                        gradient: {{ shadeIntensity: 1, opacityFrom: 0.3, opacityTo: 0.1, stops: [0, 100] }}
-                                    }},
-                                    stroke: {{ curve: 'smooth', width: 1 }},
-                                    dataLabels: {{ enabled: false }},
-                                    xaxis: {{
-                                        categories: timeCats,
-                                        tickAmount: 10,
-                                        labels: {{ show: false }},
-                                        tooltip: {{ enabled: false }}
-                                    }},
-                                    yaxis: {{ show: false, tickAmount: 2 }},
-                                    grid: {{ show: false }}
-                                }};
-
-                                window.chartSlider = new ApexCharts(document.querySelector("#chart-slider"), optionsSlider);
-                                window.chartSlider.render();
-                                
-                                /* 🚀 Custom Reset Button perfectly syncs the main chart and slider 🚀 */
+                                /* 🚀 CUSTOM RESET LOGIC: Resets the Main Chart to default view 🚀 */
                                 document.getElementById('custom-reset-btn').addEventListener('click', function() {{
-                                    if(window.chartSlider) {{
-                                        window.chartSlider.updateOptions({{
-                                            chart: {{
-                                                selection: {{
-                                                    xaxis: {{
-                                                        min: timeCats[0],
-                                                        max: timeCats[timeCats.length - 1]
-                                                    }}
-                                                }}
-                                            }}
-                                        }});
-                                    }}
+                                    chartMain.zoomX(timeCats[0], timeCats[timeCats.length - 1]);
                                 }});
                             </script>
                         </body>
