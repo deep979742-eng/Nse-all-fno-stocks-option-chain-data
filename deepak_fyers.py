@@ -584,7 +584,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 'CHG_%': 'CHANGE%', 
                 'LTP': 'LTP', 
                 'CE_CON': 'CE_CONTRACT', 
-                'PE_CON': 'PE_CONTRACT'
+                'PE_CONTRACT': 'PE_CONTRACT'
             })
 
             styled_df = (df.style.hide(axis="index")
@@ -631,7 +631,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🔥 100% FIXED: X-AXIS NOW USES ACTUAL TIME LABELS INSTEAD OF 1,2,3... 🔥
+                        # 🔥 UPDATED HTML/JS: SLICES DATA TO FORCE Y-AXIS AUTO-SCALING 🔥
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -709,7 +709,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             <script>
                                 var dataIndicator = {json.dumps(indicator_list)};
                                 var dataLTP = {json.dumps(ltp_list)};
-                                var timeCats = {json.dumps(time_list)}; // ACTUALLY contains ["09:17", "09:22"...]
+                                var timeCats = {json.dumps(time_list)}; 
                                 
                                 var optionsMain = {{
                                     series: [{{
@@ -738,7 +738,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     }},
                                     dataLabels: {{ enabled: false }},
                                     xaxis: {{
-                                        categories: timeCats, /* Categories properly mapped */
+                                        categories: timeCats, 
                                         tickAmount: 10,
                                         labels: {{ style: {{ colors: '#888' }} }},
                                         tooltip: {{ enabled: false }}
@@ -747,11 +747,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         {{
                                             title: {{ text: '{chart_mode}', style: {{ color: '{indicator_color}' }} }},
                                             labels: {{ style: {{ colors: '{indicator_color}' }} }},
+                                            decimalsInFloat: 2
                                         }},
                                         {{
                                             opposite: true,
                                             title: {{ text: 'LTP', style: {{ color: '#00CC66' }} }},
                                             labels: {{ style: {{ colors: '#00CC66' }} }},
+                                            decimalsInFloat: 2
                                         }}
                                     ],
                                     tooltip: {{
@@ -765,7 +767,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                /* 🔥 DYNAMIC FILTER LOGIC 🔥 */
+                                /* 🔥 NEW DYNAMIC SLICING FILTER LOGIC 🔥 */
                                 var totalPoints = timeCats.length;
                                 var slider = document.getElementById('native-slider');
                                 var lblStart = document.getElementById('lbl-start');
@@ -785,13 +787,24 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         var percentage = slider.max > 0 ? (slider.value / slider.max) * 100 : 0;
                                         slider.style.background = 'linear-gradient(to right, #2962FF ' + percentage + '%, #e0e0e0 ' + percentage + '%)';
                                         
-                                        // 🔥 THE FIX: zoomX expects the EXACT categorical string values (like "09:17"), NOT indices!
-                                        chartMain.zoomX(timeCats[startIdx], timeCats[totalPoints - 1]);
+                                        // 1. Slice the arrays to permanently hide past data based on slider
+                                        var slicedTimeCats = timeCats.slice(startIdx);
+                                        var slicedIndicator = dataIndicator.slice(startIdx);
+                                        var slicedLTP = dataLTP.slice(startIdx);
+                                        
+                                        // 2. Update chart data entirely. This forces the Y-Axes to auto-scale, causing the lines to intersect naturally.
+                                        chartMain.updateOptions({{
+                                            xaxis: {{ categories: slicedTimeCats }},
+                                            series: [
+                                                {{ name: '{chart_mode}', data: slicedIndicator }},
+                                                {{ name: 'LTP', data: slicedLTP }}
+                                            ]
+                                        }}, false, false, false);
                                     }}
                                     
                                     slider.addEventListener('input', updateChartAndUI);
                                     
-                                    setTimeout(updateChartAndUI, 500);
+                                    setTimeout(updateChartAndUI, 200);
 
                                     document.getElementById('custom-reset-btn').addEventListener('click', function() {{
                                         slider.value = 0; 
