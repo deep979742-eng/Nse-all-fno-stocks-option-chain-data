@@ -634,11 +634,14 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
+                        # 🔥 UPDATED HTML/JS: Added noUiSlider for Dual Dots 🔥
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
                         <head>
                             <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+                            <link href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css" rel="stylesheet">
+                            <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
                             <style> 
                                 body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; position: relative; overflow: hidden; }} 
                                 
@@ -663,35 +666,32 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     font-size: 11px;
                                     font-weight: bold;
                                     color: #666;
-                                    margin-bottom: 5px;
+                                    margin-bottom: 15px;
                                 }}
                                 
-                                input[type=range] {{
-                                    -webkit-appearance: none;
-                                    width: 100%;
-                                    height: 5px;
+                                /* Customizing noUiSlider to match your previous blue theme */
+                                .noUi-target {{
                                     background: #e0e0e0;
-                                    border-radius: 5px;
-                                    outline: none;
+                                    border: none;
+                                    box-shadow: none;
+                                    height: 5px;
                                 }}
-                                input[type=range]::-webkit-slider-thumb {{
-                                    -webkit-appearance: none;
-                                    appearance: none;
-                                    width: 22px;
-                                    height: 22px;
+                                .noUi-connect {{
+                                    background: #2962FF;
+                                }}
+                                .noUi-handle {{
+                                    width: 22px !important;
+                                    height: 22px !important;
                                     border-radius: 50%;
                                     background: #2962FF;
-                                    cursor: pointer;
-                                    box-shadow: 0 2px 5px rgba(0,0,0,0.3);
-                                }}
-                                input[type=range]::-moz-range-thumb {{
-                                    width: 22px;
-                                    height: 22px;
-                                    border-radius: 50%;
-                                    background: #2962FF;
-                                    cursor: pointer;
                                     box-shadow: 0 2px 5px rgba(0,0,0,0.3);
                                     border: none;
+                                    right: -11px !important;
+                                    top: -9px !important;
+                                    cursor: pointer;
+                                }}
+                                .noUi-handle:before, .noUi-handle:after {{
+                                    display: none; /* Removes the double lines inside the handles */
                                 }}
                             </style>
                         </head>
@@ -705,7 +705,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     <span id="lbl-start"></span>
                                     <span id="lbl-end"></span>
                                 </div>
-                                <input type="range" id="native-slider" min="0" value="0">
+                                <div id="dual-slider"></div>
                             </div>
                             
                             <script>
@@ -733,7 +733,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
-                                    /* 🔥 Yahi smooth curve lagaya gaya hai 🔥 */
                                     stroke: {{ curve: 'smooth', width: [3, 3] }}, 
                                     fill: {{
                                         type: ['gradient', 'solid'],
@@ -771,27 +770,32 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 chartMain.render();
 
                                 var totalPoints = timeCats.length;
-                                var slider = document.getElementById('native-slider');
+                                var slider = document.getElementById('dual-slider');
                                 var lblStart = document.getElementById('lbl-start');
                                 var lblEnd = document.getElementById('lbl-end');
 
                                 if(totalPoints > 0) {{
-                                    slider.max = totalPoints - 1; 
-                                    slider.value = 0; 
+                                    // Initialize Dual Slider
+                                    noUiSlider.create(slider, {{
+                                        start: [0, totalPoints - 1],
+                                        connect: true,
+                                        range: {{
+                                            'min': 0,
+                                            'max': totalPoints - 1
+                                        }},
+                                        step: 1
+                                    }});
                                     
-                                    lblEnd.innerText = "Live: " + timeCats[totalPoints - 1]; 
-                                    
-                                    function updateChartAndUI() {{
-                                        var startIdx = parseInt(slider.value);
+                                    slider.noUiSlider.on('update', function (values, handle) {{
+                                        var startIdx = parseInt(values[0]);
+                                        var endIdx = parseInt(values[1]);
                                         
                                         lblStart.innerText = "From: " + timeCats[startIdx];
+                                        lblEnd.innerText = "To: " + timeCats[endIdx];
                                         
-                                        var percentage = slider.max > 0 ? (slider.value / slider.max) * 100 : 0;
-                                        slider.style.background = 'linear-gradient(to right, #2962FF ' + percentage + '%, #e0e0e0 ' + percentage + '%)';
-                                        
-                                        var slicedTimeCats = timeCats.slice(startIdx);
-                                        var slicedIndicator = dataIndicator.slice(startIdx);
-                                        var slicedLTP = dataLTP.slice(startIdx);
+                                        var slicedTimeCats = timeCats.slice(startIdx, endIdx + 1);
+                                        var slicedIndicator = dataIndicator.slice(startIdx, endIdx + 1);
+                                        var slicedLTP = dataLTP.slice(startIdx, endIdx + 1);
                                         
                                         chartMain.updateOptions({{
                                             xaxis: {{ categories: slicedTimeCats }},
@@ -800,15 +804,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                                 {{ name: 'LTP', data: slicedLTP }}
                                             ]
                                         }}, false, false, false);
-                                    }}
-                                    
-                                    slider.addEventListener('input', updateChartAndUI);
-                                    
-                                    setTimeout(updateChartAndUI, 200);
+                                    }});
 
                                     document.getElementById('custom-reset-btn').addEventListener('click', function() {{
-                                        slider.value = 0; 
-                                        updateChartAndUI(); 
+                                        slider.noUiSlider.set([0, totalPoints - 1]);
                                     }});
                                 }} else {{
                                     lblStart.innerText = "No Data";
