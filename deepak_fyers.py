@@ -584,7 +584,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 'CHG_%': 'CHANGE%', 
                 'LTP': 'LTP', 
                 'CE_CON': 'CE_CONTRACT', 
-                'PE_CONTRACT': 'PE_CONTRACT'
+                'PE_CON': 'PE_CONTRACT'
             })
 
             styled_df = (df.style.hide(axis="index")
