@@ -133,7 +133,8 @@ st.sidebar.markdown("---")
 if app_mode == "📱 Viewer (Mobile Client)":
     st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 elif app_mode == "💻 Master (Data Fetcher)":
-    st_autorefresh(interval=300000, limit=100000, key="master_fetch_loop")
+    # 3 मिनट का मास्टर फेच लूप
+    st_autorefresh(interval=180000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
 # 5. DATA SCANNER (Master Fast Engine)
@@ -220,11 +221,12 @@ def run_master_scan(token, date_str, cycle_id):
 
     def fetch_option_chain_fast_local(q):
         sym = q['n']
-        time.sleep(0.3) 
+        # 0.6 सेकंड का स्लीप
+        time.sleep(0.6) 
         try:
             oc = fyers.optionchain(data={"symbol": sym, "strikecount": 60, "timestamp": ""})
             if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
-                time.sleep(1.0) 
+                time.sleep(2.0) 
                 oc = fyers.optionchain(data={"symbol": sym, "strikecount": 60, "timestamp": ""})
             return q, oc
         except Exception: 
@@ -233,7 +235,7 @@ def run_master_scan(token, date_str, cycle_id):
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
         future_to_q = {executor.submit(fetch_option_chain_fast_local, q): q for q in all_quotes}
         try:
-            for future in concurrent.futures.as_completed(future_to_q, timeout=120):
+            for future in concurrent.futures.as_completed(future_to_q, timeout=180):
                 try:
                     res = future.result()
                     if res: results_list.append(res)
@@ -515,12 +517,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
     with col_timer:
         if app_mode == "💻 Master (Data Fetcher)":
+            # 180 सेकंड का उलटा टाइमर
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Next Fetch: <span id="clock"></span>
             </div>
             <script>
-                var timeLeft = 300;
+                var timeLeft = 180;
                 var clockTimer = setInterval(function() {{
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
@@ -631,7 +634,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🔥 UPDATED HTML/JS: SLICES DATA TO FORCE Y-AXIS AUTO-SCALING 🔥
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -731,7 +733,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         animations: {{ enabled: false }}
                                     }},
                                     colors: ['{indicator_color}', '#00CC66'],
-                                    stroke: {{ curve: 'smooth', width: [2, 2] }}, 
+                                    /* 🔥 Yahi smooth curve lagaya gaya hai 🔥 */
+                                    stroke: {{ curve: 'smooth', width: [3, 3] }}, 
                                     fill: {{
                                         type: ['gradient', 'solid'],
                                         gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }}
@@ -767,7 +770,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                                 chartMain.render();
 
-                                /* 🔥 NEW DYNAMIC SLICING FILTER LOGIC 🔥 */
                                 var totalPoints = timeCats.length;
                                 var slider = document.getElementById('native-slider');
                                 var lblStart = document.getElementById('lbl-start');
@@ -787,12 +789,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                         var percentage = slider.max > 0 ? (slider.value / slider.max) * 100 : 0;
                                         slider.style.background = 'linear-gradient(to right, #2962FF ' + percentage + '%, #e0e0e0 ' + percentage + '%)';
                                         
-                                        // 1. Slice the arrays to permanently hide past data based on slider
                                         var slicedTimeCats = timeCats.slice(startIdx);
                                         var slicedIndicator = dataIndicator.slice(startIdx);
                                         var slicedLTP = dataLTP.slice(startIdx);
                                         
-                                        // 2. Update chart data entirely. This forces the Y-Axes to auto-scale, causing the lines to intersect naturally.
                                         chartMain.updateOptions({{
                                             xaxis: {{ categories: slicedTimeCats }},
                                             series: [
