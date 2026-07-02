@@ -108,7 +108,7 @@ raw_symbols = [
     "NAUKRI", "NBCC", "NESTLEIND", "NHPC", "NMDC", "NTPC", "NUVAMA", "NYKAA", "OBEROIRLTY", "OFSS", 
     "OIL", "ONGC", "PAGEIND", "PATANJALI", "PAYTM", "PERSISTENT", "PETRONET", "PFC", "PGEL", "PHOENIXLTD", 
     "PIDILITIND", "PIIND", "PNB", "PNBHOUSING", "POLICYBZR", "POLYCAB", "POWERGRID", "POWERINDIA", "PREMIERENE", "PRESTIGE", 
-    "RADICO", "RBLBANK", "RECLTD", "RELIANCE", "RVNL", "SAIL", "SBICARD", "SBILIFE", "SBIN", 
+    "RADICO", "RBLBANK", "RECLTD", "RELIANCE", "RVNL", "SAIL", "SAMMAANCAP", "SBICARD", "SBILIFE", "SBIN", 
     "SHREECEM", "SHRIRAMFIN", "SIEMENS", "SOLARINDS", "SONACOMS", "SRF", "SUNPHARMA", "SUPREMEIND", "SUZLON", "SWIGGY", 
     "TATACONSUM", "TATAELXSI", "TATAPOWER", "TATASTEEL", "TCS", "TECHM", "TIINDIA", "TITAN", "TMPV", "TORNTPHARM", 
     "TRENT", "TVSMOTOR", "ULTRACEMCO", "UNIONBANK", "UNITDSPR", "UNOMINDA", "UPL", "VBL", "VEDL", "VMM", 
@@ -224,10 +224,11 @@ def run_master_scan(token, date_str, cycle_id):
         # 0.6 सेकंड का स्लीप
         time.sleep(0.6) 
         try:
-            oc = fyers.optionchain(data={"symbol": sym, "strikecount": 60, "timestamp": ""})
+            # 🔥 FIX: strikecount 160 कर दिया गया है 🔥
+            oc = fyers.optionchain(data={"symbol": sym, "strikecount": 160, "timestamp": ""})
             if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
                 time.sleep(2.0) 
-                oc = fyers.optionchain(data={"symbol": sym, "strikecount": 60, "timestamp": ""})
+                oc = fyers.optionchain(data={"symbol": sym, "strikecount": 160, "timestamp": ""})
             return q, oc
         except Exception: 
             return q, None
@@ -634,7 +635,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         indicator_list = df_sym[target_col].tolist()
                         ltp_list = df_sym['LTP'].tolist()
 
-                        # 🔥 UPDATED HTML/JS: Added noUiSlider for Dual Dots 🔥
                         apex_html = f"""
                         <!DOCTYPE html>
                         <html>
@@ -669,7 +669,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     margin-bottom: 15px;
                                 }}
                                 
-                                /* Customizing noUiSlider to match your previous blue theme */
                                 .noUi-target {{
                                     background: #e0e0e0;
                                     border: none;
@@ -691,7 +690,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                     cursor: pointer;
                                 }}
                                 .noUi-handle:before, .noUi-handle:after {{
-                                    display: none; /* Removes the double lines inside the handles */
+                                    display: none;
                                 }}
                             </style>
                         </head>
@@ -775,7 +774,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 var lblEnd = document.getElementById('lbl-end');
 
                                 if(totalPoints > 0) {{
-                                    // Initialize Dual Slider
                                     noUiSlider.create(slider, {{
                                         start: [0, totalPoints - 1],
                                         connect: true,
