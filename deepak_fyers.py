@@ -124,17 +124,17 @@ def get_raw_symbol(fyers_sym):
     return "NIFTY" if s=="NIFTY50" else "BANKNIFTY" if s=="NIFTYBANK" else s
 
 # ==========================================
-# 4. APP MODE SELECTION
+# 4. APP MODE SELECTION & COUNTER FIX
 # ==========================================
 st.sidebar.markdown("### 📱 APP MODE")
 app_mode = st.sidebar.radio("Select Device Role:", ["💻 Master (Data Fetcher)", "📱 Viewer (Mobile Client)"])
 st.sidebar.markdown("---")
 
+fetch_counter = 0
 if app_mode == "📱 Viewer (Mobile Client)":
-    st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
+    fetch_counter = st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 elif app_mode == "💻 Master (Data Fetcher)":
-    # 3 मिनट का मास्टर फेच लूप
-    st_autorefresh(interval=180000, limit=100000, key="master_fetch_loop")
+    fetch_counter = st_autorefresh(interval=180000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
 # 5. DATA SCANNER (Master Fast Engine)
@@ -161,6 +161,7 @@ def run_master_scan(token, date_str, cycle_id):
                 tab2_date_row = ws2.cell(1, 1).value
                 if tab2_date_row and "LAST_SAVED_DATE:" in tab2_date_row:
                     saved_date = tab2_date_row.replace("LAST_SAVED_DATE:", "").strip()
+                    # 🔥 THE FIX IS HERE 🔥
                     if saved_date and saved_date != date_str:
                         tab2_col_vals = ws2.col_values(1)[1:] 
                         full_b64 = "".join(tab2_col_vals)
@@ -173,6 +174,7 @@ def run_master_scan(token, date_str, cycle_id):
                             
                             ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
                             ws2.batch_clear(["A2:A100"])
+                            ws2.update_cell(1, 2, "") # 🔥 कल का 9:50 AM स्नैपशॉट डिलीट किया गया 🔥
                             saved_date = date_str
             except Exception:
                 pass
@@ -193,8 +195,10 @@ def run_master_scan(token, date_str, cycle_id):
                 pass
 
             try:
-                snap_val = ws2.cell(1, 2).value
-                if snap_val: snap_950 = json.loads(snap_val)
+                # 🔥 EXTRA SAFETY: अब ये स्नैपशॉट तभी लोड करेगा जब दिन आज का हो 🔥
+                if saved_date == date_str:
+                    snap_val = ws2.cell(1, 2).value
+                    if snap_val: snap_950 = json.loads(snap_val)
             except Exception:
                 pass
         except Exception:
@@ -221,10 +225,8 @@ def run_master_scan(token, date_str, cycle_id):
 
     def fetch_option_chain_fast_local(q):
         sym = q['n']
-        # 0.6 सेकंड का स्लीप
         time.sleep(0.6) 
         try:
-            # 🔥 FIX: strikecount 160 कर दिया गया है 🔥
             oc = fyers.optionchain(data={"symbol": sym, "strikecount": 160, "timestamp": ""})
             if not (oc and oc.get('s') == 'ok' and 'optionsChain' in oc['data']):
                 time.sleep(2.0) 
@@ -451,7 +453,7 @@ if app_mode == "💻 Master (Data Fetcher)":
             token = saved_token
 
         if token:
-            cached_result, last_scan_timestamp = run_master_scan(token, today_str, int(time.time()))
+            cached_result, last_scan_timestamp = run_master_scan(token, today_str, fetch_counter)
 
             if cached_result is not None:
                 st.session_state.cached_data = cached_result
@@ -518,7 +520,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
     with col_timer:
         if app_mode == "💻 Master (Data Fetcher)":
-            # 180 सेकंड का उलटा टाइमर
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Next Fetch: <span id="clock"></span>
