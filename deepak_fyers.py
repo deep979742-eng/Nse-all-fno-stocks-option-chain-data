@@ -134,12 +134,13 @@ fetch_counter = 0
 if app_mode == "📱 Viewer (Mobile Client)":
     fetch_counter = st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 elif app_mode == "💻 Master (Data Fetcher)":
-    fetch_counter = st_autorefresh(interval=180000, limit=100000, key="master_fetch_loop")
+    # 🔥 3.5 मिनट (210000 ms) का मास्टर फेच लूप 🔥
+    fetch_counter = st_autorefresh(interval=210000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
 # 5. DATA SCANNER (Master Fast Engine)
 # ==========================================
-@st.cache_data(show_spinner=False)
+@st.cache_data(show_spinner=False, ttl=600)
 def run_master_scan(token, date_str, cycle_id):
     fyers = fyersModel.FyersModel(client_id=APP_ID, is_async=False, token=token, log_path="")
     scan_time_ist = datetime.datetime.now(IST)
@@ -161,7 +162,6 @@ def run_master_scan(token, date_str, cycle_id):
                 tab2_date_row = ws2.cell(1, 1).value
                 if tab2_date_row and "LAST_SAVED_DATE:" in tab2_date_row:
                     saved_date = tab2_date_row.replace("LAST_SAVED_DATE:", "").strip()
-                    # 🔥 THE FIX IS HERE 🔥
                     if saved_date and saved_date != date_str:
                         tab2_col_vals = ws2.col_values(1)[1:] 
                         full_b64 = "".join(tab2_col_vals)
@@ -174,7 +174,7 @@ def run_master_scan(token, date_str, cycle_id):
                             
                             ws2.update_cell(1, 1, f"LAST_SAVED_DATE: {date_str}")
                             ws2.batch_clear(["A2:A100"])
-                            ws2.update_cell(1, 2, "") # 🔥 कल का 9:50 AM स्नैपशॉट डिलीट किया गया 🔥
+                            ws2.update_cell(1, 2, "") 
                             saved_date = date_str
             except Exception:
                 pass
@@ -195,7 +195,6 @@ def run_master_scan(token, date_str, cycle_id):
                 pass
 
             try:
-                # 🔥 EXTRA SAFETY: अब ये स्नैपशॉट तभी लोड करेगा जब दिन आज का हो 🔥
                 if saved_date == date_str:
                     snap_val = ws2.cell(1, 2).value
                     if snap_val: snap_950 = json.loads(snap_val)
@@ -453,7 +452,10 @@ if app_mode == "💻 Master (Data Fetcher)":
             token = saved_token
 
         if token:
-            cached_result, last_scan_timestamp = run_master_scan(token, today_str, fetch_counter)
+            if 'session_run_id' not in st.session_state:
+                st.session_state.session_run_id = int(time.time())
+                
+            cached_result, last_scan_timestamp = run_master_scan(token, today_str, st.session_state.session_run_id)
 
             if cached_result is not None:
                 st.session_state.cached_data = cached_result
@@ -520,12 +522,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
     with col_timer:
         if app_mode == "💻 Master (Data Fetcher)":
+            # 🔥 3.5 मिनट (210 सेकंड) का उलटा टाइमर 🔥
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Next Fetch: <span id="clock"></span>
             </div>
             <script>
-                var timeLeft = 180;
+                var timeLeft = 210;
                 var clockTimer = setInterval(function() {{
                     if(timeLeft <= 0) {{
                         clearInterval(clockTimer);
