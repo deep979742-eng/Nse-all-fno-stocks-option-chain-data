@@ -5,12 +5,20 @@ import time
 import os
 import json
 import base64
+import socket  # 🔥 NAYA IMPORT: ADVANCED WATCHDOG KE LIYE 🔥
 from fyers_apiv3 import fyersModel
 import gspread
 from google.oauth2.service_account import Credentials
 import concurrent.futures
 from streamlit_autorefresh import st_autorefresh
 import streamlit.components.v1 as components  
+
+# ==========================================
+# 🔥 ADVANCED FIX: WATCHDOG TIMEOUT 🔥
+# Agar Fyers API 12 second se zyada hang hui, toh connection auto-cut ho jayega. 
+# Code kabhi bhi 30-40 minute ke liye freeze nahi hoga!
+# ==========================================
+socket.setdefaulttimeout(12)
 
 # ==========================================
 # 1. FYERS CREDENTIALS & SETUP
@@ -134,13 +142,13 @@ fetch_counter = 0
 if app_mode == "📱 Viewer (Mobile Client)":
     fetch_counter = st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 elif app_mode == "💻 Master (Data Fetcher)":
-    # 🔥 3.5 मिनट (210000 ms) का मास्टर फेच लूप 🔥
+    # 3.5 मिनट (210000 ms) का मास्टर फेच लूप
     fetch_counter = st_autorefresh(interval=210000, limit=100000, key="master_fetch_loop")
 
 # ==========================================
 # 5. DATA SCANNER (Master Fast Engine)
 # ==========================================
-@st.cache_data(show_spinner=False, ttl=600)
+@st.cache_data(show_spinner=False, ttl=600, max_entries=5)
 def run_master_scan(token, date_str, cycle_id):
     fyers = fyersModel.FyersModel(client_id=APP_ID, is_async=False, token=token, log_path="")
     scan_time_ist = datetime.datetime.now(IST)
@@ -452,10 +460,8 @@ if app_mode == "💻 Master (Data Fetcher)":
             token = saved_token
 
         if token:
-            if 'session_run_id' not in st.session_state:
-                st.session_state.session_run_id = int(time.time())
-                
-            cached_result, last_scan_timestamp = run_master_scan(token, today_str, st.session_state.session_run_id)
+            # 🔥 FIX: fetch_counter pass kar rahe hain taaki master refresh perfect ho 🔥
+            cached_result, last_scan_timestamp = run_master_scan(token, today_str, fetch_counter)
 
             if cached_result is not None:
                 st.session_state.cached_data = cached_result
@@ -522,7 +528,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
     with col_timer:
         if app_mode == "💻 Master (Data Fetcher)":
-            # 🔥 3.5 मिनट (210 सेकंड) का उलटा टाइमर 🔥
             js_code = f"""
             <div style="text-align: right; color: #FF4D4D; font-size: 13px; font-weight: bold; font-family: 'Segoe UI', Arial, sans-serif; padding-top: 5px;">
                 ⏱️ Next Fetch: <span id="clock"></span>
