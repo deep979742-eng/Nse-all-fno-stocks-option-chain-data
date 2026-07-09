@@ -460,7 +460,6 @@ if app_mode == "💻 Master (Data Fetcher)":
             token = saved_token
 
         if token:
-            # 🔥 FIX: fetch_counter pass kar rahe hain taaki master refresh perfect ho 🔥
             cached_result, last_scan_timestamp = run_master_scan(token, today_str, fetch_counter)
 
             if cached_result is not None:
@@ -478,19 +477,34 @@ if app_mode == "💻 Master (Data Fetcher)":
         st.info("👈 Please enter Auth Code in sidebar to start Master Server.")
 
 elif app_mode == "📱 Viewer (Mobile Client)":
-    st.sidebar.success("🟢 Viewer Mode Active!\n\nNo Fyers Login needed. Receiving data from Master.")
-    if os.path.exists(SHARED_LIVE_DATA_FILE):
+    st.sidebar.success("🟢 Viewer Mode Active!\n\nReceiving LIVE data from Google Sheets.")
+    client = get_gspread_client()
+    if client:
         try:
-            shared_pack = json.load(open(SHARED_LIVE_DATA_FILE, 'r'))
-            st.session_state.cached_data = shared_pack.get("data", [])
-            last_scan_timestamp = shared_pack.get("time", time.time())
-            st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
-            st.session_state.missing_stocks_list = shared_pack.get("missing", [])
-        except Exception:
-            pass
+            ss = client.open("Fyers_EOD_Data")
+            ws2 = ss.worksheet("Sheet2")
+            
+            # Master Pydroid engine ab Column E se live data bhej raha hai
+            col_vals = ws2.col_values(5) 
+            if col_vals:
+                full_str = "".join(col_vals)
+                # Base64 decode karke data wapas fetch karein
+                decoded_str = base64.b64decode(full_str).decode('utf-8')
+                shared_pack = json.loads(decoded_str)
+                
+                st.session_state.cached_data = shared_pack.get("data", [])
+                last_scan_timestamp = shared_pack.get("time", time.time())
+                st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
+                st.session_state.missing_stocks_list = shared_pack.get("missing", [])
+            else:
+                st.info("⏳ Waiting for Master Engine data...")
+                if 'cached_data' not in st.session_state: st.session_state.cached_data = []
+        except Exception as e:
+            st.error(f"⚠️ Error reading from Google Sheet: {e}")
+            if 'cached_data' not in st.session_state: st.session_state.cached_data = []
     else:
-        st.info("⏳ Waiting for Master Server to fetch data. Master ko on rakhein...")
-        st.session_state.cached_data = []
+        st.error("❌ Viewer Mode cannot access Google Sheet. Check your secrets.")
+        if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
 # ==========================================
 # 7. APP RENDERING (UI & TABLES)
