@@ -3,9 +3,7 @@ import pandas as pd
 import datetime
 import time
 import json
-import base64
-import gspread
-from google.oauth2.service_account import Credentials
+import requests
 from streamlit_autorefresh import st_autorefresh
 import streamlit.components.v1 as components  
 
@@ -53,19 +51,9 @@ IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 today_str = datetime.datetime.now(IST).strftime("%Y-%m-%d")
 
 # ==========================================
-# 2. GOOGLE SHEETS CONNECTION
+# 2. FIREBASE CONNECTION DETAILS
 # ==========================================
-@st.cache_resource
-def get_gspread_client():
-    try:
-        if "gcp_service_account" in st.secrets:
-            scopes = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive']
-            creds_dict = dict(st.secrets["gcp_service_account"])
-            creds = Credentials.from_service_account_info(creds_dict, scopes=scopes)
-            return gspread.authorize(creds)
-    except Exception:
-        pass
-    return None
+FIREBASE_URL = "https://fyers-bot-606b9-default-rtdb.firebaseio.com"
 
 raw_symbols = [
     "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
@@ -93,55 +81,45 @@ raw_symbols = [
 ]
 
 # ==========================================
-# 3. AUTO-REFRESH & DATA FETCH (VIEWER ONLY)
+# 3. AUTO-REFRESH & FIREBASE FETCH
 # ==========================================
 st_autorefresh(interval=30000, limit=100000, key="viewer_fetch_loop")
 
-st.sidebar.success("🟢 LIVE VIEWER ACTIVE\n\nReceiving data from Mobile Master Server.")
+st.sidebar.success("🟢 LIVE VIEWER ACTIVE\n\nReceiving data from Firebase Mobile Engine.")
 
-client = get_gspread_client()
-if client:
-    try:
-        ss = client.open("Fyers_EOD_Data")
-        
-        # Dashboard Data Fetch
-        try:
-            ws2 = ss.worksheet("Sheet2")
-            col_vals = ws2.col_values(5) 
-            if col_vals:
-                full_str = "".join(col_vals)
-                decoded_str = base64.b64decode(full_str).decode('utf-8')
-                shared_pack = json.loads(decoded_str)
-                
-                st.session_state.cached_data = shared_pack.get("data", [])
-                last_scan_timestamp = shared_pack.get("time", time.time())
-                st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
-                st.session_state.missing_stocks_list = shared_pack.get("missing", [])
-            else:
-                st.info("⏳ Waiting for Master Engine data...")
-                if 'cached_data' not in st.session_state: st.session_state.cached_data = []
-        except Exception as e:
-            st.error(f"Dashboard Load Error: {e}")
-
-        # Chart Data Fetch
-        try:
-            ws_chart = ss.worksheet("Chart_History")
-            chart_vals = ws_chart.get_all_values()
-            if len(chart_vals) > 1:
-                headers = chart_vals[0]
-                st.session_state.chart_df = pd.DataFrame(chart_vals[1:], columns=headers)
-            else:
-                st.session_state.chart_df = pd.DataFrame()
-        except gspread.exceptions.WorksheetNotFound:
-            st.session_state.chart_df = pd.DataFrame()
-        except Exception as e:
-            st.session_state.chart_df = pd.DataFrame()
-
-    except Exception as e:
-        st.error(f"⚠️ Error opening Google Sheet: {e}")
+try:
+    # --- FETCH DASHBOARD DATA ---
+    dash_resp = requests.get(f"{FIREBASE_URL}/Dashboard/Latest.json", timeout=10)
+    if dash_resp.status_code == 200 and dash_resp.json():
+        shared_pack = dash_resp.json()
+        st.session_state.cached_data = shared_pack.get("data", [])
+        last_scan_timestamp = shared_pack.get("time", time.time())
+        st.session_state.last_api_call = datetime.datetime.fromtimestamp(last_scan_timestamp, IST)
+        st.session_state.missing_stocks_list = shared_pack.get("missing", [])
+    else:
+        st.info("⏳ Waiting for Firebase Master Engine data...")
         if 'cached_data' not in st.session_state: st.session_state.cached_data = []
-else:
-    st.error("❌ Google Sheet Access Denied. Check Secrets.")
+        
+    # --- FETCH CHART HISTORY DATA ---
+    chart_resp = requests.get(f"{FIREBASE_URL}/ChartHistory.json", timeout=10)
+    if chart_resp.status_code == 200 and chart_resp.json():
+        all_chart_data = chart_resp.json()
+        all_rows = []
+        # Sirf aaj ka data filter karein
+        for doc_id, chart_batch in all_chart_data.items():
+            if str(doc_id).startswith(today_str.replace("-", "")): 
+                if 'data' in chart_batch:
+                    all_rows.extend(chart_batch['data'])
+        
+        if all_rows:
+            st.session_state.chart_df = pd.DataFrame(all_rows)
+        else:
+            st.session_state.chart_df = pd.DataFrame()
+    else:
+        st.session_state.chart_df = pd.DataFrame()
+
+except Exception as e:
+    st.error(f"⚠️ Error fetching from Firebase: {e}")
     if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
 # ==========================================
