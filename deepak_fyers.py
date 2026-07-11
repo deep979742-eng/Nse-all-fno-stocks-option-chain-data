@@ -17,42 +17,41 @@ css_str = """
 /* Streamlit UI Overrides */
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], .stApp { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
-[data-testid='stStatusWidget'], [data-testid="stConnectionStatus"] { visibility: hidden !important; display: none !important; } /* Hides "Connecting..." error popup */
+[data-testid='stStatusWidget'], [data-testid="stConnectionStatus"] { visibility: hidden !important; display: none !important; } 
 
 .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 
 /* Table Header Customization */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
-    background-color: darkblue !important; 
-    color: white !important; 
-    font-weight: bold !important; 
-    text-align: center !important; 
-    writing-mode: vertical-rl !important; 
-    transform: rotate(180deg) !important; 
-    white-space: nowrap !important; 
-    padding: 8px 4px !important;
-    height: 120px !important;
+    background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; 
+    writing-mode: vertical-rl !important; transform: rotate(180deg) !important; white-space: nowrap !important; padding: 8px 4px !important; height: 120px !important;
 } 
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
 
 /* ==========================================
-   MAGIC: CONVERT RADIO DOTS TO SQUARE BUTTONS
+   SQUARE BUTTONS FIX (Names Visible)
    ========================================== */
 .stRadio div[role='radiogroup'] { gap: 10px; }
-.stRadio div[role='radiogroup'] > label > div:first-of-type { display: none !important; } /* Hides the circle dot */
+
+/* Hide ONLY the radio circle, but FORCE the text/name to display */
+.stRadio div[role='radiogroup'] > label > div:first-child { display: none !important; } 
+.stRadio div[role='radiogroup'] > label > div:last-child, 
+.stRadio div[role='radiogroup'] > label p { display: block !important; margin: 0 !important; font-size: inherit !important; }
+
 .stRadio div[role='radiogroup'] > label {
     border: 1px solid rgba(128, 128, 128, 0.4);
-    padding: 6px 14px;
-    border-radius: 6px; /* Square with slight curved edges */
+    padding: 8px 16px !important;
+    border-radius: 6px;
     background-color: rgba(128, 128, 128, 0.1);
-    margin-right: 5px;
     cursor: pointer !important;
-    transition: all 0.2s ease;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-weight: 600 !important;
 }
-.stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2); }
 
-/* Custom Box for Time Display */
+/* Time Box Style */
 .time-box {
     border: 1px solid rgba(128, 128, 128, 0.4);
     padding: 6px 14px;
@@ -69,7 +68,7 @@ th { background-color: darkblue !important; color: white !important; }
     [data-testid='stDataFrameTable'] th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
     [data-testid='stDataFrameTable'] td { font-size: 10px !important; padding: 4px 2px !important; } 
     .time-box { font-size: 12px; padding: 6px 5px; }
-    .stRadio div[role='radiogroup'] > label { padding: 6px 8px; font-size: 13px; }
+    .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; }
 }
 </style>
 """
@@ -83,35 +82,12 @@ today_str = datetime.datetime.now(IST).strftime("%Y-%m-%d")
 # ==========================================
 FIREBASE_URL = "https://fyers-bot-606b9-default-rtdb.firebaseio.com"
 
-raw_symbols = [
-    "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
-    "ADANIPORTS", "ADANIPOWER", "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP", "ASHOKLEY", "ASIANPAINT", 
-    "ASTRAL", "AUBANK", "AUROPHARMA", "AXISBANK", "BAJAJ-AUTO", "BAJAJFINSV", "BAJAJHLDNG", "BAJFINANCE", "BANDHANBNK", "BANKBARODA", 
-    "BANKINDIA", "BDL", "BEL", "BHARATFORG", "BHARTIARTL", "BHEL", "BIOCON", "BLUESTARCO", "BOSCHLTD", "BPCL", 
-    "BRITANNIA", "BSE", "CAMS", "CANBK", "CDSL", "CGPOWER", "CHOLAFIN", "CIPLA", "COALINDIA", "COCHINSHIP", 
-    "COFORGE", "COLPAL", "CONCOR", "CROMPTON", "CUMMINSIND", "DABUR", "DALBHARAT", "DELHIVERY", "DIVISLAB", "DIXON", 
-    "DLF", "DMART", "DRREDDY", "EICHERMOT", "ETERNAL", "EXIDEIND", "FEDERALBNK", "FORCEMOT", "FORTIS", "GAIL", 
-    "GLENMARK", "GMRAIRPORT", "GODFRYPHLP", "GODREJCP", "GODREJPROP", "GRASIM", "GVT&D", "HAL", "HAVELLS", "HCLTECH", 
-    "HDFCAMC", "HDFCBANK", "HDFCLIFE", "HEROMOTOCO", "HINDALCO", "HINDPETRO", "HINDUNILVR", "HINDZINC", "HYUNDAI", "ICICIBANK", 
-    "ICICIGI", "ICICIPRULI", "IDEA", "IDFCFIRSTB", "IEX", "INDHOTEL", "INDIANB", "INDIGO", "INDUSINDBK", "INDUSTOWER", 
-    "INFY", "INOXWIND", "IOC", "IREDA", "IRFC", "ITC", "JINDALSTEL", "JIOFIN", "JSWENERGY", "JSWSTEEL", 
-    "JUBLFOOD", "KALYANKJIL", "KAYNES", "KEI", "KFINTECH", "KOTAKBANK", "KPITTECH", "LAURUSLABS", "LICHSGFIN", "LICI", 
-    "LODHA", "LT", "LTF", "LTM", "LUPIN", "M&M", "MANAPPURAM", "MANKIND", "MARICO", "MARUTI", 
-    "MAXHEALTH", "MAZDOCK", "MCX", "MFSL", "MOTHERSON", "MOTILALOFS", "MPHASIS", "MUTHOOTFIN", "NAM-INDIA", "NATIONALUM", 
-    "NAUKRI", "NBCC", "NESTLEIND", "NHPC", "NMDC", "NTPC", "NUVAMA", "NYKAA", "OBEROIRLTY", "OFSS", 
-    "OIL", "ONGC", "PAGEIND", "PATANJALI", "PAYTM", "PERSISTENT", "PETRONET", "PFC", "PGEL", "PHOENIXLTD", 
-    "PIDILITIND", "PIIND", "PNB", "PNBHOUSING", "POLICYBZR", "POLYCAB", "POWERGRID", "POWERINDIA", "PREMIERENE", "PRESTIGE", 
-    "RADICO", "RBLBANK", "RECLTD", "RELIANCE", "RVNL", "SAIL", "SBICARD", "SBILIFE", "SBIN", 
-    "SHREECEM", "SHRIRAMFIN", "SIEMENS", "SOLARINDS", "SONACOMS", "SRF", "SUNPHARMA", "SUPREMEIND", "SUZLON", "SWIGGY", 
-    "TATACONSUM", "TATAELXSI", "TATAPOWER", "TATASTEEL", "TCS", "TECHM", "TIINDIA", "TITAN", "TMPV", "TORNTPHARM", 
-    "TRENT", "TVSMOTOR", "ULTRACEMCO", "UNIONBANK", "UNITDSPR", "UNOMINDA", "UPL", "VBL", "VEDL", "VMM", 
-    "VOLTAS", "WAAREEENER", "WIPRO", "YESBANK", "ZYDUSLIFE"
-]
+raw_symbols = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", "ADANIPORTS", "ADANIPOWER", "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP", "ASHOKLEY", "ASIANPAINT", "ASTRAL", "AUBANK", "AUROPHARMA", "AXISBANK", "BAJAJ-AUTO", "BAJAJFINSV", "BAJAJHLDNG", "BAJFINANCE", "BANDHANBNK", "BANKBARODA", "BANKINDIA", "BDL", "BEL", "BHARATFORG", "BHARTIARTL", "BHEL", "BIOCON", "BLUESTARCO", "BOSCHLTD", "BPCL", "BRITANNIA", "BSE", "CAMS", "CANBK", "CDSL", "CGPOWER", "CHOLAFIN", "CIPLA", "COALINDIA", "COCHINSHIP", "COFORGE", "COLPAL", "CONCOR", "CROMPTON", "CUMMINSIND", "DABUR", "DALBHARAT", "DELHIVERY", "DIVISLAB", "DIXON", "DLF", "DMART", "DRREDDY", "EICHERMOT", "ETERNAL", "EXIDEIND", "FEDERALBNK", "FORCEMOT", "FORTIS", "GAIL", "GLENMARK", "GMRAIRPORT", "GODFRYPHLP", "GODREJCP", "GODREJPROP", "GRASIM", "GVT&D", "HAL", "HAVELLS", "HCLTECH", "HDFCAMC", "HDFCBANK", "HDFCLIFE", "HEROMOTOCO", "HINDALCO", "HINDPETRO", "HINDUNILVR", "HINDZINC", "HYUNDAI", "ICICIBANK", "ICICIGI", "ICICIPRULI", "IDEA", "IDFCFIRSTB", "IEX", "INDHOTEL", "INDIANB", "INDIGO", "INDUSINDBK", "INDUSTOWER", "INFY", "INOXWIND", "IOC", "IREDA", "IRFC", "ITC", "JINDALSTEL", "JIOFIN", "JSWENERGY", "JSWSTEEL", "JUBLFOOD", "KALYANKJIL", "KAYNES", "KEI", "KFINTECH", "KOTAKBANK", "KPITTECH", "LAURUSLABS", "LICHSGFIN", "LICI", "LODHA", "LT", "LTF", "LTM", "LUPIN", "M&M", "MANAPPURAM", "MANKIND", "MARICO", "MARUTI", "MAXHEALTH", "MAZDOCK", "MCX", "MFSL", "MOTHERSON", "MOTILALOFS", "MPHASIS", "MUTHOOTFIN", "NAM-INDIA", "NATIONALUM", "NAUKRI", "NBCC", "NESTLEIND", "NHPC", "NMDC", "NTPC", "NUVAMA", "NYKAA", "OBEROIRLTY", "OFSS", "OIL", "ONGC", "PAGEIND", "PATANJALI", "PAYTM", "PERSISTENT", "PETRONET", "PFC", "PGEL", "PHOENIXLTD", "PIDILITIND", "PIIND", "PNB", "PNBHOUSING", "POLICYBZR", "POLYCAB", "POWERGRID", "POWERINDIA", "PREMIERENE", "PRESTIGE", "RADICO", "RBLBANK", "RECLTD", "RELIANCE", "RVNL", "SAIL", "SBICARD", "SBILIFE", "SBIN", "SHREECEM", "SHRIRAMFIN", "SIEMENS", "SOLARINDS", "SONACOMS", "SRF", "SUNPHARMA", "SUPREMEIND", "SUZLON", "SWIGGY", "TATACONSUM", "TATAELXSI", "TATAPOWER", "TATASTEEL", "TCS", "TECHM", "TIINDIA", "TITAN", "TMPV", "TORNTPHARM", "TRENT", "TVSMOTOR", "ULTRACEMCO", "UNIONBANK", "UNITDSPR", "UNOMINDA", "UPL", "VBL", "VEDL", "VMM", "VOLTAS", "WAAREEENER", "WIPRO", "YESBANK", "ZYDUSLIFE"]
 
 # ==========================================
 # 3. HIGH-SPEED FIREBASE FETCH (5 SECONDS)
 # ==========================================
-st_autorefresh(interval=5000, limit=100000, key="viewer_fetch_loop") # Changed from 30s to 5s
+st_autorefresh(interval=5000, limit=100000, key="viewer_fetch_loop")
 
 try:
     dash_resp = requests.get(f"{FIREBASE_URL}/Dashboard/Latest.json", timeout=4)
@@ -136,19 +112,16 @@ try:
         st.session_state.chart_df = pd.DataFrame()
 
 except Exception:
-    # Fail silently to avoid UI mess on quick disconnections
     if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
 # ==========================================
-# 4. SINGLE-LINE CLEAN HEADER
+# 4. DASHBOARD & CHART RENDERING
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # Clean Single Line Column Layout
     col_menu, col_toggle, col_timer = st.columns([3, 2.5, 2.5], vertical_alignment="center")
     
     with col_menu:
-        # Thanks to our CSS, these look like clean Square Tabs!
         selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
         
     with col_toggle:
@@ -156,14 +129,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
     with col_timer:
         ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
-        # Time displayed inside a clean box matching the square buttons
         st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
-    # ==========================================
-    # DASHBOARD VIEW
-    # ==========================================
     if selected_tab == "📊 Dashboard":
         
         if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
@@ -216,20 +185,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                          .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
             st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
-    # ==========================================
-    # CHART VIEW
-    # ==========================================
     elif selected_tab == "📈 CHART":
-        
-        # Chart Menu also neatly aligned
         col_c1, col_c2, col_c3 = st.columns([1.5, 1.5, 1.5], vertical_alignment="center")
-        with col_c1: 
-            sel_stock = st.selectbox("Stock:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
-        with col_c2: 
-            # These will also inherit the square CSS!
-            chart_mode = st.radio("View:", ["Vol CPR", "Option PCR"], horizontal=True, label_visibility="collapsed")
-        with col_c3: 
-            device_mode = st.radio("Screen:", ["💻 Laptop", "📱 Mobile"], horizontal=True, index=1, label_visibility="collapsed")
+        with col_c1: sel_stock = st.selectbox("Stock:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
+        with col_c2: chart_mode = st.radio("View:", ["Vol CPR", "Option PCR"], horizontal=True, label_visibility="collapsed")
+        with col_c3: device_mode = st.radio("Screen:", ["💻 Laptop", "📱 Mobile"], horizontal=True, index=1, label_visibility="collapsed")
 
         if device_mode == "💻 Laptop": c_main_h, c_iframe_h = 480, 610    
         else: c_main_h, c_iframe_h = 350, 470    
