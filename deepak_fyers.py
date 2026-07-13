@@ -30,28 +30,39 @@ th { background-color: darkblue !important; color: white !important; }
 * { cursor: default !important; } 
 
 /* ==========================================
-   SQUARE BUTTONS FIX (Names Visible)
+   MAGIC: NO DOTS, ONLY SQUARE TEXT BOXES
    ========================================== */
 .stRadio div[role='radiogroup'] { gap: 10px; }
 
-/* Hide ONLY the radio circle, but FORCE the text/name to display */
+/* 100% Hide the radio circle/dot */
 .stRadio div[role='radiogroup'] > label > div:first-child { display: none !important; } 
 .stRadio div[role='radiogroup'] > label > div:last-child, 
 .stRadio div[role='radiogroup'] > label p { display: block !important; margin: 0 !important; font-size: inherit !important; }
 
+/* Make the label look like a square button */
 .stRadio div[role='radiogroup'] > label {
-    border: 1px solid rgba(128, 128, 128, 0.4);
-    padding: 8px 16px !important;
-    border-radius: 6px;
-    background-color: rgba(128, 128, 128, 0.1);
+    border: 1px solid rgba(128, 128, 128, 0.4) !important;
+    padding: 8px 18px !important;
+    border-radius: 6px !important;
+    background-color: rgba(128, 128, 128, 0.1) !important;
     cursor: pointer !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
     font-weight: 600 !important;
+    margin-top: 5px; /* Alignment fix */
 }
 
-/* Time Box Style */
+/* Hover effect */
+.stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2) !important; }
+
+/* Active button style (Optional subtle highlight) */
+.stRadio div[role='radiogroup'] > label[data-checked="true"] {
+    background-color: rgba(0, 191, 255, 0.15) !important;
+    border-color: #00BFFF !important;
+}
+
+/* Centered Time Box Style */
 .time-box {
     border: 1px solid rgba(128, 128, 128, 0.4);
     padding: 6px 14px;
@@ -61,15 +72,15 @@ th { background-color: darkblue !important; color: white !important; }
     font-weight: bold;
     font-size: 14px;
     color: #00BFFF;
-    margin-top: 5px;
+    margin-top: 5px; /* Matches radio button alignment perfectly */
 }
 
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
     [data-testid='stDataFrameTable'] th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
     [data-testid='stDataFrameTable'] td { font-size: 10px !important; padding: 4px 2px !important; } 
-    .time-box { font-size: 12px; padding: 6px 5px; margin-top: 0px; }
-    .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; }
+    .time-box { font-size: 12px; padding: 6px 5px; }
+    .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; margin-top: 0px; }
 }
 </style>
 """
@@ -150,21 +161,24 @@ st.session_state.chart_df = fetch_chart_history(today_prefix)
 
 
 # ==========================================
-# 4. SINGLE-LINE CLEAN HEADER
+# 4. DASHBOARD HEADER & RENDERING
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # ❌ FIX: Removed vertical_alignment command that was crashing older Streamlit versions!
+    # Simple Columns WITHOUT crashing commands
     col_menu, col_toggle, col_timer = st.columns([3, 2.5, 2.5])
     
     with col_menu:
+        # These will display as clean text inside square boxes (dots are hidden via CSS)
         selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
         
     with col_toggle:
+        st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
         show_pct = st.toggle("📊 Show %", value=True)
         
     with col_timer:
         ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
+        # Box is perfectly aligned with the menu buttons using CSS
         st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
@@ -229,7 +243,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     # ==========================================
     elif selected_tab == "📈 CHART":
         
-        # ❌ FIX: Removed vertical_alignment command that was crashing older Streamlit versions!
         col_c1, col_c2, col_c3 = st.columns([1.5, 1.5, 1.5])
         
         with col_c1: 
