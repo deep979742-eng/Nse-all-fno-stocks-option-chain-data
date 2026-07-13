@@ -10,76 +10,43 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide")
 
 # ==========================================
-# 1. UI, CSS & SQUARE BUTTONS SETUP
+# 1. UI & HTML TABLE CSS (PYARROW BYPASS)
 # ==========================================
 css_str = """
 <style>
-/* Streamlit UI Overrides - ANTI BLUR & ANTI POPUP FIX */
+/* Anti-Blur & Anti-Popup */
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], .stApp { opacity: 1 !important; filter: none !important; transition: none !important; } 
-[data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
-
-/* 🔥 HIDE ALL CONNECTION ERRORS & POPUP DIALOGS FOREVER 🔥 */
-[data-testid='stStatusWidget'], [data-testid="stConnectionStatus"], 
-[data-testid="stModal"], div[role="dialog"] { 
-    display: none !important; 
-    visibility: hidden !important; 
-} 
-
-/* 🔥 MAGIC: PREVENT WIDGETS FROM BLURRING DURING REFRESH 🔥 */
-[data-testid="stRadio"], [data-testid="stToggle"], .stRadio, .stToggle {
-    opacity: 1 !important;
-    filter: none !important;
-    transition: none !important;
-}
+[data-testid='stStatusWidget'], [data-testid="stConnectionStatus"], [data-testid="stModal"], div[role="dialog"] { display: none !important; visibility: hidden !important; } 
+[data-testid="stRadio"], [data-testid="stToggle"], .stRadio, .stToggle { opacity: 1 !important; filter: none !important; transition: none !important; }
 div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !important; }
 
 .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 
-/* Table Header Customization */
-[data-testid='stDataFrameTable'] > thead > tr > th { 
+/* 🔥 CUSTOM HTML TABLE CSS (NO MORE CRASHES) 🔥 */
+.custom-html-table-wrapper { height: 800px; overflow-y: auto; overflow-x: auto; width: 100%; border: 1px solid rgba(128,128,128,0.2); border-radius: 5px; }
+table.dataframe { width: 100%; border-collapse: collapse; font-family: 'Segoe UI', sans-serif; font-size: 14px; margin: 0 auto; }
+table.dataframe th { 
     background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; 
-    writing-mode: vertical-rl !important; transform: rotate(180deg) !important; white-space: nowrap !important; padding: 8px 4px !important; height: 120px !important;
-} 
-th { background-color: darkblue !important; color: white !important; } 
-* { cursor: default !important; } 
+    writing-mode: vertical-rl !important; transform: rotate(180deg) !important; white-space: nowrap !important; 
+    padding: 10px 4px !important; height: 120px !important;
+    position: sticky; top: 0; z-index: 10; border: 1px solid rgba(255,255,255,0.2);
+}
+table.dataframe td { text-align: center !important; padding: 8px 5px !important; border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; }
+table.dataframe tr:hover { background-color: rgba(128,128,128,0.1); }
 
-/* MAGIC: NO DOTS, ONLY SQUARE TEXT BOXES */
+/* Square Buttons */
 .stRadio div[role='radiogroup'] { gap: 10px; }
 .stRadio div[role='radiogroup'] > label > div:first-child { display: none !important; } 
-.stRadio div[role='radiogroup'] > label > div:last-child, 
-.stRadio div[role='radiogroup'] > label p { display: block !important; margin: 0 !important; font-size: inherit !important; }
-
-.stRadio div[role='radiogroup'] > label {
-    border: 1px solid rgba(128, 128, 128, 0.4) !important;
-    padding: 8px 18px !important;
-    border-radius: 6px !important;
-    background-color: rgba(128, 128, 128, 0.1) !important;
-    cursor: pointer !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-weight: 600 !important;
-    margin-top: 5px; 
-}
+.stRadio div[role='radiogroup'] > label { border: 1px solid rgba(128, 128, 128, 0.4) !important; padding: 8px 18px !important; border-radius: 6px !important; background-color: rgba(128, 128, 128, 0.1) !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; margin-top: 5px; }
 .stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2) !important; }
 
-/* Centered Time Box Style */
-.time-box {
-    border: 1px solid rgba(128, 128, 128, 0.4);
-    padding: 6px 14px;
-    border-radius: 6px;
-    background-color: rgba(128, 128, 128, 0.1);
-    text-align: center;
-    font-weight: bold;
-    font-size: 14px;
-    color: #00BFFF;
-    margin-top: 5px; 
-}
+/* Time Box */
+.time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 6px 14px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 14px; color: #00BFFF; margin-top: 5px; }
 
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
-    [data-testid='stDataFrameTable'] th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
-    [data-testid='stDataFrameTable'] td { font-size: 10px !important; padding: 4px 2px !important; } 
+    table.dataframe th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
+    table.dataframe td { font-size: 10px !important; padding: 4px 2px !important; } 
     .time-box { font-size: 12px; padding: 6px 5px; margin-top: 0px; }
     .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; margin-top: 0px; }
 }
@@ -91,9 +58,6 @@ IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 today_str = datetime.datetime.now(IST).strftime("%Y-%m-%d")
 today_prefix = today_str.replace("-", "")
 
-# ==========================================
-# 2. FIREBASE CONNECTION DETAILS
-# ==========================================
 FIREBASE_URL = "https://fyers-bot-606b9-default-rtdb.firebaseio.com"
 
 raw_symbols = [
@@ -122,7 +86,7 @@ raw_symbols = [
 ]
 
 # ==========================================
-# 3. HIGH-SPEED FIREBASE FETCH (5 SECONDS)
+# 3. HIGH-SPEED FIREBASE FETCH
 # ==========================================
 st_autorefresh(interval=5000, limit=100000, key="viewer_fetch_loop") 
 
@@ -139,32 +103,25 @@ try:
 except Exception:
     if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
-# 🔥 DOUBLE-ENGINE BACKUP FOR CHART FIX 🔥
+# 🔥 CACHE RAW LIST ONLY to prevent PyArrow Memory Crash 🔥
 @st.cache_data(ttl=60)
-def fetch_chart_history(prefix):
+def fetch_chart_history_raw(prefix):
     try:
-        # Step 1: Safe URL Encoded Request
-        params = {'orderBy': '"$key"', 'startAt': f'"{prefix}_"', 'endAt': f'"{prefix}_\uf8ff"'}
-        r = requests.get(f"{FIREBASE_URL}/ChartHistory.json", params=params, timeout=6)
-        
-        # Step 2: Fallback Backup (If Firebase rejects the filter, grab all and filter here)
-        if r.status_code != 200:
-            r = requests.get(f"{FIREBASE_URL}/ChartHistory.json", timeout=6)
-            
+        r = requests.get(f"{FIREBASE_URL}/ChartHistory.json", timeout=6)
         if r.status_code == 200 and r.json():
             data = r.json()
             all_rows = []
             if isinstance(data, dict):
                 for doc_id, chart_batch in data.items():
-                    # Only take today's data to keep it light
                     if str(doc_id).startswith(prefix) and 'data' in chart_batch: 
                         all_rows.extend(chart_batch['data'])
-            return pd.DataFrame(all_rows)
+            return all_rows
     except Exception:
         pass
-    return pd.DataFrame()
+    return []
 
-st.session_state.chart_df = fetch_chart_history(today_prefix)
+raw_chart_data = fetch_chart_history_raw(today_prefix)
+st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else pd.DataFrame()
 
 # ==========================================
 # 4. DASHBOARD HEADER & RENDERING
@@ -192,41 +149,34 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             missing_str = ", ".join(st.session_state.missing_stocks_list)
             st.warning(f"⚠️ Fyers API missed data for: {missing_str}")
             
-        def style_indicators(val):
-            try:
-                if isinstance(val, str): 
-                    if "Gap Up" in val: return 'color: #00AA00; font-weight: bold; text-align: center;'
-                    if "Gap Down" in val: return 'color: #FF0000; font-weight: bold; text-align: center;'
-                    if "Same" in val: return 'color: #00BFFF; font-weight: bold; text-align: center;'
-                    return 'text-align: center;'
-                v = float(val)
-                if v > 0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-                elif v < 0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-                return 'color: #888888; font-weight: bold; text-align: center;'
-            except:
-                return 'text-align: center;'
+        # 🔥 MANUAL HTML COLOR FORMATTERS (NO PYARROW STYLER) 🔥
+        def color_open(val):
+            if "Gap Up" in str(val): return f"<span style='color: #00AA00;'>{val}</span>"
+            if "Gap Down" in str(val): return f"<span style='color: #FF0000;'>{val}</span>"
+            if "Same" in str(val): return f"<span style='color: #00BFFF;'>{val}</span>"
+            return str(val)
 
-        def style_pcr_columns(val):
+        def color_num(val, is_pct=False):
             try:
                 v = float(val)
-                if v >= 1.0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-                elif v > 0 and v < 1.0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-                return 'text-align: center;'
-            except:
-                return 'text-align: center;'
+                fmt = f"{v:+.2f}%" if is_pct else f"{v:+.2f}"
+                if v > 0: return f"<span style='color: #00AA00;'>{fmt}</span>"
+                if v < 0: return f"<span style='color: #FF0000;'>{fmt}</span>"
+                return f"<span style='color: #888888;'>{fmt}</span>"
+            except: return str(val)
 
-        header_styles = [
-            {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
-            {'selector': 'thead th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]}
-        ]
-        
-        checker_fmt = '{:+.2f}%' if show_pct else '{:+.2f}'
-        format_dict = {
-            'VOL PCR': '{:.2f}', 'OPTION PCR': '{:.2f}', 'VOL CPR': '{:.2f}', 
-            'LTP': '{:.2f}', 'LTP CHANGE': '{:.2f}', 'CHANGE%': '{:+.2f}%', 
-            'CE_CONTRACT': '{:+.1f}%', 'PE_CONTRACT': '{:+.1f}%',
-            'PCR CHECKER': checker_fmt, 'VOL CHECKER': checker_fmt
-        }
+        def color_pcr(val):
+            try:
+                v = float(val)
+                fmt = f"{v:.2f}"
+                if v >= 1.0: return f"<span style='color: #00AA00;'>{fmt}</span>"
+                if 0 < v < 1.0: return f"<span style='color: #FF0000;'>{fmt}</span>"
+                return fmt
+            except: return str(val)
+
+        def format_ltp(val):
+            try: return f"{float(val):.2f}"
+            except: return str(val)
         
         df = pd.DataFrame(st.session_state.cached_data)
         if not df.empty:
@@ -237,15 +187,22 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHECKER', 'VOL CHECKER']]
             df = df.rename(columns={'SYMS': 'SYMBOL', 'OPEN_STATUS': 'OPENING', 'V_PCR': 'VOL PCR', 'O_PCR': 'OPTION PCR', 'V_CPR': 'VOL CPR', 'LTP_CH': 'LTP CHANGE', 'CHG_%': 'CHANGE%', 'LTP': 'LTP', 'CE_CON': 'CE_CONTRACT', 'PE_CON': 'PE_CONTRACT'})
 
-            styled_df = (df.style
-                         .set_properties(**{'text-align': 'center'})
-                         .format(format_dict)
-                         .set_table_styles(header_styles)
-                         .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
-                         .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
+            # Apply Manual HTML Colors directly to the cells
+            df['OPENING'] = df['OPENING'].apply(color_open)
+            df['LTP CHANGE'] = df['LTP CHANGE'].apply(lambda x: color_num(x, False))
+            df['CHANGE%'] = df['CHANGE%'].apply(lambda x: color_num(x, True))
+            df['CE_CONTRACT'] = df['CE_CONTRACT'].apply(lambda x: color_num(x, True))
+            df['PE_CONTRACT'] = df['PE_CONTRACT'].apply(lambda x: color_num(x, True))
+            df['PCR CHECKER'] = df['PCR CHECKER'].apply(lambda x: color_num(x, show_pct))
+            df['VOL CHECKER'] = df['VOL CHECKER'].apply(lambda x: color_num(x, show_pct))
+            df['VOL PCR'] = df['VOL PCR'].apply(color_pcr)
+            df['OPTION PCR'] = df['OPTION PCR'].apply(color_pcr)
+            df['VOL CPR'] = df['VOL CPR'].apply(color_pcr)
+            df['LTP'] = df['LTP'].apply(format_ltp)
             
-            # 🔥 THE FIX: using width='stretch' instead of use_container_width=True 🔥
-            st.dataframe(styled_df, width='stretch', hide_index=True, height=800)
+            # 🔥 MAGIC: Convert to Pure HTML string and display. This WILL NEVER Crash. 🔥
+            html_table = df.to_html(escape=False, index=False, classes="dataframe")
+            st.markdown(f'<div class="custom-html-table-wrapper">{html_table}</div>', unsafe_allow_html=True)
 
     # ==========================================
     # CHART VIEW
