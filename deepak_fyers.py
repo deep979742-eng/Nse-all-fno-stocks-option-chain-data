@@ -136,77 +136,145 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             missing_str = ", ".join(st.session_state.missing_stocks_list)
             st.warning(f"⚠️ Fyers API missed data for: {missing_str}")
             
+        def color_open(val):
+            if "Gap Up" in str(val): return f"<span style='color: #00AA00;'>{val}</span>"
+            if "Gap Down" in str(val): return f"<span style='color: #FF0000;'>{val}</span>"
+            if "Same" in str(val): return f"<span style='color: #00BFFF;'>{val}</span>"
+            return str(val)
+
+        def color_num(val, is_pct=False):
+            try:
+                v = float(val)
+                fmt = f"{v:+.2f}%" if is_pct else f"{v:+.2f}"
+                if v > 0: return f"<span style='color: #00AA00;'>{fmt}</span>"
+                if v < 0: return f"<span style='color: #FF0000;'>{fmt}</span>"
+                return f"<span style='color: #888888;'>{fmt}</span>"
+            except: return str(val)
+
+        def color_pcr(val):
+            try:
+                v = float(val)
+                fmt = f"{v:.2f}"
+                if v >= 1.0: return f"<span style='color: #00AA00;'>{fmt}</span>"
+                if 0 < v < 1.0: return f"<span style='color: #FF0000;'>{fmt}</span>"
+                return fmt
+            except: return str(val)
+
+        def format_ltp(val):
+            try: return f"{float(val):.2f}"
+            except: return str(val)
+        
         df = pd.DataFrame(st.session_state.cached_data)
         if not df.empty:
             df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
             df = df.sort_values(by='Conv_Rank', ascending=False)
             df['VOL CHECKER'] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
             df['PCR CHECKER'] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
-            
             df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHECKER', 'VOL CHECKER']]
             
-            # 🔥 1. Rename Columns with \n for Multi-line & Horizontal Look 🔥
+            # 🔥 1. Multi-line (Horizontal) Column Names With <br> 🔥
             df = df.rename(columns={
                 'SYMS': 'SYMBOL', 
                 'OPEN_STATUS': 'OPENING', 
-                'V_PCR': 'VOL\nPCR', 
-                'O_PCR': 'OPTION\nPCR', 
-                'V_CPR': 'VOL\nCPR', 
-                'LTP_CH': 'LTP\nCHANGE', 
-                'CHG_%': 'CHANGE\n%', 
+                'V_PCR': 'VOL<br>PCR', 
+                'O_PCR': 'OPTION<br>PCR', 
+                'V_CPR': 'VOL<br>CPR', 
+                'LTP_CH': 'LTP<br>CHANGE', 
+                'CHG_%': 'CHANGE<br>%', 
                 'LTP': 'LTP', 
-                'CE_CON': 'CE\nCONTRACT', 
-                'PE_CON': 'PE\nCONTRACT',
-                'PCR CHECKER': 'PCR\nCHECKER', 
-                'VOL CHECKER': 'VOL\nCHECKER'
+                'CE_CON': 'CE<br>CONTRACT', 
+                'PE_CON': 'PE<br>CONTRACT',
+                'PCR CHECKER': 'PCR<br>CHECKER', 
+                'VOL CHECKER': 'VOL<br>CHECKER'
             })
 
-            # 🔥 2. Strict Type Casting (100% Guaranteed Anti-PyArrow Crash) 🔥
-            df['SYMBOL'] = df['SYMBOL'].astype(str)
-            df['OPENING'] = df['OPENING'].astype(str)
+            # 🔥 2. Apply Custom Colors (Exactly as before) 🔥
+            df['OPENING'] = df['OPENING'].apply(color_open)
+            df['LTP<br>CHANGE'] = df['LTP<br>CHANGE'].apply(lambda x: color_num(x, False))
+            df['CHANGE<br>%'] = df['CHANGE<br>%'].apply(lambda x: color_num(x, True))
+            df['CE<br>CONTRACT'] = df['CE<br>CONTRACT'].apply(lambda x: color_num(x, True))
+            df['PE<br>CONTRACT'] = df['PE<br>CONTRACT'].apply(lambda x: color_num(x, True))
+            df['PCR<br>CHECKER'] = df['PCR<br>CHECKER'].apply(lambda x: color_num(x, show_pct))
+            df['VOL<br>CHECKER'] = df['VOL<br>CHECKER'].apply(lambda x: color_num(x, show_pct))
+            df['VOL<br>PCR'] = df['VOL<br>PCR'].apply(color_pcr)
+            df['OPTION<br>PCR'] = df['OPTION<br>PCR'].apply(color_pcr)
+            df['VOL<br>CPR'] = df['VOL<br>CPR'].apply(color_pcr)
+            df['LTP'] = df['LTP'].apply(format_ltp)
             
-            # Numbers are kept as float for mathematically perfect Ascending/Descending Sorting
-            numeric_cols = ['VOL\nPCR', 'OPTION\nPCR', 'VOL\nCPR', 'LTP\nCHANGE', 'CHANGE\n%', 'LTP', 'CE\nCONTRACT', 'PE\nCONTRACT', 'PCR\nCHECKER', 'VOL\nCHECKER']
-            for col in numeric_cols:
-                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
-
-            # 🔥 3. Pandas Styling (Keeps text colored without breaking sorting logic) 🔥
-            def style_open(val):
-                if "Gap Up" in str(val): return "color: #00AA00; font-weight: bold;"
-                if "Gap Down" in str(val): return "color: #FF0000; font-weight: bold;"
-                if "Same" in str(val): return "color: #00BFFF; font-weight: bold;"
-                return ""
-
-            def style_num(val):
-                if val > 0: return "color: #00AA00; font-weight: bold;"
-                if val < 0: return "color: #FF0000; font-weight: bold;"
-                return "color: #888888; font-weight: bold;"
-
-            def style_pcr(val):
-                if val >= 1.0: return "color: #00AA00; font-weight: bold;"
-                if val > 0 and val < 1.0: return "color: #FF0000; font-weight: bold;"
-                return "font-weight: bold;"
-
-            styler = df.style
-            apply_map = styler.map if hasattr(styler, "map") else styler.applymap
+            html_table = df.to_html(escape=False, index=False, classes="dataframe")
             
-            styler = apply_map(style_open, subset=['OPENING'])
-            styler = apply_map(style_num, subset=['LTP\nCHANGE', 'CHANGE\n%', 'CE\nCONTRACT', 'PE\nCONTRACT', 'PCR\nCHECKER', 'VOL\nCHECKER'])
-            styler = apply_map(style_pcr, subset=['VOL\nPCR', 'OPTION\nPCR', 'VOL\nCPR'])
-
-            # 🔥 4. Value Formatting (Adds + and % signs visually but stays float in backend) 🔥
-            styler = styler.format("{:+.2f}", subset=['LTP\nCHANGE'])
-            styler = styler.format("{:+.2f}%", subset=['CHANGE\n%', 'CE\nCONTRACT', 'PE\nCONTRACT'])
+            # 🔥 3. Magic HTML + CSS + JS (Ascending/Descending Click Filter on Headers) 🔥
+            full_interactive_html = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <style>
+                body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: transparent; }}
+                .table-wrapper {{ height: 800px; overflow: auto; border-radius: 5px; }}
+                table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 14px; margin: 0 auto; background-color: #ffffff; color: #000000; }}
+                table.dataframe th {{ 
+                    background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; 
+                    padding: 10px 4px !important; position: sticky; top: 0; z-index: 10; border: 1px solid rgba(255,255,255,0.2);
+                    cursor: pointer; user-select: none; transition: background 0.2s;
+                }}
+                table.dataframe th:hover {{ background-color: #0000cc !important; }}
+                table.dataframe td {{ text-align: center !important; padding: 8px 5px !important; border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; }}
+                table.dataframe tr:hover {{ background-color: rgba(128,128,128,0.1); }}
+                /* Custom Scrollbar */
+                ::-webkit-scrollbar {{ width: 6px; height: 6px; }}
+                ::-webkit-scrollbar-thumb {{ background: rgba(128,128,128,0.5); border-radius: 3px; }}
+            </style>
+            </head>
+            <body>
+            <div class="table-wrapper">
+                {html_table}
+            </div>
             
-            if show_pct:
-                styler = styler.format("{:+.2f}%", subset=['PCR\nCHECKER', 'VOL\nCHECKER'])
-            else:
-                styler = styler.format("{:+.2f}", subset=['PCR\nCHECKER', 'VOL\nCHECKER'])
-                
-            styler = styler.format("{:.2f}", subset=['VOL\nPCR', 'OPTION\nPCR', 'VOL\nCPR', 'LTP'])
+            <script>
+                document.querySelectorAll('th').forEach(th => {{
+                    th.title = "Click to Sort Ascending / Descending";
+                    th.addEventListener('click', function() {{
+                        const table = th.closest('table');
+                        const tbody = table.querySelector('tbody');
+                        const rows = Array.from(tbody.querySelectorAll('tr'));
+                        const idx = Array.from(th.parentNode.children).indexOf(th);
+                        const asc = this.asc = !this.asc;
 
-            # 🔥 5. Render Native Dataframe with Built-in Filters & Ascending/Descending Sorting! 🔥
-            st.dataframe(styler, use_container_width=True, hide_index=True, height=800)
+                        // Remove existing arrows
+                        table.querySelectorAll('th').forEach(el => el.innerHTML = el.innerHTML.replace(/ ▲| ▼/g, ''));
+                        // Add new arrow to clicked column
+                        th.innerHTML += asc ? ' ▲' : ' ▼';
+
+                        // Smart parser to extract raw numbers from HTML tags (e.g. +4.10% -> 4.10)
+                        const parseVal = (td) => {{
+                            let val = td.innerText || td.textContent;
+                            val = val.replace(/,/g, '').replace(/%/g, '').replace(/[+]/g, '').trim();
+                            let num = parseFloat(val);
+                            return isNaN(num) ? val : num;
+                        }};
+
+                        rows.sort((a, b) => {{
+                            let v1 = parseVal(a.children[idx]);
+                            let v2 = parseVal(b.children[idx]);
+                            
+                            // Number sorting
+                            if (typeof v1 === 'number' && typeof v2 === 'number') {{
+                                return asc ? v1 - v2 : v2 - v1;
+                            }}
+                            // Text sorting (for SYMBOL, OPENING)
+                            return asc ? String(v1).localeCompare(String(v2)) : String(v2).localeCompare(String(v1));
+                        }});
+
+                        // Re-attach sorted rows
+                        rows.forEach(tr => tbody.appendChild(tr));
+                    }});
+                }});
+            </script>
+            </body>
+            </html>
+            """
+            # Render completely isolated from Streamlit bugs, with perfect sorting and colors
+            components.html(full_interactive_html, height=800, scrolling=False)
 
     # ==========================================
     # CHART VIEW
