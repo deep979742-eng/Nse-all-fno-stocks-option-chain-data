@@ -14,10 +14,16 @@ st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide")
 # ==========================================
 css_str = """
 <style>
-/* Streamlit UI Overrides - ANTI BLUR FIX */
+/* Streamlit UI Overrides - ANTI BLUR & ANTI POPUP FIX */
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], .stApp { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
-[data-testid='stStatusWidget'], [data-testid="stConnectionStatus"] { visibility: hidden !important; display: none !important; } 
+
+/* 🔥 HIDE ALL CONNECTION ERRORS & POPUP DIALOGS FOREVER 🔥 */
+[data-testid='stStatusWidget'], [data-testid="stConnectionStatus"], 
+[data-testid="stModal"], div[role="dialog"] { 
+    display: none !important; 
+    visibility: hidden !important; 
+} 
 
 /* 🔥 MAGIC: PREVENT WIDGETS FROM BLURRING DURING REFRESH 🔥 */
 [data-testid="stRadio"], [data-testid="stToggle"], .stRadio, .stToggle {
@@ -133,17 +139,25 @@ try:
 except Exception:
     if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
+# 🔥 DOUBLE-ENGINE BACKUP FOR CHART FIX 🔥
 @st.cache_data(ttl=60)
 def fetch_chart_history(prefix):
-    url = f'{FIREBASE_URL}/ChartHistory.json?orderBy="$key"&startAt="{prefix}_"&endAt="{prefix}_\uf8ff"'
     try:
-        r = requests.get(url, timeout=6)
+        # Step 1: Safe URL Encoded Request
+        params = {'orderBy': '"$key"', 'startAt': f'"{prefix}_"', 'endAt': f'"{prefix}_\uf8ff"'}
+        r = requests.get(f"{FIREBASE_URL}/ChartHistory.json", params=params, timeout=6)
+        
+        # Step 2: Fallback Backup (If Firebase rejects the filter, grab all and filter here)
+        if r.status_code != 200:
+            r = requests.get(f"{FIREBASE_URL}/ChartHistory.json", timeout=6)
+            
         if r.status_code == 200 and r.json():
             data = r.json()
             all_rows = []
             if isinstance(data, dict):
                 for doc_id, chart_batch in data.items():
-                    if 'data' in chart_batch: 
+                    # Only take today's data to keep it light
+                    if str(doc_id).startswith(prefix) and 'data' in chart_batch: 
                         all_rows.extend(chart_batch['data'])
             return pd.DataFrame(all_rows)
     except Exception:
