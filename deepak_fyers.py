@@ -27,8 +27,9 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
 table.dataframe { width: 100%; border-collapse: collapse; font-family: 'Segoe UI', sans-serif; font-size: 14px; margin: 0 auto; }
 table.dataframe th { 
     background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; 
-    writing-mode: vertical-rl !important; transform: rotate(180deg) !important; white-space: nowrap !important; 
-    padding: 10px 4px !important; height: 120px !important;
+    /* Vertical line style removed, kept normal formatting */
+    white-space: nowrap !important; 
+    padding: 10px 4px !important; height: auto !important; /* Height auto for multi-line */
     position: sticky; top: 0; z-index: 10; border: 1px solid rgba(255,255,255,0.2);
 }
 table.dataframe td { text-align: center !important; padding: 8px 5px !important; border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; }
@@ -45,7 +46,7 @@ table.dataframe tr:hover { background-color: rgba(128,128,128,0.1); }
 
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
-    table.dataframe th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
+    table.dataframe th { font-size: 10px !important; height: auto !important; padding: 4px 2px !important; } 
     table.dataframe td { font-size: 10px !important; padding: 4px 2px !important; } 
     .time-box { font-size: 12px; padding: 6px 5px; margin-top: 0px; }
     .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; margin-top: 0px; }
@@ -107,7 +108,6 @@ except Exception:
 @st.cache_data(ttl=60)
 def fetch_chart_history_raw(prefix):
     try:
-        # We append the exact Firebase query to the URL to avoid request encoding bugs
         req_url = f'{FIREBASE_URL}/ChartHistory.json?orderBy="$key"&limitToLast=100'
         r = requests.get(req_url, timeout=10)
         
@@ -200,6 +200,24 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             df['OPTION PCR'] = df['OPTION PCR'].apply(color_pcr)
             df['VOL CPR'] = df['VOL CPR'].apply(color_pcr)
             df['LTP'] = df['LTP'].apply(format_ltp)
+            
+            # 🔥 1. Yahan Naya Filter Add Kiya Gaya Hai 🔥
+            search_query = st.text_input("🔍 Search Symbol (e.g., NIFTY, HDFC):", "")
+            if search_query:
+                df = df[df['SYMBOL'].str.contains(search_query.upper(), na=False)]
+
+            # 🔥 2. Yahan Column Names ko Multi-line (Horizontal) Kiya Gaya Hai <br> Tag Ke Sath 🔥
+            df = df.rename(columns={
+                'VOL PCR': 'VOL<br>PCR', 
+                'OPTION PCR': 'OPTION<br>PCR', 
+                'VOL CPR': 'VOL<br>CPR', 
+                'LTP CHANGE': 'LTP<br>CHANGE', 
+                'CHANGE%': 'CHANGE<br>%', 
+                'CE_CONTRACT': 'CE<br>CONTRACT', 
+                'PE_CONTRACT': 'PE<br>CONTRACT',
+                'PCR CHECKER': 'PCR<br>CHECKER', 
+                'VOL CHECKER': 'VOL<br>CHECKER'
+            })
             
             # 🔥 HTML Rendering - Zero chance of PyArrow Crash 🔥
             html_table = df.to_html(escape=False, index=False, classes="dataframe")
