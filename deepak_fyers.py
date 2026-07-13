@@ -103,11 +103,14 @@ try:
 except Exception:
     if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
-# 🔥 CACHE RAW LIST ONLY to prevent PyArrow Memory Crash 🔥
+# 🔥 MEMORY CRASH FIX: Fetch only the last 100 scans directly from Firebase 🔥
 @st.cache_data(ttl=60)
 def fetch_chart_history_raw(prefix):
     try:
-        r = requests.get(f"{FIREBASE_URL}/ChartHistory.json", timeout=6)
+        # We append the exact Firebase query to the URL to avoid request encoding bugs
+        req_url = f'{FIREBASE_URL}/ChartHistory.json?orderBy="$key"&limitToLast=100'
+        r = requests.get(req_url, timeout=10)
+        
         if r.status_code == 200 and r.json():
             data = r.json()
             all_rows = []
@@ -149,7 +152,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             missing_str = ", ".join(st.session_state.missing_stocks_list)
             st.warning(f"⚠️ Fyers API missed data for: {missing_str}")
             
-        # 🔥 MANUAL HTML COLOR FORMATTERS (NO PYARROW STYLER) 🔥
         def color_open(val):
             if "Gap Up" in str(val): return f"<span style='color: #00AA00;'>{val}</span>"
             if "Gap Down" in str(val): return f"<span style='color: #FF0000;'>{val}</span>"
@@ -187,7 +189,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHECKER', 'VOL CHECKER']]
             df = df.rename(columns={'SYMS': 'SYMBOL', 'OPEN_STATUS': 'OPENING', 'V_PCR': 'VOL PCR', 'O_PCR': 'OPTION PCR', 'V_CPR': 'VOL CPR', 'LTP_CH': 'LTP CHANGE', 'CHG_%': 'CHANGE%', 'LTP': 'LTP', 'CE_CON': 'CE_CONTRACT', 'PE_CON': 'PE_CONTRACT'})
 
-            # Apply Manual HTML Colors directly to the cells
             df['OPENING'] = df['OPENING'].apply(color_open)
             df['LTP CHANGE'] = df['LTP CHANGE'].apply(lambda x: color_num(x, False))
             df['CHANGE%'] = df['CHANGE%'].apply(lambda x: color_num(x, True))
@@ -200,7 +201,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             df['VOL CPR'] = df['VOL CPR'].apply(color_pcr)
             df['LTP'] = df['LTP'].apply(format_ltp)
             
-            # 🔥 MAGIC: Convert to Pure HTML string and display. This WILL NEVER Crash. 🔥
+            # 🔥 HTML Rendering - Zero chance of PyArrow Crash 🔥
             html_table = df.to_html(escape=False, index=False, classes="dataframe")
             st.markdown(f'<div class="custom-html-table-wrapper">{html_table}</div>', unsafe_allow_html=True)
 
