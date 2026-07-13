@@ -236,7 +236,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                          .set_table_styles(header_styles)
                          .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
                          .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
-            st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
+            
+            # 🔥 FIX: Removed hide_index=True and changed use_container_width to width='stretch' to fix Segmentation fault
+            st.dataframe(styled_df, width='stretch', height=800)
 
     # ==========================================
     # CHART VIEW
