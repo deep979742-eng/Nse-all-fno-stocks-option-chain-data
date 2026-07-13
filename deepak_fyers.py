@@ -244,7 +244,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                          .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
                          .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
             
-            st.dataframe(styled_df, use_container_width=True, hide_index=True, height=800)
+            # 🔥 THE FIX: using width='stretch' instead of use_container_width=True 🔥
+            st.dataframe(styled_df, width='stretch', hide_index=True, height=800)
 
     # ==========================================
     # CHART VIEW
