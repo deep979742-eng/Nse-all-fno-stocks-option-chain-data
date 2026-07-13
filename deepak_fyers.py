@@ -29,17 +29,12 @@ css_str = """
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
 
-/* ==========================================
-   MAGIC: NO DOTS, ONLY SQUARE TEXT BOXES
-   ========================================== */
+/* MAGIC: NO DOTS, ONLY SQUARE TEXT BOXES */
 .stRadio div[role='radiogroup'] { gap: 10px; }
-
-/* 100% Hide the radio circle/dot */
 .stRadio div[role='radiogroup'] > label > div:first-child { display: none !important; } 
 .stRadio div[role='radiogroup'] > label > div:last-child, 
 .stRadio div[role='radiogroup'] > label p { display: block !important; margin: 0 !important; font-size: inherit !important; }
 
-/* Make the label look like a square button */
 .stRadio div[role='radiogroup'] > label {
     border: 1px solid rgba(128, 128, 128, 0.4) !important;
     padding: 8px 18px !important;
@@ -50,17 +45,9 @@ th { background-color: darkblue !important; color: white !important; }
     align-items: center !important;
     justify-content: center !important;
     font-weight: 600 !important;
-    margin-top: 5px; /* Alignment fix */
+    margin-top: 5px; 
 }
-
-/* Hover effect */
 .stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2) !important; }
-
-/* Active button style (Optional subtle highlight) */
-.stRadio div[role='radiogroup'] > label[data-checked="true"] {
-    background-color: rgba(0, 191, 255, 0.15) !important;
-    border-color: #00BFFF !important;
-}
 
 /* Centered Time Box Style */
 .time-box {
@@ -72,14 +59,14 @@ th { background-color: darkblue !important; color: white !important; }
     font-weight: bold;
     font-size: 14px;
     color: #00BFFF;
-    margin-top: 5px; /* Matches radio button alignment perfectly */
+    margin-top: 5px; 
 }
 
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
     [data-testid='stDataFrameTable'] th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
     [data-testid='stDataFrameTable'] td { font-size: 10px !important; padding: 4px 2px !important; } 
-    .time-box { font-size: 12px; padding: 6px 5px; }
+    .time-box { font-size: 12px; padding: 6px 5px; margin-top: 0px; }
     .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; margin-top: 0px; }
 }
 </style>
@@ -125,7 +112,6 @@ raw_symbols = [
 # ==========================================
 st_autorefresh(interval=5000, limit=100000, key="viewer_fetch_loop") 
 
-# --- DASHBOARD FETCH (FAST 5 SECONDS) ---
 try:
     dash_resp = requests.get(f"{FIREBASE_URL}/Dashboard/Latest.json", timeout=4)
     if dash_resp.status_code == 200 and dash_resp.json():
@@ -139,7 +125,6 @@ try:
 except Exception:
     if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
-# --- CHART FETCH (CACHED FOR 60 SECONDS TO PREVENT CRASH) ---
 @st.cache_data(ttl=60)
 def fetch_chart_history(prefix):
     url = f'{FIREBASE_URL}/ChartHistory.json?orderBy="$key"&startAt="{prefix}_"&endAt="{prefix}_\uf8ff"'
@@ -159,17 +144,14 @@ def fetch_chart_history(prefix):
 
 st.session_state.chart_df = fetch_chart_history(today_prefix)
 
-
 # ==========================================
 # 4. DASHBOARD HEADER & RENDERING
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # Simple Columns WITHOUT crashing commands
     col_menu, col_toggle, col_timer = st.columns([3, 2.5, 2.5])
     
     with col_menu:
-        # These will display as clean text inside square boxes (dots are hidden via CSS)
         selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
         
     with col_toggle:
@@ -178,14 +160,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
     with col_timer:
         ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
-        # Box is perfectly aligned with the menu buttons using CSS
         st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
-    # ==========================================
-    # DASHBOARD VIEW
-    # ==========================================
     if selected_tab == "📊 Dashboard":
         
         if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
@@ -193,20 +171,27 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             st.warning(f"⚠️ Fyers API missed data for: {missing_str}")
             
         def style_indicators(val):
-            if isinstance(val, str): 
-                if "Gap Up" in val: return 'color: #00AA00; font-weight: bold; text-align: center;'
-                if "Gap Down" in val: return 'color: #FF0000; font-weight: bold; text-align: center;'
-                if "Same" in val: return 'color: #00BFFF; font-weight: bold; text-align: center;'
+            try:
+                if isinstance(val, str): 
+                    if "Gap Up" in val: return 'color: #00AA00; font-weight: bold; text-align: center;'
+                    if "Gap Down" in val: return 'color: #FF0000; font-weight: bold; text-align: center;'
+                    if "Same" in val: return 'color: #00BFFF; font-weight: bold; text-align: center;'
+                    return 'text-align: center;'
+                v = float(val)
+                if v > 0: return 'color: #00AA00; font-weight: bold; text-align: center;'
+                elif v < 0: return 'color: #FF0000; font-weight: bold; text-align: center;'
+                return 'color: #888888; font-weight: bold; text-align: center;'
+            except:
                 return 'text-align: center;'
-            if val > 0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-            elif val < 0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-            return 'color: #888888; font-weight: bold; text-align: center;'
 
         def style_pcr_columns(val):
-            if isinstance(val, (int, float)):
-                if val >= 1.0: return 'color: #00AA00; font-weight: bold; text-align: center;'
-                elif val > 0 and val < 1.0: return 'color: #FF0000; font-weight: bold; text-align: center;'
-            return 'text-align: center;'
+            try:
+                v = float(val)
+                if v >= 1.0: return 'color: #00AA00; font-weight: bold; text-align: center;'
+                elif v > 0 and v < 1.0: return 'color: #FF0000; font-weight: bold; text-align: center;'
+                return 'text-align: center;'
+            except:
+                return 'text-align: center;'
 
         header_styles = [
             {'selector': 'th', 'props': [('background-color', 'darkblue'), ('color', 'white'), ('font-weight', 'bold'), ('text-align', 'center')]},
@@ -230,15 +215,16 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHECKER', 'VOL CHECKER']]
             df = df.rename(columns={'SYMS': 'SYMBOL', 'OPEN_STATUS': 'OPENING', 'V_PCR': 'VOL PCR', 'O_PCR': 'OPTION PCR', 'V_CPR': 'VOL CPR', 'LTP_CH': 'LTP CHANGE', 'CHG_%': 'CHANGE%', 'LTP': 'LTP', 'CE_CON': 'CE_CONTRACT', 'PE_CON': 'PE_CONTRACT'})
 
-            styled_df = (df.style.hide(axis="index")
+            # 🔥 THE FIX: Removed .hide(axis="index") completely to prevent PyArrow Crash 🔥
+            styled_df = (df.style
                          .set_properties(**{'text-align': 'center'})
                          .format(format_dict)
                          .set_table_styles(header_styles)
                          .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
                          .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
             
-            # 🔥 FIX: Removed hide_index=True and changed use_container_width to width='stretch' to fix Segmentation fault
-            st.dataframe(styled_df, width='stretch', height=800)
+            # Using native hide_index=True to safely hide numbers
+            st.dataframe(styled_df, use_container_width=True, hide_index=True, height=800)
 
     # ==========================================
     # CHART VIEW
