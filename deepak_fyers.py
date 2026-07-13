@@ -188,7 +188,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 'VOL CHECKER': 'VOL<br>CHECKER'
             })
 
-            # 🔥 2. Apply Custom Colors (Exactly as before) 🔥
+            # 🔥 2. Apply Custom Colors 🔥
             df['OPENING'] = df['OPENING'].apply(color_open)
             df['LTP<br>CHANGE'] = df['LTP<br>CHANGE'].apply(lambda x: color_num(x, False))
             df['CHANGE<br>%'] = df['CHANGE<br>%'].apply(lambda x: color_num(x, True))
@@ -203,7 +203,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             
             html_table = df.to_html(escape=False, index=False, classes="dataframe")
             
-            # 🔥 3. Magic HTML + CSS + JS (Ascending/Descending Click Filter on Headers) 🔥
+            # 🔥 3. Updated CSS (Font size reduced to 12px and Padding reduced for compact look) 🔥
             full_interactive_html = f"""
             <!DOCTYPE html>
             <html>
@@ -211,14 +211,21 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             <style>
                 body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: transparent; }}
                 .table-wrapper {{ height: 800px; overflow: auto; border-radius: 5px; }}
-                table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 14px; margin: 0 auto; background-color: #ffffff; color: #000000; }}
+                /* 🔥 Font-size reduced from 14px to 12px 🔥 */
+                table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 12px; margin: 0 auto; background-color: #ffffff; color: #000000; }}
                 table.dataframe th {{ 
                     background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; 
-                    padding: 10px 4px !important; position: sticky; top: 0; z-index: 10; border: 1px solid rgba(255,255,255,0.2);
+                    /* 🔥 Padding reduced for compact header 🔥 */
+                    padding: 8px 3px !important; position: sticky; top: 0; z-index: 10; border: 1px solid rgba(255,255,255,0.2);
                     cursor: pointer; user-select: none; transition: background 0.2s;
                 }}
                 table.dataframe th:hover {{ background-color: #0000cc !important; }}
-                table.dataframe td {{ text-align: center !important; padding: 8px 5px !important; border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; }}
+                table.dataframe td {{ 
+                    text-align: center !important; 
+                    /* 🔥 Padding reduced for compact rows 🔥 */
+                    padding: 6px 3px !important; 
+                    border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; 
+                }}
                 table.dataframe tr:hover {{ background-color: rgba(128,128,128,0.1); }}
                 /* Custom Scrollbar */
                 ::-webkit-scrollbar {{ width: 6px; height: 6px; }}
@@ -273,7 +280,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             </body>
             </html>
             """
-            # Render completely isolated from Streamlit bugs, with perfect sorting and colors
+            # Render HTML inside Streamlit
             components.html(full_interactive_html, height=800, scrolling=False)
 
     # ==========================================
