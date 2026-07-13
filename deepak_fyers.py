@@ -14,10 +14,18 @@ st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide")
 # ==========================================
 css_str = """
 <style>
-/* Streamlit UI Overrides */
+/* Streamlit UI Overrides - ANTI BLUR FIX */
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], .stApp { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stStatusWidget'], [data-testid="stConnectionStatus"] { visibility: hidden !important; display: none !important; } 
+
+/* 🔥 MAGIC: PREVENT WIDGETS FROM BLURRING DURING REFRESH 🔥 */
+[data-testid="stRadio"], [data-testid="stToggle"], .stRadio, .stToggle {
+    opacity: 1 !important;
+    filter: none !important;
+    transition: none !important;
+}
+div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !important; }
 
 .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 
@@ -215,7 +223,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHECKER', 'VOL CHECKER']]
             df = df.rename(columns={'SYMS': 'SYMBOL', 'OPEN_STATUS': 'OPENING', 'V_PCR': 'VOL PCR', 'O_PCR': 'OPTION PCR', 'V_CPR': 'VOL CPR', 'LTP_CH': 'LTP CHANGE', 'CHG_%': 'CHANGE%', 'LTP': 'LTP', 'CE_CON': 'CE_CONTRACT', 'PE_CON': 'PE_CONTRACT'})
 
-            # 🔥 THE FIX: Removed .hide(axis="index") completely to prevent PyArrow Crash 🔥
             styled_df = (df.style
                          .set_properties(**{'text-align': 'center'})
                          .format(format_dict)
@@ -223,7 +230,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                          .map(style_indicators, subset=['OPENING', 'LTP CHANGE', 'CHANGE%', 'CE_CONTRACT', 'PE_CONTRACT', 'VOL CHECKER', 'PCR CHECKER'])
                          .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
             
-            # Using native hide_index=True to safely hide numbers
             st.dataframe(styled_df, use_container_width=True, hide_index=True, height=800)
 
     # ==========================================
