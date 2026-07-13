@@ -10,7 +10,7 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide")
 
 # ==========================================
-# 1. UI & HTML TABLE CSS (PYARROW BYPASS)
+# 1. UI CSS
 # ==========================================
 css_str = """
 <style>
@@ -21,19 +21,6 @@ css_str = """
 div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !important; }
 
 .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
-
-/* 🔥 CUSTOM HTML TABLE CSS (NO MORE CRASHES) 🔥 */
-.custom-html-table-wrapper { height: 800px; overflow-y: auto; overflow-x: auto; width: 100%; border: 1px solid rgba(128,128,128,0.2); border-radius: 5px; }
-table.dataframe { width: 100%; border-collapse: collapse; font-family: 'Segoe UI', sans-serif; font-size: 14px; margin: 0 auto; }
-table.dataframe th { 
-    background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; 
-    /* Vertical line style removed, kept normal formatting */
-    white-space: nowrap !important; 
-    padding: 10px 4px !important; height: auto !important; /* Height auto for multi-line */
-    position: sticky; top: 0; z-index: 10; border: 1px solid rgba(255,255,255,0.2);
-}
-table.dataframe td { text-align: center !important; padding: 8px 5px !important; border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; }
-table.dataframe tr:hover { background-color: rgba(128,128,128,0.1); }
 
 /* Square Buttons */
 .stRadio div[role='radiogroup'] { gap: 10px; }
@@ -46,8 +33,6 @@ table.dataframe tr:hover { background-color: rgba(128,128,128,0.1); }
 
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
-    table.dataframe th { font-size: 10px !important; height: auto !important; padding: 4px 2px !important; } 
-    table.dataframe td { font-size: 10px !important; padding: 4px 2px !important; } 
     .time-box { font-size: 12px; padding: 6px 5px; margin-top: 0px; }
     .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; margin-top: 0px; }
 }
@@ -104,7 +89,6 @@ try:
 except Exception:
     if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
-# 🔥 MEMORY CRASH FIX: Fetch only the last 100 scans directly from Firebase 🔥
 @st.cache_data(ttl=60)
 def fetch_chart_history_raw(prefix):
     try:
@@ -152,78 +136,77 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             missing_str = ", ".join(st.session_state.missing_stocks_list)
             st.warning(f"⚠️ Fyers API missed data for: {missing_str}")
             
-        def color_open(val):
-            if "Gap Up" in str(val): return f"<span style='color: #00AA00;'>{val}</span>"
-            if "Gap Down" in str(val): return f"<span style='color: #FF0000;'>{val}</span>"
-            if "Same" in str(val): return f"<span style='color: #00BFFF;'>{val}</span>"
-            return str(val)
-
-        def color_num(val, is_pct=False):
-            try:
-                v = float(val)
-                fmt = f"{v:+.2f}%" if is_pct else f"{v:+.2f}"
-                if v > 0: return f"<span style='color: #00AA00;'>{fmt}</span>"
-                if v < 0: return f"<span style='color: #FF0000;'>{fmt}</span>"
-                return f"<span style='color: #888888;'>{fmt}</span>"
-            except: return str(val)
-
-        def color_pcr(val):
-            try:
-                v = float(val)
-                fmt = f"{v:.2f}"
-                if v >= 1.0: return f"<span style='color: #00AA00;'>{fmt}</span>"
-                if 0 < v < 1.0: return f"<span style='color: #FF0000;'>{fmt}</span>"
-                return fmt
-            except: return str(val)
-
-        def format_ltp(val):
-            try: return f"{float(val):.2f}"
-            except: return str(val)
-        
         df = pd.DataFrame(st.session_state.cached_data)
         if not df.empty:
             df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
             df = df.sort_values(by='Conv_Rank', ascending=False)
             df['VOL CHECKER'] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
             df['PCR CHECKER'] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
+            
             df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHECKER', 'VOL CHECKER']]
-            df = df.rename(columns={'SYMS': 'SYMBOL', 'OPEN_STATUS': 'OPENING', 'V_PCR': 'VOL PCR', 'O_PCR': 'OPTION PCR', 'V_CPR': 'VOL CPR', 'LTP_CH': 'LTP CHANGE', 'CHG_%': 'CHANGE%', 'LTP': 'LTP', 'CE_CON': 'CE_CONTRACT', 'PE_CON': 'PE_CONTRACT'})
-
-            df['OPENING'] = df['OPENING'].apply(color_open)
-            df['LTP CHANGE'] = df['LTP CHANGE'].apply(lambda x: color_num(x, False))
-            df['CHANGE%'] = df['CHANGE%'].apply(lambda x: color_num(x, True))
-            df['CE_CONTRACT'] = df['CE_CONTRACT'].apply(lambda x: color_num(x, True))
-            df['PE_CONTRACT'] = df['PE_CONTRACT'].apply(lambda x: color_num(x, True))
-            df['PCR CHECKER'] = df['PCR CHECKER'].apply(lambda x: color_num(x, show_pct))
-            df['VOL CHECKER'] = df['VOL CHECKER'].apply(lambda x: color_num(x, show_pct))
-            df['VOL PCR'] = df['VOL PCR'].apply(color_pcr)
-            df['OPTION PCR'] = df['OPTION PCR'].apply(color_pcr)
-            df['VOL CPR'] = df['VOL CPR'].apply(color_pcr)
-            df['LTP'] = df['LTP'].apply(format_ltp)
             
-            # 🔥 1. Yahan Dropdown (Selectbox) Filter Add Kiya Gaya Hai 🔥
-            unique_symbols = ["All"] + sorted(df['SYMBOL'].unique().tolist())
-            selected_symbol = st.selectbox("🔍 Filter by Symbol:", unique_symbols, index=0)
-            
-            if selected_symbol != "All":
-                df = df[df['SYMBOL'] == selected_symbol]
-
-            # 🔥 2. Yahan Column Names ko Multi-line (Horizontal) Kiya Gaya Hai <br> Tag Ke Sath 🔥
+            # 🔥 1. Rename Columns with \n for Multi-line & Horizontal Look 🔥
             df = df.rename(columns={
-                'VOL PCR': 'VOL<br>PCR', 
-                'OPTION PCR': 'OPTION<br>PCR', 
-                'VOL CPR': 'VOL<br>CPR', 
-                'LTP CHANGE': 'LTP<br>CHANGE', 
-                'CHANGE%': 'CHANGE<br>%', 
-                'CE_CONTRACT': 'CE<br>CONTRACT', 
-                'PE_CONTRACT': 'PE<br>CONTRACT',
-                'PCR CHECKER': 'PCR<br>CHECKER', 
-                'VOL CHECKER': 'VOL<br>CHECKER'
+                'SYMS': 'SYMBOL', 
+                'OPEN_STATUS': 'OPENING', 
+                'V_PCR': 'VOL\nPCR', 
+                'O_PCR': 'OPTION\nPCR', 
+                'V_CPR': 'VOL\nCPR', 
+                'LTP_CH': 'LTP\nCHANGE', 
+                'CHG_%': 'CHANGE\n%', 
+                'LTP': 'LTP', 
+                'CE_CON': 'CE\nCONTRACT', 
+                'PE_CON': 'PE\nCONTRACT',
+                'PCR CHECKER': 'PCR\nCHECKER', 
+                'VOL CHECKER': 'VOL\nCHECKER'
             })
+
+            # 🔥 2. Strict Type Casting (100% Guaranteed Anti-PyArrow Crash) 🔥
+            df['SYMBOL'] = df['SYMBOL'].astype(str)
+            df['OPENING'] = df['OPENING'].astype(str)
             
-            # 🔥 HTML Rendering - Zero chance of PyArrow Crash 🔥
-            html_table = df.to_html(escape=False, index=False, classes="dataframe")
-            st.markdown(f'<div class="custom-html-table-wrapper">{html_table}</div>', unsafe_allow_html=True)
+            # Numbers are kept as float for mathematically perfect Ascending/Descending Sorting
+            numeric_cols = ['VOL\nPCR', 'OPTION\nPCR', 'VOL\nCPR', 'LTP\nCHANGE', 'CHANGE\n%', 'LTP', 'CE\nCONTRACT', 'PE\nCONTRACT', 'PCR\nCHECKER', 'VOL\nCHECKER']
+            for col in numeric_cols:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+
+            # 🔥 3. Pandas Styling (Keeps text colored without breaking sorting logic) 🔥
+            def style_open(val):
+                if "Gap Up" in str(val): return "color: #00AA00; font-weight: bold;"
+                if "Gap Down" in str(val): return "color: #FF0000; font-weight: bold;"
+                if "Same" in str(val): return "color: #00BFFF; font-weight: bold;"
+                return ""
+
+            def style_num(val):
+                if val > 0: return "color: #00AA00; font-weight: bold;"
+                if val < 0: return "color: #FF0000; font-weight: bold;"
+                return "color: #888888; font-weight: bold;"
+
+            def style_pcr(val):
+                if val >= 1.0: return "color: #00AA00; font-weight: bold;"
+                if val > 0 and val < 1.0: return "color: #FF0000; font-weight: bold;"
+                return "font-weight: bold;"
+
+            styler = df.style
+            apply_map = styler.map if hasattr(styler, "map") else styler.applymap
+            
+            styler = apply_map(style_open, subset=['OPENING'])
+            styler = apply_map(style_num, subset=['LTP\nCHANGE', 'CHANGE\n%', 'CE\nCONTRACT', 'PE\nCONTRACT', 'PCR\nCHECKER', 'VOL\nCHECKER'])
+            styler = apply_map(style_pcr, subset=['VOL\nPCR', 'OPTION\nPCR', 'VOL\nCPR'])
+
+            # 🔥 4. Value Formatting (Adds + and % signs visually but stays float in backend) 🔥
+            styler = styler.format("{:+.2f}", subset=['LTP\nCHANGE'])
+            styler = styler.format("{:+.2f}%", subset=['CHANGE\n%', 'CE\nCONTRACT', 'PE\nCONTRACT'])
+            
+            if show_pct:
+                styler = styler.format("{:+.2f}%", subset=['PCR\nCHECKER', 'VOL\nCHECKER'])
+            else:
+                styler = styler.format("{:+.2f}", subset=['PCR\nCHECKER', 'VOL\nCHECKER'])
+                
+            styler = styler.format("{:.2f}", subset=['VOL\nPCR', 'OPTION\nPCR', 'VOL\nCPR', 'LTP'])
+
+            # 🔥 5. Render Native Dataframe with Built-in Filters & Ascending/Descending Sorting! 🔥
+            st.dataframe(styler, use_container_width=True, hide_index=True, height=800)
 
     # ==========================================
     # CHART VIEW
