@@ -17,42 +17,41 @@ css_str = """
 /* Streamlit UI Overrides */
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], .stApp { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
-[data-testid='stStatusWidget'], [data-testid="stConnectionStatus"] { visibility: hidden !important; display: none !important; } /* Hides "Connecting..." error popup */
+[data-testid='stStatusWidget'], [data-testid="stConnectionStatus"] { visibility: hidden !important; display: none !important; } 
 
 .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 
 /* Table Header Customization */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
-    background-color: darkblue !important; 
-    color: white !important; 
-    font-weight: bold !important; 
-    text-align: center !important; 
-    writing-mode: vertical-rl !important; 
-    transform: rotate(180deg) !important; 
-    white-space: nowrap !important; 
-    padding: 8px 4px !important;
-    height: 120px !important;
+    background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; 
+    writing-mode: vertical-rl !important; transform: rotate(180deg) !important; white-space: nowrap !important; padding: 8px 4px !important; height: 120px !important;
 } 
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
 
 /* ==========================================
-   MAGIC: CONVERT RADIO DOTS TO SQUARE BUTTONS
+   SQUARE BUTTONS FIX (Names Visible)
    ========================================== */
 .stRadio div[role='radiogroup'] { gap: 10px; }
-.stRadio div[role='radiogroup'] > label > div:first-of-type { display: none !important; } /* Hides the circle dot */
+
+/* Hide ONLY the radio circle, but FORCE the text/name to display */
+.stRadio div[role='radiogroup'] > label > div:first-child { display: none !important; } 
+.stRadio div[role='radiogroup'] > label > div:last-child, 
+.stRadio div[role='radiogroup'] > label p { display: block !important; margin: 0 !important; font-size: inherit !important; }
+
 .stRadio div[role='radiogroup'] > label {
     border: 1px solid rgba(128, 128, 128, 0.4);
-    padding: 6px 14px;
-    border-radius: 6px; /* Square with slight curved edges */
+    padding: 8px 16px !important;
+    border-radius: 6px;
     background-color: rgba(128, 128, 128, 0.1);
-    margin-right: 5px;
     cursor: pointer !important;
-    transition: all 0.2s ease;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-weight: 600 !important;
 }
-.stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2); }
 
-/* Custom Box for Time Display */
+/* Time Box Style */
 .time-box {
     border: 1px solid rgba(128, 128, 128, 0.4);
     padding: 6px 14px;
@@ -62,14 +61,15 @@ th { background-color: darkblue !important; color: white !important; }
     font-weight: bold;
     font-size: 14px;
     color: #00BFFF;
+    margin-top: 5px;
 }
 
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
     [data-testid='stDataFrameTable'] th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
     [data-testid='stDataFrameTable'] td { font-size: 10px !important; padding: 4px 2px !important; } 
-    .time-box { font-size: 12px; padding: 6px 5px; }
-    .stRadio div[role='radiogroup'] > label { padding: 6px 8px; font-size: 13px; }
+    .time-box { font-size: 12px; padding: 6px 5px; margin-top: 0px; }
+    .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; }
 }
 </style>
 """
@@ -154,8 +154,8 @@ st.session_state.chart_df = fetch_chart_history(today_prefix)
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # Clean Single Line Column Layout
-    col_menu, col_toggle, col_timer = st.columns([3, 2.5, 2.5], vertical_alignment="center")
+    # ❌ FIX: Removed vertical_alignment command that was crashing older Streamlit versions!
+    col_menu, col_toggle, col_timer = st.columns([3, 2.5, 2.5])
     
     with col_menu:
         selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
@@ -229,8 +229,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     # ==========================================
     elif selected_tab == "📈 CHART":
         
-        # Chart Menu also neatly aligned
-        col_c1, col_c2, col_c3 = st.columns([1.5, 1.5, 1.5], vertical_alignment="center")
+        # ❌ FIX: Removed vertical_alignment command that was crashing older Streamlit versions!
+        col_c1, col_c2, col_c3 = st.columns([1.5, 1.5, 1.5])
+        
         with col_c1: 
             sel_stock = st.selectbox("Stock:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
         with col_c2: 
