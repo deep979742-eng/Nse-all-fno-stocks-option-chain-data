@@ -201,10 +201,12 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             df['VOL CPR'] = df['VOL CPR'].apply(color_pcr)
             df['LTP'] = df['LTP'].apply(format_ltp)
             
-            # 🔥 1. Yahan Naya Filter Add Kiya Gaya Hai 🔥
-            search_query = st.text_input("🔍 Search Symbol (e.g., NIFTY, HDFC):", "")
-            if search_query:
-                df = df[df['SYMBOL'].str.contains(search_query.upper(), na=False)]
+            # 🔥 1. Yahan Dropdown (Selectbox) Filter Add Kiya Gaya Hai 🔥
+            unique_symbols = ["All"] + sorted(df['SYMBOL'].unique().tolist())
+            selected_symbol = st.selectbox("🔍 Filter by Symbol:", unique_symbols, index=0)
+            
+            if selected_symbol != "All":
+                df = df[df['SYMBOL'] == selected_symbol]
 
             # 🔥 2. Yahan Column Names ko Multi-line (Horizontal) Kiya Gaya Hai <br> Tag Ke Sath 🔥
             df = df.rename(columns={
