@@ -17,41 +17,42 @@ css_str = """
 /* Streamlit UI Overrides */
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], .stApp { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stDataFrame'], [data-testid='stTabs'] { opacity: 1 !important; filter: none !important; transition: none !important; } 
-[data-testid='stStatusWidget'], [data-testid="stConnectionStatus"] { visibility: hidden !important; display: none !important; } 
+[data-testid='stStatusWidget'], [data-testid="stConnectionStatus"] { visibility: hidden !important; display: none !important; } /* Hides "Connecting..." error popup */
 
 .block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 
 /* Table Header Customization */
 [data-testid='stDataFrameTable'] > thead > tr > th { 
-    background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; 
-    writing-mode: vertical-rl !important; transform: rotate(180deg) !important; white-space: nowrap !important; padding: 8px 4px !important; height: 120px !important;
+    background-color: darkblue !important; 
+    color: white !important; 
+    font-weight: bold !important; 
+    text-align: center !important; 
+    writing-mode: vertical-rl !important; 
+    transform: rotate(180deg) !important; 
+    white-space: nowrap !important; 
+    padding: 8px 4px !important;
+    height: 120px !important;
 } 
 th { background-color: darkblue !important; color: white !important; } 
 * { cursor: default !important; } 
 
 /* ==========================================
-   SQUARE BUTTONS FIX (Names Visible)
+   MAGIC: CONVERT RADIO DOTS TO SQUARE BUTTONS
    ========================================== */
 .stRadio div[role='radiogroup'] { gap: 10px; }
-
-/* Hide ONLY the radio circle, but FORCE the text/name to display */
-.stRadio div[role='radiogroup'] > label > div:first-child { display: none !important; } 
-.stRadio div[role='radiogroup'] > label > div:last-child, 
-.stRadio div[role='radiogroup'] > label p { display: block !important; margin: 0 !important; font-size: inherit !important; }
-
+.stRadio div[role='radiogroup'] > label > div:first-of-type { display: none !important; } /* Hides the circle dot */
 .stRadio div[role='radiogroup'] > label {
     border: 1px solid rgba(128, 128, 128, 0.4);
-    padding: 8px 16px !important;
-    border-radius: 6px;
+    padding: 6px 14px;
+    border-radius: 6px; /* Square with slight curved edges */
     background-color: rgba(128, 128, 128, 0.1);
+    margin-right: 5px;
     cursor: pointer !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    font-weight: 600 !important;
+    transition: all 0.2s ease;
 }
+.stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2); }
 
-/* Time Box Style */
+/* Custom Box for Time Display */
 .time-box {
     border: 1px solid rgba(128, 128, 128, 0.4);
     padding: 6px 14px;
@@ -68,7 +69,7 @@ th { background-color: darkblue !important; color: white !important; }
     [data-testid='stDataFrameTable'] th { font-size: 10px !important; height: 100px !important; padding: 4px 2px !important; } 
     [data-testid='stDataFrameTable'] td { font-size: 10px !important; padding: 4px 2px !important; } 
     .time-box { font-size: 12px; padding: 6px 5px; }
-    .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; }
+    .stRadio div[role='radiogroup'] > label { padding: 6px 8px; font-size: 13px; }
 }
 </style>
 """
@@ -76,19 +77,44 @@ st.markdown(css_str, unsafe_allow_html=True)
 
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 today_str = datetime.datetime.now(IST).strftime("%Y-%m-%d")
+today_prefix = today_str.replace("-", "")
 
 # ==========================================
 # 2. FIREBASE CONNECTION DETAILS
 # ==========================================
 FIREBASE_URL = "https://fyers-bot-606b9-default-rtdb.firebaseio.com"
 
-raw_symbols = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", "ADANIPORTS", "ADANIPOWER", "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP", "ASHOKLEY", "ASIANPAINT", "ASTRAL", "AUBANK", "AUROPHARMA", "AXISBANK", "BAJAJ-AUTO", "BAJAJFINSV", "BAJAJHLDNG", "BAJFINANCE", "BANDHANBNK", "BANKBARODA", "BANKINDIA", "BDL", "BEL", "BHARATFORG", "BHARTIARTL", "BHEL", "BIOCON", "BLUESTARCO", "BOSCHLTD", "BPCL", "BRITANNIA", "BSE", "CAMS", "CANBK", "CDSL", "CGPOWER", "CHOLAFIN", "CIPLA", "COALINDIA", "COCHINSHIP", "COFORGE", "COLPAL", "CONCOR", "CROMPTON", "CUMMINSIND", "DABUR", "DALBHARAT", "DELHIVERY", "DIVISLAB", "DIXON", "DLF", "DMART", "DRREDDY", "EICHERMOT", "ETERNAL", "EXIDEIND", "FEDERALBNK", "FORCEMOT", "FORTIS", "GAIL", "GLENMARK", "GMRAIRPORT", "GODFRYPHLP", "GODREJCP", "GODREJPROP", "GRASIM", "GVT&D", "HAL", "HAVELLS", "HCLTECH", "HDFCAMC", "HDFCBANK", "HDFCLIFE", "HEROMOTOCO", "HINDALCO", "HINDPETRO", "HINDUNILVR", "HINDZINC", "HYUNDAI", "ICICIBANK", "ICICIGI", "ICICIPRULI", "IDEA", "IDFCFIRSTB", "IEX", "INDHOTEL", "INDIANB", "INDIGO", "INDUSINDBK", "INDUSTOWER", "INFY", "INOXWIND", "IOC", "IREDA", "IRFC", "ITC", "JINDALSTEL", "JIOFIN", "JSWENERGY", "JSWSTEEL", "JUBLFOOD", "KALYANKJIL", "KAYNES", "KEI", "KFINTECH", "KOTAKBANK", "KPITTECH", "LAURUSLABS", "LICHSGFIN", "LICI", "LODHA", "LT", "LTF", "LTM", "LUPIN", "M&M", "MANAPPURAM", "MANKIND", "MARICO", "MARUTI", "MAXHEALTH", "MAZDOCK", "MCX", "MFSL", "MOTHERSON", "MOTILALOFS", "MPHASIS", "MUTHOOTFIN", "NAM-INDIA", "NATIONALUM", "NAUKRI", "NBCC", "NESTLEIND", "NHPC", "NMDC", "NTPC", "NUVAMA", "NYKAA", "OBEROIRLTY", "OFSS", "OIL", "ONGC", "PAGEIND", "PATANJALI", "PAYTM", "PERSISTENT", "PETRONET", "PFC", "PGEL", "PHOENIXLTD", "PIDILITIND", "PIIND", "PNB", "PNBHOUSING", "POLICYBZR", "POLYCAB", "POWERGRID", "POWERINDIA", "PREMIERENE", "PRESTIGE", "RADICO", "RBLBANK", "RECLTD", "RELIANCE", "RVNL", "SAIL", "SBICARD", "SBILIFE", "SBIN", "SHREECEM", "SHRIRAMFIN", "SIEMENS", "SOLARINDS", "SONACOMS", "SRF", "SUNPHARMA", "SUPREMEIND", "SUZLON", "SWIGGY", "TATACONSUM", "TATAELXSI", "TATAPOWER", "TATASTEEL", "TCS", "TECHM", "TIINDIA", "TITAN", "TMPV", "TORNTPHARM", "TRENT", "TVSMOTOR", "ULTRACEMCO", "UNIONBANK", "UNITDSPR", "UNOMINDA", "UPL", "VBL", "VEDL", "VMM", "VOLTAS", "WAAREEENER", "WIPRO", "YESBANK", "ZYDUSLIFE"]
+raw_symbols = [
+    "NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "360ONE", "ABB", "ABCAPITAL", "ADANIENSOL", "ADANIENT", "ADANIGREEN", 
+    "ADANIPORTS", "ADANIPOWER", "ALKEM", "AMBER", "AMBUJACEM", "ANGELONE", "APLAPOLLO", "APOLLOHOSP", "ASHOKLEY", "ASIANPAINT", 
+    "ASTRAL", "AUBANK", "AUROPHARMA", "AXISBANK", "BAJAJ-AUTO", "BAJAJFINSV", "BAJAJHLDNG", "BAJFINANCE", "BANDHANBNK", "BANKBARODA", 
+    "BANKINDIA", "BDL", "BEL", "BHARATFORG", "BHARTIARTL", "BHEL", "BIOCON", "BLUESTARCO", "BOSCHLTD", "BPCL", 
+    "BRITANNIA", "BSE", "CAMS", "CANBK", "CDSL", "CGPOWER", "CHOLAFIN", "CIPLA", "COALINDIA", "COCHINSHIP", 
+    "COFORGE", "COLPAL", "CONCOR", "CROMPTON", "CUMMINSIND", "DABUR", "DALBHARAT", "DELHIVERY", "DIVISLAB", "DIXON", 
+    "DLF", "DMART", "DRREDDY", "EICHERMOT", "ETERNAL", "EXIDEIND", "FEDERALBNK", "FORCEMOT", "FORTIS", "GAIL", 
+    "GLENMARK", "GMRAIRPORT", "GODFRYPHLP", "GODREJCP", "GODREJPROP", "GRASIM", "GVT&D", "HAL", "HAVELLS", "HCLTECH", 
+    "HDFCAMC", "HDFCBANK", "HDFCLIFE", "HEROMOTOCO", "HINDALCO", "HINDPETRO", "HINDUNILVR", "HINDZINC", "HYUNDAI", "ICICIBANK", 
+    "ICICIGI", "ICICIPRULI", "IDEA", "IDFCFIRSTB", "IEX", "INDHOTEL", "INDIANB", "INDIGO", "INDUSINDBK", "INDUSTOWER", 
+    "INFY", "INOXWIND", "IOC", "IREDA", "IRFC", "ITC", "JINDALSTEL", "JIOFIN", "JSWENERGY", "JSWSTEEL", 
+    "JUBLFOOD", "KALYANKJIL", "KAYNES", "KEI", "KFINTECH", "KOTAKBANK", "KPITTECH", "LAURUSLABS", "LICHSGFIN", "LICI", 
+    "LODHA", "LT", "LTF", "LTM", "LUPIN", "M&M", "MANAPPURAM", "MANKIND", "MARICO", "MARUTI", 
+    "MAXHEALTH", "MAZDOCK", "MCX", "MFSL", "MOTHERSON", "MOTILALOFS", "MPHASIS", "MUTHOOTFIN", "NAM-INDIA", "NATIONALUM", 
+    "NAUKRI", "NBCC", "NESTLEIND", "NHPC", "NMDC", "NTPC", "NUVAMA", "NYKAA", "OBEROIRLTY", "OFSS", 
+    "OIL", "ONGC", "PAGEIND", "PATANJALI", "PAYTM", "PERSISTENT", "PETRONET", "PFC", "PGEL", "PHOENIXLTD", 
+    "PIDILITIND", "PIIND", "PNB", "PNBHOUSING", "POLICYBZR", "POLYCAB", "POWERGRID", "POWERINDIA", "PREMIERENE", "PRESTIGE", 
+    "RADICO", "RBLBANK", "RECLTD", "RELIANCE", "RVNL", "SAIL", "SBICARD", "SBILIFE", "SBIN", 
+    "SHREECEM", "SHRIRAMFIN", "SIEMENS", "SOLARINDS", "SONACOMS", "SRF", "SUNPHARMA", "SUPREMEIND", "SUZLON", "SWIGGY", 
+    "TATACONSUM", "TATAELXSI", "TATAPOWER", "TATASTEEL", "TCS", "TECHM", "TIINDIA", "TITAN", "TMPV", "TORNTPHARM", 
+    "TRENT", "TVSMOTOR", "ULTRACEMCO", "UNIONBANK", "UNITDSPR", "UNOMINDA", "UPL", "VBL", "VEDL", "VMM", 
+    "VOLTAS", "WAAREEENER", "WIPRO", "YESBANK", "ZYDUSLIFE"
+]
 
 # ==========================================
 # 3. HIGH-SPEED FIREBASE FETCH (5 SECONDS)
 # ==========================================
-st_autorefresh(interval=5000, limit=100000, key="viewer_fetch_loop")
+st_autorefresh(interval=5000, limit=100000, key="viewer_fetch_loop") 
 
+# --- DASHBOARD FETCH (FAST 5 SECONDS) ---
 try:
     dash_resp = requests.get(f"{FIREBASE_URL}/Dashboard/Latest.json", timeout=4)
     if dash_resp.status_code == 200 and dash_resp.json():
@@ -99,26 +125,36 @@ try:
         st.session_state.missing_stocks_list = shared_pack.get("missing", [])
     else:
         if 'cached_data' not in st.session_state: st.session_state.cached_data = []
-        
-    chart_resp = requests.get(f"{FIREBASE_URL}/ChartHistory.json", timeout=4)
-    if chart_resp.status_code == 200 and chart_resp.json():
-        all_chart_data = chart_resp.json()
-        all_rows = []
-        for doc_id, chart_batch in all_chart_data.items():
-            if str(doc_id).startswith(today_str.replace("-", "")): 
-                if 'data' in chart_batch: all_rows.extend(chart_batch['data'])
-        st.session_state.chart_df = pd.DataFrame(all_rows) if all_rows else pd.DataFrame()
-    else:
-        st.session_state.chart_df = pd.DataFrame()
-
 except Exception:
     if 'cached_data' not in st.session_state: st.session_state.cached_data = []
 
+# --- CHART FETCH (CACHED FOR 60 SECONDS TO PREVENT CRASH) ---
+@st.cache_data(ttl=60)
+def fetch_chart_history(prefix):
+    url = f'{FIREBASE_URL}/ChartHistory.json?orderBy="$key"&startAt="{prefix}_"&endAt="{prefix}_\uf8ff"'
+    try:
+        r = requests.get(url, timeout=6)
+        if r.status_code == 200 and r.json():
+            data = r.json()
+            all_rows = []
+            if isinstance(data, dict):
+                for doc_id, chart_batch in data.items():
+                    if 'data' in chart_batch: 
+                        all_rows.extend(chart_batch['data'])
+            return pd.DataFrame(all_rows)
+    except Exception:
+        pass
+    return pd.DataFrame()
+
+st.session_state.chart_df = fetch_chart_history(today_prefix)
+
+
 # ==========================================
-# 4. DASHBOARD & CHART RENDERING
+# 4. SINGLE-LINE CLEAN HEADER
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
+    # Clean Single Line Column Layout
     col_menu, col_toggle, col_timer = st.columns([3, 2.5, 2.5], vertical_alignment="center")
     
     with col_menu:
@@ -133,6 +169,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
+    # ==========================================
+    # DASHBOARD VIEW
+    # ==========================================
     if selected_tab == "📊 Dashboard":
         
         if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
@@ -185,14 +224,24 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                          .map(style_pcr_columns, subset=['VOL PCR', 'OPTION PCR', 'VOL CPR']))
             st.dataframe(styled_df, use_container_width=True, height=800, hide_index=True)
 
+    # ==========================================
+    # CHART VIEW
+    # ==========================================
     elif selected_tab == "📈 CHART":
+        
+        # Chart Menu also neatly aligned
         col_c1, col_c2, col_c3 = st.columns([1.5, 1.5, 1.5], vertical_alignment="center")
-        with col_c1: sel_stock = st.selectbox("Stock:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
-        with col_c2: chart_mode = st.radio("View:", ["Vol CPR", "Option PCR"], horizontal=True, label_visibility="collapsed")
-        with col_c3: device_mode = st.radio("Screen:", ["💻 Laptop", "📱 Mobile"], horizontal=True, index=1, label_visibility="collapsed")
+        with col_c1: 
+            sel_stock = st.selectbox("Stock:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
+        with col_c2: 
+            chart_mode = st.radio("View:", ["Vol CPR", "Option PCR"], horizontal=True, label_visibility="collapsed")
+        with col_c3: 
+            device_mode = st.radio("Screen:", ["💻 Laptop", "📱 Mobile"], horizontal=True, index=1, label_visibility="collapsed")
 
-        if device_mode == "💻 Laptop": c_main_h, c_iframe_h = 480, 610    
-        else: c_main_h, c_iframe_h = 350, 470    
+        if device_mode == "💻 Laptop": 
+            c_main_h, c_iframe_h = 480, 610    
+        else: 
+            c_main_h, c_iframe_h = 350, 470    
 
         if 'chart_df' in st.session_state and not st.session_state.chart_df.empty:
             try:
@@ -206,7 +255,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         
                         target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
                         indicator_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF"
-                        time_list, indicator_list, ltp_list = df_sym['Time'].tolist(), pd.to_numeric(df_sym[target_col], errors='coerce').fillna(0).tolist(), pd.to_numeric(df_sym['LTP'], errors='coerce').fillna(0).tolist()
+                        
+                        time_list = df_sym['Time'].tolist()
+                        indicator_list = pd.to_numeric(df_sym[target_col], errors='coerce').fillna(0).tolist()
+                        ltp_list = pd.to_numeric(df_sym['LTP'], errors='coerce').fillna(0).tolist()
 
                         apex_html = f"""
                         <!DOCTYPE html>
@@ -235,23 +287,39 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 <div id="dual-slider"></div>
                             </div>
                             <script>
-                                var dataIndicator = {json.dumps(indicator_list)}; var dataLTP = {json.dumps(ltp_list)}; var timeCats = {json.dumps(time_list)}; 
+                                var dataIndicator = {json.dumps(indicator_list)}; 
+                                var dataLTP = {json.dumps(ltp_list)}; 
+                                var timeCats = {json.dumps(time_list)}; 
+                                
                                 var optionsMain = {{
                                     series: [{{ name: '{chart_mode}', type: 'area', data: dataIndicator }}, {{ name: 'LTP', type: 'line', data: dataLTP }}],
                                     chart: {{ id: 'mainChart', height: {c_main_h}, type: 'line', toolbar: {{ show: false }}, zoom: {{ enabled: false }}, animations: {{ enabled: false }} }},
-                                    colors: ['{indicator_color}', '#00CC66'], stroke: {{ curve: 'smooth', width: [3, 3] }}, 
+                                    colors: ['{indicator_color}', '#00CC66'], 
+                                    stroke: {{ curve: 'smooth', width: [3, 3] }}, 
                                     fill: {{ type: ['gradient', 'solid'], gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }} }},
-                                    dataLabels: {{ enabled: false }}, xaxis: {{ categories: timeCats, tickAmount: 10, labels: {{ style: {{ colors: '#888' }} }}, tooltip: {{ enabled: false }} }},
-                                    yaxis: [{{ title: {{ text: '{chart_mode}', style: {{ color: '{indicator_color}' }} }}, labels: {{ style: {{ colors: '{indicator_color}' }} }}, decimalsInFloat: 2 }}, {{ opposite: true, title: {{ text: 'LTP', style: {{ color: '#00CC66' }} }}, labels: {{ style: {{ colors: '#00CC66' }} }}, decimalsInFloat: 2 }}],
-                                    tooltip: {{ shared: true, intersect: false }}, legend: {{ position: 'top', horizontalAlign: 'right' }}
+                                    dataLabels: {{ enabled: false }}, 
+                                    xaxis: {{ categories: timeCats, tickAmount: 10, labels: {{ style: {{ colors: '#888' }} }}, tooltip: {{ enabled: false }} }},
+                                    yaxis: [
+                                        {{ title: {{ text: '{chart_mode}', style: {{ color: '{indicator_color}' }} }}, labels: {{ style: {{ colors: '{indicator_color}' }} }}, decimalsInFloat: 2 }}, 
+                                        {{ opposite: true, title: {{ text: 'LTP', style: {{ color: '#00CC66' }} }}, labels: {{ style: {{ colors: '#00CC66' }} }}, decimalsInFloat: 2 }}
+                                    ],
+                                    tooltip: {{ shared: true, intersect: false }}, 
+                                    legend: {{ position: 'top', horizontalAlign: 'right' }}
                                 }};
-                                var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain); chartMain.render();
-                                var slider = document.getElementById('dual-slider'); var lblStart = document.getElementById('lbl-start'); var lblEnd = document.getElementById('lbl-end');
+                                
+                                var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain); 
+                                chartMain.render();
+                                
+                                var slider = document.getElementById('dual-slider'); 
+                                var lblStart = document.getElementById('lbl-start'); 
+                                var lblEnd = document.getElementById('lbl-end');
+                                
                                 if(timeCats.length > 0) {{
                                     noUiSlider.create(slider, {{ start: [0, timeCats.length - 1], connect: true, range: {{ 'min': 0, 'max': timeCats.length - 1 }}, step: 1 }});
                                     slider.noUiSlider.on('update', function (values, handle) {{
                                         var sIdx = parseInt(values[0]), eIdx = parseInt(values[1]);
-                                        lblStart.innerText = "From: " + timeCats[sIdx]; lblEnd.innerText = "To: " + timeCats[eIdx];
+                                        lblStart.innerText = "From: " + timeCats[sIdx]; 
+                                        lblEnd.innerText = "To: " + timeCats[eIdx];
                                         chartMain.updateOptions({{ xaxis: {{ categories: timeCats.slice(sIdx, eIdx + 1) }}, series: [{{ name: '{chart_mode}', data: dataIndicator.slice(sIdx, eIdx + 1) }}, {{ name: 'LTP', data: dataLTP.slice(sIdx, eIdx + 1) }}] }}, false, false, false);
                                     }});
                                     document.getElementById('custom-reset-btn').addEventListener('click', function() {{ slider.noUiSlider.set([0, timeCats.length - 1]); }});
@@ -261,9 +329,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         </html>
                         """
                         components.html(apex_html, height=c_iframe_h)
-                    else: st.info(f"⏳ Waiting for Market Data for {sel_stock}...")
-                else: st.info("⏳ Market data hasn't started logging yet today.")
-            except Exception as e: st.error(f"Chart Load Error: {e}")
-        else: st.info("⏳ Chart data sheet is empty. Waiting for Master Engine...")
+                    else: 
+                        st.info(f"⏳ Waiting for Market Data for {sel_stock}...")
+                else: 
+                    st.info("⏳ Market data hasn't started logging yet today.")
+            except Exception as e: 
+                st.error(f"Chart Load Error: {e}")
+        else: 
+            st.info("⏳ Chart data sheet is empty. Waiting for Master Engine...")
 else:
     st.info("⏳ Booting up... Waiting for Engine to push data.")
