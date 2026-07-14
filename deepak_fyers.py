@@ -10,14 +10,23 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide")
 
 # ==========================================
-# 1. UI CSS (ULTRA COMPACT SINGLE LINE HEADER)
+# 1. UI CSS (ULTRA COMPACT & ZERO TOP SPACE)
 # ==========================================
 css_str = """
 <style>
-/* 🔥 STREAMLIT KA FALTU TOP HEADER HATA DIYA 🔥 */
+/* 🔥 TOP HEADER & WHITE SPACE KILLER 🔥 */
 [data-testid="stHeader"], header { display: none !important; }
 #MainMenu { visibility: hidden !important; }
 footer { visibility: hidden !important; }
+
+/* Streamlit ki default padding ko jabardasti zero karna */
+.block-container { 
+    padding-top: 1rem !important; 
+    padding-bottom: 0rem !important; 
+    padding-left: 0.5rem !important; 
+    padding-right: 0.5rem !important; 
+    margin-top: -20px !important; 
+} 
 
 /* Anti-Blur & Anti-Popup (Connection Error Modal Hidden) */
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], .stApp { opacity: 1 !important; filter: none !important; transition: none !important; } 
@@ -25,10 +34,8 @@ footer { visibility: hidden !important; }
 [data-testid="stRadio"], [data-testid="stToggle"], .stRadio, .stToggle { opacity: 1 !important; filter: none !important; transition: none !important; }
 div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !important; }
 
-.block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
-
-/* 🔥 PERFECT EQUAL SIZE BUTTONS 🔥 */
-.stRadio div[role='radiogroup'] { gap: 6px; width: 100%; flex-wrap: nowrap !important; }
+/* 🔥 EQUAL SIZE BUTTONS 🔥 */
+.stRadio div[role='radiogroup'] { gap: 4px; width: 100%; flex-wrap: nowrap !important; }
 .stRadio div[role='radiogroup'] > label > div:first-child { display: none !important; } 
 .stRadio div[role='radiogroup'] > label { 
     flex: 1 1 0px !important; 
@@ -42,7 +49,7 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
     font-weight: 600 !important; 
     margin-top: 0px; 
     white-space: nowrap !important; 
-    height: 38px !important; 
+    height: 36px !important; 
     padding: 0 4px !important;
     overflow: hidden !important;
 }
@@ -50,29 +57,30 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
 .stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2) !important; }
 
 /* Time Box */
-.time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 0px 5px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 13px; color: #00BFFF; margin: 0; display: flex; align-items: center; justify-content: center; height: 38px; white-space: nowrap; }
+.time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 0px 5px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 13px; color: #00BFFF; margin: 0; display: flex; align-items: center; justify-content: center; height: 36px; white-space: nowrap; }
 
 /* 🔥 MOBILE STRICT 1-LINE LAYOUT 🔥 */
 @media (max-width: 768px) { 
-    .block-container { padding-top: 0.5rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
+    /* Top space ko ekdum khatam kar diya hai */
+    .block-container { padding-top: 0.5rem !important; margin-top: -30px !important; } 
     
-    /* Mobile par text thoda chota taaki sab fit aa jaye */
-    .stRadio div[role='radiogroup'] > label { font-size: 12px !important; height: 36px !important; padding: 0 2px !important; }
-    .time-box { font-size: 12px !important; height: 36px !important; padding: 0 2px !important; }
+    .stRadio div[role='radiogroup'] > label { font-size: 12px !important; height: 34px !important; padding: 0 2px !important; }
+    .time-box { font-size: 11px !important; height: 34px !important; padding: 0 2px !important; }
     
     /* Toggle, Menu aur Timer ko ek hi line mein force karna */
     div[data-testid="stColumns"] {
         display: flex !important;
         flex-direction: row !important;
         align-items: center !important;
-        gap: 4px !important; /* Ekdum kam gap */
+        flex-wrap: nowrap !important; 
+        gap: 4px !important; 
     }
     div[data-testid="stColumns"] > div[data-testid="column"] {
         width: auto !important;
         min-width: 0 !important;
         padding: 0 !important;
     }
-    .stToggle { height: 36px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 !important; }
+    .stToggle { height: 34px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 !important; padding: 0 !important; }
 }
 </style>
 """
@@ -153,8 +161,8 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # 🔥 TOP SINGLE ROW: Menu(55%) | Toggle(12%) | Timer(33%) sab ek hi line me! 🔥
-    col_menu, col_tog, col_tim = st.columns([5.2, 1.5, 3.3])
+    # 🔥 TOP ROW: Menu(45%) | Toggle(15%) | Timer(40%) sab ek sath ek line mein 🔥
+    col_menu, col_tog, col_tim = st.columns([4.5, 1.5, 4.0])
     
     with col_menu:
         selected_tab = st.radio("Menu", ["📊 Dash", "📈 CHART"], horizontal=True, label_visibility="collapsed")
@@ -166,12 +174,16 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         if selected_tab == "📊 Dash":
             show_pct = st.toggle("pct_btn", value=True, label_visibility="collapsed")
         else:
-            st.empty() # Chart tab me toggle ki jagah khali rahegi par line nahi tootegi
+            st.empty() # Chart me top toggle hide rahega
             
     with col_tim:
-        st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
+        if selected_tab == "📊 Dash":
+            st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
+        else:
+            st.empty() # Chart me TOP timer (15:25:05) hide rahega
 
-    st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
+    # Spacer
+    st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
 
     if selected_tab == "📊 Dash":
         
@@ -315,6 +327,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     # ==========================================
     elif selected_tab == "📈 CHART":
         
+        # 🔥 CHART WALE ORIGINAL OPTIONS (INHE BHI KABHI HATAAYA NAHI GAYA HAI) 🔥
         col_c1, col_c2 = st.columns([1, 1])
         
         with col_c1: 
@@ -363,10 +376,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         <body>
                             <button id="custom-reset-btn">🔄 Reset Zoom</button>
                             <div id="chart-main"></div>
+                            
+                            <!-- 🔥 ORIGINAL BOTTOM TIMELINE SLIDER (100% SAFE) 🔥 -->
                             <div class="slider-wrapper">
                                 <div class="time-labels"><span id="lbl-start"></span><span id="lbl-end"></span></div>
                                 <div id="dual-slider"></div>
                             </div>
+                            
                             <script>
                                 var dataIndicator = {json.dumps(indicator_list)}; 
                                 var dataLTP = {json.dumps(ltp_list)}; 
