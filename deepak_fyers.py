@@ -10,13 +10,13 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide")
 
 # ==========================================
-# 1. UI CSS
+# 1. UI CSS (WITH AGGRESSIVE POPUP KILLER)
 # ==========================================
 css_str = """
 <style>
-/* Anti-Blur & Anti-Popup */
+/* Anti-Blur & Anti-Popup (Connection Error Modal Hidden) */
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], .stApp { opacity: 1 !important; filter: none !important; transition: none !important; } 
-[data-testid='stStatusWidget'], [data-testid="stConnectionStatus"], [data-testid="stModal"], div[role="dialog"] { display: none !important; visibility: hidden !important; } 
+[data-testid='stStatusWidget'], [data-testid="stConnectionStatus"], [data-testid="stModal"], div[role="dialog"], [data-baseweb="modal"] { display: none !important; visibility: hidden !important; opacity: 0 !important; } 
 [data-testid="stRadio"], [data-testid="stToggle"], .stRadio, .stToggle { opacity: 1 !important; filter: none !important; transition: none !important; }
 div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !important; }
 
@@ -122,7 +122,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
     with col_toggle:
         st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
-        show_pct = st.toggle("📊 Show %", value=True)
+        if selected_tab == "📊 Dashboard":
+            show_pct = st.toggle("📊 Show %", value=True)
         
     with col_timer:
         ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
@@ -172,7 +173,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             df['PCR CHECKER'] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
             df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHECKER', 'VOL CHECKER']]
             
-            # 🔥 1. Multi-line (Horizontal) Column Names With <br> 🔥
+            # Multi-line (Horizontal) Column Names
             df = df.rename(columns={
                 'SYMS': 'SYMBOL', 
                 'OPEN_STATUS': 'OPENING', 
@@ -188,7 +189,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 'VOL CHECKER': 'VOL<br>CHECKER'
             })
 
-            # 🔥 2. Apply Custom Colors 🔥
+            # Apply Custom Colors
             df['OPENING'] = df['OPENING'].apply(color_open)
             df['LTP<br>CHANGE'] = df['LTP<br>CHANGE'].apply(lambda x: color_num(x, False))
             df['CHANGE<br>%'] = df['CHANGE<br>%'].apply(lambda x: color_num(x, True))
@@ -203,7 +204,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             
             html_table = df.to_html(escape=False, index=False, classes="dataframe")
             
-            # 🔥 3. Updated CSS (Font size reduced to 12px and Padding reduced for compact look) 🔥
+            # Interactive HTML + JS
             full_interactive_html = f"""
             <!DOCTYPE html>
             <html>
@@ -211,18 +212,15 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             <style>
                 body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: transparent; }}
                 .table-wrapper {{ height: 800px; overflow: auto; border-radius: 5px; }}
-                /* 🔥 Font-size reduced from 14px to 12px 🔥 */
                 table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 12px; margin: 0 auto; background-color: #ffffff; color: #000000; }}
                 table.dataframe th {{ 
                     background-color: darkblue !important; color: white !important; font-weight: bold !important; text-align: center !important; 
-                    /* 🔥 Padding reduced for compact header 🔥 */
                     padding: 8px 3px !important; position: sticky; top: 0; z-index: 10; border: 1px solid rgba(255,255,255,0.2);
                     cursor: pointer; user-select: none; transition: background 0.2s;
                 }}
                 table.dataframe th:hover {{ background-color: #0000cc !important; }}
                 table.dataframe td {{ 
                     text-align: center !important; 
-                    /* 🔥 Padding reduced for compact rows 🔥 */
                     padding: 6px 3px !important; 
                     border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; 
                 }}
@@ -252,7 +250,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         // Add new arrow to clicked column
                         th.innerHTML += asc ? ' ▲' : ' ▼';
 
-                        // Smart parser to extract raw numbers from HTML tags (e.g. +4.10% -> 4.10)
+                        // Smart parser to extract raw numbers from HTML tags
                         const parseVal = (td) => {{
                             let val = td.innerText || td.textContent;
                             val = val.replace(/,/g, '').replace(/%/g, '').replace(/[+]/g, '').trim();
@@ -268,7 +266,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             if (typeof v1 === 'number' && typeof v2 === 'number') {{
                                 return asc ? v1 - v2 : v2 - v1;
                             }}
-                            // Text sorting (for SYMBOL, OPENING)
+                            // Text sorting
                             return asc ? String(v1).localeCompare(String(v2)) : String(v2).localeCompare(String(v1));
                         }});
 
@@ -280,7 +278,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             </body>
             </html>
             """
-            # Render HTML inside Streamlit
             components.html(full_interactive_html, height=800, scrolling=False)
 
     # ==========================================
@@ -288,19 +285,15 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     # ==========================================
     elif selected_tab == "📈 CHART":
         
-        col_c1, col_c2, col_c3 = st.columns([1.5, 1.5, 1.5])
+        col_c1, col_c2 = st.columns(2)
         
         with col_c1: 
             sel_stock = st.selectbox("Stock:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
         with col_c2: 
             chart_mode = st.radio("View:", ["Vol CPR", "Option PCR"], horizontal=True, label_visibility="collapsed")
-        with col_c3: 
-            device_mode = st.radio("Screen:", ["💻 Laptop", "📱 Mobile"], horizontal=True, index=1, label_visibility="collapsed")
 
-        if device_mode == "💻 Laptop": 
-            c_main_h, c_iframe_h = 480, 610    
-        else: 
-            c_main_h, c_iframe_h = 350, 470    
+        # Mobile settings applied globally for charting
+        c_main_h, c_iframe_h = 350, 470    
 
         if 'chart_df' in st.session_state and not st.session_state.chart_df.empty:
             try:
