@@ -10,7 +10,7 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide")
 
 # ==========================================
-# 1. UI CSS (MOBILE SPACING & AUTO-FIT HACK)
+# 1. UI CSS (STRICT MOBILE NO-WRAP)
 # ==========================================
 css_str = """
 <style>
@@ -31,27 +31,26 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
 /* Time Box */
 .time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 6px 14px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 14px; color: #00BFFF; margin-top: 5px; }
 
-/* 🔥 MOBILE PERFECT HORIZONTAL ALIGNMENT (Menu + Toggle) 🔥 */
+/* 🔥 MOBILE STRICT HORIZONTAL ALIGNMENT (NO STACKING) 🔥 */
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
     .time-box { font-size: 12px; padding: 6px 5px; margin-top: 0px; }
     .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; margin-top: 0px; }
     .stRadio div[role='radiogroup'] { gap: 5px; }
     
-    /* Columns ko ek hi line mein fix karne ki command */
-    div[data-testid="stHorizontalBlock"] {
+    /* Yeh command Streamlit ke columns ko mobile par niche khisakne nahi degi */
+    div[data-testid="stColumns"] {
+        display: flex !important;
         flex-direction: row !important;
+        flex-wrap: nowrap !important;
         align-items: center !important;
+        gap: 5px !important;
     }
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+    div[data-testid="stColumns"] > div[data-testid="column"] {
         width: auto !important;
-        padding: 0 4px !important;
-    }
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(1) {
-        flex: 1.5 !important; /* Menu ko thodi zyada jagah milegi */
-    }
-    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) {
-        flex: 1 !important; /* Toggle button ko bachi hui jagah milegi */
+        min-width: auto !important;
+        flex: 1 !important;
+        padding: 0 !important;
     }
 }
 </style>
@@ -133,8 +132,8 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # 🔥 CHANGE: Menu aur Toggle ek hi row me daal diye gaye hain 🔥
-    col_menu, col_toggle = st.columns([1.6, 1])
+    # 🔥 Menu aur bina Text wala Toggle ek hi row me perfect size me 🔥
+    col_menu, col_toggle = st.columns([5, 1])
     show_pct = True # Default
     
     with col_menu:
@@ -142,10 +141,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
     with col_toggle:
         if selected_tab == "📊 Dashboard":
-            st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
-            show_pct = st.toggle("📊 Show %", value=True)
+            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+            # Text hamesha ke liye hide kar diya gaya hai (sirf button bachega)
+            show_pct = st.toggle("pct_btn", value=True, label_visibility="collapsed")
         
-    # 🔥 CHANGE: Timer alag se poori line me niche aayega 🔥
+    # 🔥 Timer un dono ke theek niche full width mein aayega 🔥
     ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
     st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
 
@@ -293,7 +293,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     # ==========================================
     elif selected_tab == "📈 CHART":
         
-        col_c1, col_c2 = st.columns(2)
+        # Mobile me CHART tab me Stock Name aur View Radio button ke liye bhi yahi fix rahega
+        col_c1, col_c2 = st.columns([1, 1])
         
         with col_c1: 
             sel_stock = st.selectbox("Stock:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
