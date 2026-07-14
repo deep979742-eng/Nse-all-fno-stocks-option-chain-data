@@ -31,25 +31,27 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
 /* Time Box */
 .time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 6px 14px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 14px; color: #00BFFF; margin-top: 5px; }
 
-/* 🔥 MOBILE PERFECT AUTO-FIT HORIZONTAL COLUMNS 🔥 */
+/* 🔥 MOBILE PERFECT HORIZONTAL ALIGNMENT (Menu + Toggle) 🔥 */
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
     .time-box { font-size: 12px; padding: 6px 5px; margin-top: 0px; }
     .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; margin-top: 0px; }
     .stRadio div[role='radiogroup'] { gap: 5px; }
     
+    /* Columns ko ek hi line mein fix karne ki command */
     div[data-testid="stHorizontalBlock"] {
         flex-direction: row !important;
-        flex-wrap: wrap !important;
-        justify-content: center !important; 
-        align-items: center !important; 
-        gap: 10px !important;
+        align-items: center !important;
     }
     div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
         width: auto !important;
-        flex: 0 1 auto !important; /* Content ke hisaab se width lega, faltu gap nahi banayega */
-        min-width: 0 !important;
-        padding: 0 !important;
+        padding: 0 4px !important;
+    }
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(1) {
+        flex: 1.5 !important; /* Menu ko thodi zyada jagah milegi */
+    }
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"]:nth-child(2) {
+        flex: 1 !important; /* Toggle button ko bachi hui jagah milegi */
     }
 }
 </style>
@@ -131,20 +133,21 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    col_menu, col_toggle, col_timer = st.columns([3.8, 2.2, 2.5])
-    show_pct = True # Default state
+    # 🔥 CHANGE: Menu aur Toggle ek hi row me daal diye gaye hain 🔥
+    col_menu, col_toggle = st.columns([1.6, 1])
+    show_pct = True # Default
     
     with col_menu:
         selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
         
     with col_toggle:
-        # Puraani artificial margin hata di gayi, CSS (align-items: center) khud ise center kar dega
         if selected_tab == "📊 Dashboard":
+            st.markdown("<div style='margin-top: 2px;'></div>", unsafe_allow_html=True)
             show_pct = st.toggle("📊 Show %", value=True)
         
-    with col_timer:
-        ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
-        st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
+    # 🔥 CHANGE: Timer alag se poori line me niche aayega 🔥
+    ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
+    st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
@@ -190,7 +193,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             df['PCR CHECKER'] = df['PCR_PCT'] if show_pct else df['PCR_ABS']
             df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHECKER', 'VOL CHECKER']]
             
-            # Multi-line (Horizontal) Column Names
             df = df.rename(columns={
                 'SYMS': 'SYMBOL', 
                 'OPEN_STATUS': 'OPENING', 
@@ -206,7 +208,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 'VOL CHECKER': 'VOL<br>CHECKER'
             })
 
-            # Apply Custom Colors
             df['OPENING'] = df['OPENING'].apply(color_open)
             df['LTP<br>CHANGE'] = df['LTP<br>CHANGE'].apply(lambda x: color_num(x, False))
             df['CHANGE<br>%'] = df['CHANGE<br>%'].apply(lambda x: color_num(x, True))
@@ -221,7 +222,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             
             html_table = df.to_html(escape=False, index=False, classes="dataframe")
             
-            # Interactive HTML + JS
             full_interactive_html = f"""
             <!DOCTYPE html>
             <html>
@@ -242,7 +242,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                     border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; 
                 }}
                 table.dataframe tr:hover {{ background-color: rgba(128,128,128,0.1); }}
-                /* Custom Scrollbar */
                 ::-webkit-scrollbar {{ width: 6px; height: 6px; }}
                 ::-webkit-scrollbar-thumb {{ background: rgba(128,128,128,0.5); border-radius: 3px; }}
             </style>
@@ -262,12 +261,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         const idx = Array.from(th.parentNode.children).indexOf(th);
                         const asc = this.asc = !this.asc;
 
-                        // Remove existing arrows
                         table.querySelectorAll('th').forEach(el => el.innerHTML = el.innerHTML.replace(/ ▲| ▼/g, ''));
-                        // Add new arrow to clicked column
                         th.innerHTML += asc ? ' ▲' : ' ▼';
 
-                        // Smart parser to extract raw numbers from HTML tags
                         const parseVal = (td) => {{
                             let val = td.innerText || td.textContent;
                             val = val.replace(/,/g, '').replace(/%/g, '').replace(/[+]/g, '').trim();
@@ -278,16 +274,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         rows.sort((a, b) => {{
                             let v1 = parseVal(a.children[idx]);
                             let v2 = parseVal(b.children[idx]);
-                            
-                            // Number sorting
                             if (typeof v1 === 'number' && typeof v2 === 'number') {{
                                 return asc ? v1 - v2 : v2 - v1;
                             }}
-                            // Text sorting
                             return asc ? String(v1).localeCompare(String(v2)) : String(v2).localeCompare(String(v1));
                         }});
-
-                        // Re-attach sorted rows
                         rows.forEach(tr => tbody.appendChild(tr));
                     }});
                 }});
@@ -309,7 +300,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         with col_c2: 
             chart_mode = st.radio("View:", ["Vol CPR", "Option PCR"], horizontal=True, label_visibility="collapsed")
 
-        # Mobile settings applied globally for charting
         c_main_h, c_iframe_h = 350, 470    
 
         if 'chart_df' in st.session_state and not st.session_state.chart_df.empty:
