@@ -10,7 +10,7 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide")
 
 # ==========================================
-# 1. UI CSS (WITH AGGRESSIVE POPUP KILLER)
+# 1. UI CSS (WITH SINGLE-ROW MOBILE HACK)
 # ==========================================
 css_str = """
 <style>
@@ -31,10 +31,25 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
 /* Time Box */
 .time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 6px 14px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 14px; color: #00BFFF; margin-top: 5px; }
 
+/* 🔥 HORIZONTAL COLUMNS FOR MOBILE (SAVES VERTICAL SPACE) 🔥 */
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
     .time-box { font-size: 12px; padding: 6px 5px; margin-top: 0px; }
     .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; margin-top: 0px; }
+    .stRadio div[role='radiogroup'] { gap: 5px; }
+    
+    /* Streamlit columns ko mobile par ek line mein force karne ka magic */
+    div[data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important;
+        gap: 2px !important;
+    }
+    div[data-testid="stHorizontalBlock"] > div[data-testid="column"] {
+        width: auto !important;
+        flex: 1 1 0% !important;
+        min-width: 0 !important;
+    }
 }
 </style>
 """
@@ -115,13 +130,14 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    col_menu, col_toggle, col_timer = st.columns([3, 2.5, 2.5])
+    # 🔥 Columns ki ratio thodi adjust ki hai taaki sab ek line me fit aa sakein 🔥
+    col_menu, col_toggle, col_timer = st.columns([3.8, 2.2, 2.5])
     
     with col_menu:
         selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
         
     with col_toggle:
-        st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
+        # Puraani extra margin hata di gayi hai jisse yeh center align rahega
         if selected_tab == "📊 Dashboard":
             show_pct = st.toggle("📊 Show %", value=True)
         
@@ -285,6 +301,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     # ==========================================
     elif selected_tab == "📈 CHART":
         
+        # Mobile view ke liye yeh dono bhi ek hi line mein dikhenge
         col_c1, col_c2 = st.columns(2)
         
         with col_c1: 
