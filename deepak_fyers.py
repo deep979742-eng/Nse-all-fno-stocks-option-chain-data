@@ -10,35 +10,42 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide")
 
 # ==========================================
-# 1. UI CSS (ULTRA COMPACT MOBILE LAYOUT)
+# 1. UI CSS (HEADER HIDDEN & TOP LAYOUT FIX)
 # ==========================================
 css_str = """
 <style>
+/* 🔥 STREAMLIT KA FALTU TOP HEADER (GITHUB, SHARE, DOTS) HATA DIYA 🔥 */
+[data-testid="stHeader"], header { display: none !important; }
+#MainMenu { visibility: hidden !important; }
+footer { visibility: hidden !important; }
+
 /* Anti-Blur & Anti-Popup (Connection Error Modal Hidden) */
-[data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], [data-testid='stHeader'], .stApp { opacity: 1 !important; filter: none !important; transition: none !important; } 
+[data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], .stApp { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stStatusWidget'], [data-testid="stConnectionStatus"], [data-testid="stModal"], div[role="dialog"], [data-baseweb="modal"] { display: none !important; visibility: hidden !important; opacity: 0 !important; } 
 [data-testid="stRadio"], [data-testid="stToggle"], .stRadio, .stToggle { opacity: 1 !important; filter: none !important; transition: none !important; }
 div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !important; }
 
-.block-container { padding-top: 2rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
+/* Top Space Recovered */
+.block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 
-/* Square Buttons */
-.stRadio div[role='radiogroup'] { gap: 10px; }
+/* Square Buttons (Dashboard / Chart) */
+.stRadio div[role='radiogroup'] { gap: 10px; width: 100%; }
 .stRadio div[role='radiogroup'] > label > div:first-child { display: none !important; } 
-.stRadio div[role='radiogroup'] > label { border: 1px solid rgba(128, 128, 128, 0.4) !important; padding: 8px 18px !important; border-radius: 6px !important; background-color: rgba(128, 128, 128, 0.1) !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; margin-top: 5px; }
+.stRadio div[role='radiogroup'] > label { flex: 1; border: 1px solid rgba(128, 128, 128, 0.4) !important; padding: 8px 18px !important; border-radius: 6px !important; background-color: rgba(128, 128, 128, 0.1) !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; margin-top: 0px; }
 .stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2) !important; }
 
 /* Time Box */
-.time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 6px 14px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 14px; color: #00BFFF; }
+.time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 6px 14px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 14px; color: #00BFFF; margin: 0; display: flex; align-items: center; justify-content: center; height: 100%; }
 
-/* 🔥 MOBILE LAYOUT: FORCE COLUMNS TO STAY IN ONE LINE 🔥 */
+/* 🔥 MOBILE STRICT LAYOUT 🔥 */
 @media (max-width: 768px) { 
-    .block-container { padding-top: 1rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
-    .time-box { font-size: 13px !important; padding: 0px !important; height: 34px !important; display: flex !important; justify-content: center !important; align-items: center !important; margin-top: 0px !important; }
+    /* Top space ekdum kam kar diya */
+    .block-container { padding-top: 0.5rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
+    .time-box { font-size: 13px !important; padding: 0px !important; height: 34px !important; margin-top: 0px !important; }
     .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; margin-top: 0px; }
     .stRadio div[role='radiogroup'] { gap: 5px; }
     
-    /* Streamlit columns stacking rokne ka hack */
+    /* Toggle aur Timer ko ek hi line mein fix rakhne ke liye */
     div[data-testid="stColumns"] {
         display: flex !important;
         flex-direction: row !important;
@@ -50,8 +57,7 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
         min-width: 0 !important;
         padding: 0 !important;
     }
-    /* Toggle button vertical alignment */
-    .stToggle { height: 34px !important; display: flex !important; align-items: center !important; }
+    .stToggle { height: 34px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 !important; }
 }
 </style>
 """
@@ -132,17 +138,18 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # 🔥 ROW 1: Sirf Menu Button 🔥
+    # 🔥 ROW 1: SABSE TOP PAR MENU (Dashboard / Chart) 🔥
     selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
     st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
     
     ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
     show_pct = True 
 
-    # 🔥 ROW 2: Toggle aur Timer ek hi line mein 🔥
+    # 🔥 ROW 2: TOGGLE AUR TIMER 🔥
     if selected_tab == "📊 Dashboard":
         col_tog, col_tim = st.columns([1.5, 8.5])
         with col_tog:
+            # Text hidden (Sirf Switch)
             show_pct = st.toggle("pct_btn", value=True, label_visibility="collapsed")
         with col_tim:
             st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
@@ -294,7 +301,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     # ==========================================
     elif selected_tab == "📈 CHART":
         
-        # Mobile me CHART tab me Stock Name aur View Radio button ke liye wahi purana theek hai
         col_c1, col_c2 = st.columns([1, 1])
         
         with col_c1: 
