@@ -10,7 +10,7 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide")
 
 # ==========================================
-# 1. UI CSS (STRICT MOBILE NO-WRAP)
+# 1. UI CSS (ULTRA COMPACT MOBILE LAYOUT)
 # ==========================================
 css_str = """
 <style>
@@ -29,29 +29,29 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
 .stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2) !important; }
 
 /* Time Box */
-.time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 6px 14px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 14px; color: #00BFFF; margin-top: 5px; }
+.time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 6px 14px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 14px; color: #00BFFF; }
 
-/* 🔥 MOBILE STRICT HORIZONTAL ALIGNMENT (NO STACKING) 🔥 */
+/* 🔥 MOBILE LAYOUT: FORCE COLUMNS TO STAY IN ONE LINE 🔥 */
 @media (max-width: 768px) { 
     .block-container { padding-top: 1rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
-    .time-box { font-size: 12px; padding: 6px 5px; margin-top: 0px; }
+    .time-box { font-size: 13px !important; padding: 0px !important; height: 34px !important; display: flex !important; justify-content: center !important; align-items: center !important; margin-top: 0px !important; }
     .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; margin-top: 0px; }
     .stRadio div[role='radiogroup'] { gap: 5px; }
     
-    /* Yeh command Streamlit ke columns ko mobile par niche khisakne nahi degi */
+    /* Streamlit columns stacking rokne ka hack */
     div[data-testid="stColumns"] {
         display: flex !important;
         flex-direction: row !important;
-        flex-wrap: nowrap !important;
         align-items: center !important;
-        gap: 5px !important;
+        gap: 10px !important;
     }
     div[data-testid="stColumns"] > div[data-testid="column"] {
         width: auto !important;
-        min-width: auto !important;
-        flex: 1 !important;
+        min-width: 0 !important;
         padding: 0 !important;
     }
+    /* Toggle button vertical alignment */
+    .stToggle { height: 34px !important; display: flex !important; align-items: center !important; }
 }
 </style>
 """
@@ -132,22 +132,23 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # 🔥 Menu aur bina Text wala Toggle ek hi row me perfect size me 🔥
-    col_menu, col_toggle = st.columns([5, 1])
-    show_pct = True # Default
+    # 🔥 ROW 1: Sirf Menu Button 🔥
+    selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
+    st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
     
-    with col_menu:
-        selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
-        
-    with col_toggle:
-        if selected_tab == "📊 Dashboard":
-            st.markdown("<div style='margin-top: 5px;'></div>", unsafe_allow_html=True)
-            # Text hamesha ke liye hide kar diya gaya hai (sirf button bachega)
-            show_pct = st.toggle("pct_btn", value=True, label_visibility="collapsed")
-        
-    # 🔥 Timer un dono ke theek niche full width mein aayega 🔥
     ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
-    st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
+    show_pct = True 
+
+    # 🔥 ROW 2: Toggle aur Timer ek hi line mein 🔥
+    if selected_tab == "📊 Dashboard":
+        col_tog, col_tim = st.columns([1.5, 8.5])
+        with col_tog:
+            show_pct = st.toggle("pct_btn", value=True, label_visibility="collapsed")
+        with col_tim:
+            st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
+    else:
+        # Chart wale view mein sirf Timer dikhega (Toggle hide rahega)
+        st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
@@ -293,7 +294,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     # ==========================================
     elif selected_tab == "📈 CHART":
         
-        # Mobile me CHART tab me Stock Name aur View Radio button ke liye bhi yahi fix rahega
+        # Mobile me CHART tab me Stock Name aur View Radio button ke liye wahi purana theek hai
         col_c1, col_c2 = st.columns([1, 1])
         
         with col_c1: 
