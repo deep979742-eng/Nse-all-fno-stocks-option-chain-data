@@ -10,11 +10,11 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide")
 
 # ==========================================
-# 1. UI CSS (PERFECT EQUAL BUTTON SIZES)
+# 1. UI CSS (ULTRA COMPACT SINGLE LINE HEADER)
 # ==========================================
 css_str = """
 <style>
-/* 🔥 STREAMLIT KA FALTU TOP HEADER (GITHUB, SHARE, DOTS) HATA DIYA 🔥 */
+/* 🔥 STREAMLIT KA FALTU TOP HEADER HATA DIYA 🔥 */
 [data-testid="stHeader"], header { display: none !important; }
 #MainMenu { visibility: hidden !important; }
 footer { visibility: hidden !important; }
@@ -25,11 +25,10 @@ footer { visibility: hidden !important; }
 [data-testid="stRadio"], [data-testid="stToggle"], .stRadio, .stToggle { opacity: 1 !important; filter: none !important; transition: none !important; }
 div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !important; }
 
-/* Top Space Recovered */
 .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 
 /* 🔥 PERFECT EQUAL SIZE BUTTONS 🔥 */
-.stRadio div[role='radiogroup'] { gap: 10px; width: 100%; flex-wrap: nowrap !important; }
+.stRadio div[role='radiogroup'] { gap: 6px; width: 100%; flex-wrap: nowrap !important; }
 .stRadio div[role='radiogroup'] > label > div:first-child { display: none !important; } 
 .stRadio div[role='radiogroup'] > label { 
     flex: 1 1 0px !important; 
@@ -43,34 +42,30 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
     font-weight: 600 !important; 
     margin-top: 0px; 
     white-space: nowrap !important; 
-    height: 42px !important; 
-    padding: 0 5px !important;
+    height: 38px !important; 
+    padding: 0 4px !important;
     overflow: hidden !important;
 }
 .stRadio div[role='radiogroup'] > label > div { white-space: nowrap !important; }
 .stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2) !important; }
 
 /* Time Box */
-.time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 6px 14px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 14px; color: #00BFFF; margin: 0; display: flex; align-items: center; justify-content: center; height: 100%; }
+.time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 0px 5px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 13px; color: #00BFFF; margin: 0; display: flex; align-items: center; justify-content: center; height: 38px; white-space: nowrap; }
 
-/* 🔥 MOBILE STRICT LAYOUT 🔥 */
+/* 🔥 MOBILE STRICT 1-LINE LAYOUT 🔥 */
 @media (max-width: 768px) { 
     .block-container { padding-top: 0.5rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
-    .time-box { font-size: 13px !important; padding: 0px !important; height: 36px !important; margin-top: 0px !important; }
     
-    /* Mobile Buttons Size */
-    .stRadio div[role='radiogroup'] > label { 
-        font-size: 13px !important; 
-        height: 38px !important; 
-    }
-    .stRadio div[role='radiogroup'] { gap: 6px !important; }
+    /* Mobile par text thoda chota taaki sab fit aa jaye */
+    .stRadio div[role='radiogroup'] > label { font-size: 12px !important; height: 36px !important; padding: 0 2px !important; }
+    .time-box { font-size: 12px !important; height: 36px !important; padding: 0 2px !important; }
     
-    /* Toggle aur Timer ko ek hi line mein fix rakhne ke liye */
+    /* Toggle, Menu aur Timer ko ek hi line mein force karna */
     div[data-testid="stColumns"] {
         display: flex !important;
         flex-direction: row !important;
         align-items: center !important;
-        gap: 10px !important;
+        gap: 4px !important; /* Ekdum kam gap */
     }
     div[data-testid="stColumns"] > div[data-testid="column"] {
         width: auto !important;
@@ -158,26 +153,25 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # 🔥 ROW 1: SABSE TOP PAR MENU (Short Name "Dash" used) 🔥
-    selected_tab = st.radio("Menu", ["📊 Dash", "📈 CHART"], horizontal=True, label_visibility="collapsed")
-    st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
+    # 🔥 TOP SINGLE ROW: Menu(55%) | Toggle(12%) | Timer(33%) sab ek hi line me! 🔥
+    col_menu, col_tog, col_tim = st.columns([5.2, 1.5, 3.3])
     
-    ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
+    with col_menu:
+        selected_tab = st.radio("Menu", ["📊 Dash", "📈 CHART"], horizontal=True, label_visibility="collapsed")
+        
     show_pct = True 
-
-    # 🔥 ROW 2: TOGGLE AUR TIMER 🔥
-    if selected_tab == "📊 Dash":
-        col_tog, col_tim = st.columns([1.5, 8.5])
-        with col_tog:
-            # Text hidden (Sirf Switch)
+    ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
+    
+    with col_tog:
+        if selected_tab == "📊 Dash":
             show_pct = st.toggle("pct_btn", value=True, label_visibility="collapsed")
-        with col_tim:
-            st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
-    else:
-        # Chart wale view mein sirf Timer dikhega
+        else:
+            st.empty() # Chart tab me toggle ki jagah khali rahegi par line nahi tootegi
+            
+    with col_tim:
         st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
 
-    st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
+    st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
 
     if selected_tab == "📊 Dash":
         
@@ -326,7 +320,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         with col_c1: 
             sel_stock = st.selectbox("Stock:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
         with col_c2: 
-            # 🔥 Short Name "OPT PCR" used here as well 🔥
             chart_mode = st.radio("View:", ["Vol CPR", "OPT PCR"], horizontal=True, label_visibility="collapsed")
 
         c_main_h, c_iframe_h = 350, 470    
@@ -341,7 +334,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                     if not df_sym.empty:
                         df_sym = df_sym.sort_values(by='Time')
                         
-                        # Logic matched to new short name "OPT PCR"
                         target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
                         indicator_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF"
                         
