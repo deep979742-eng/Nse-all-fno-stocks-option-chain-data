@@ -10,7 +10,7 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide")
 
 # ==========================================
-# 1. UI CSS (HEADER HIDDEN & TOP LAYOUT FIX)
+# 1. UI CSS (PERFECT EQUAL BUTTON SIZES)
 # ==========================================
 css_str = """
 <style>
@@ -28,10 +28,26 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
 /* Top Space Recovered */
 .block-container { padding-top: 1rem !important; padding-bottom: 0rem !important; padding-left: 1rem !important; padding-right: 1rem !important; } 
 
-/* Square Buttons (Dashboard / Chart) */
-.stRadio div[role='radiogroup'] { gap: 10px; width: 100%; }
+/* 🔥 PERFECT EQUAL SIZE BUTTONS 🔥 */
+.stRadio div[role='radiogroup'] { gap: 10px; width: 100%; flex-wrap: nowrap !important; }
 .stRadio div[role='radiogroup'] > label > div:first-child { display: none !important; } 
-.stRadio div[role='radiogroup'] > label { flex: 1; border: 1px solid rgba(128, 128, 128, 0.4) !important; padding: 8px 18px !important; border-radius: 6px !important; background-color: rgba(128, 128, 128, 0.1) !important; cursor: pointer !important; display: flex !important; align-items: center !important; justify-content: center !important; font-weight: 600 !important; margin-top: 0px; }
+.stRadio div[role='radiogroup'] > label { 
+    flex: 1 1 0px !important; 
+    border: 1px solid rgba(128, 128, 128, 0.4) !important; 
+    border-radius: 6px !important; 
+    background-color: rgba(128, 128, 128, 0.1) !important; 
+    cursor: pointer !important; 
+    display: flex !important; 
+    align-items: center !important; 
+    justify-content: center !important; 
+    font-weight: 600 !important; 
+    margin-top: 0px; 
+    white-space: nowrap !important; 
+    height: 42px !important; 
+    padding: 0 5px !important;
+    overflow: hidden !important;
+}
+.stRadio div[role='radiogroup'] > label > div { white-space: nowrap !important; }
 .stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2) !important; }
 
 /* Time Box */
@@ -39,11 +55,15 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
 
 /* 🔥 MOBILE STRICT LAYOUT 🔥 */
 @media (max-width: 768px) { 
-    /* Top space ekdum kam kar diya */
     .block-container { padding-top: 0.5rem !important; padding-left: 0.2rem !important; padding-right: 0.2rem !important; } 
-    .time-box { font-size: 13px !important; padding: 0px !important; height: 34px !important; margin-top: 0px !important; }
-    .stRadio div[role='radiogroup'] > label { padding: 6px 10px !important; font-size: 13px !important; margin-top: 0px; }
-    .stRadio div[role='radiogroup'] { gap: 5px; }
+    .time-box { font-size: 13px !important; padding: 0px !important; height: 36px !important; margin-top: 0px !important; }
+    
+    /* Mobile Buttons Size */
+    .stRadio div[role='radiogroup'] > label { 
+        font-size: 13px !important; 
+        height: 38px !important; 
+    }
+    .stRadio div[role='radiogroup'] { gap: 6px !important; }
     
     /* Toggle aur Timer ko ek hi line mein fix rakhne ke liye */
     div[data-testid="stColumns"] {
@@ -57,7 +77,7 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
         min-width: 0 !important;
         padding: 0 !important;
     }
-    .stToggle { height: 34px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 !important; }
+    .stToggle { height: 36px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 !important; }
 }
 </style>
 """
@@ -138,15 +158,15 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # 🔥 ROW 1: SABSE TOP PAR MENU (Dashboard / Chart) 🔥
-    selected_tab = st.radio("Menu", ["📊 Dashboard", "📈 CHART"], horizontal=True, label_visibility="collapsed")
+    # 🔥 ROW 1: SABSE TOP PAR MENU (Short Name "Dash" used) 🔥
+    selected_tab = st.radio("Menu", ["📊 Dash", "📈 CHART"], horizontal=True, label_visibility="collapsed")
     st.markdown("<div style='margin-bottom: 8px;'></div>", unsafe_allow_html=True)
     
     ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
     show_pct = True 
 
     # 🔥 ROW 2: TOGGLE AUR TIMER 🔥
-    if selected_tab == "📊 Dashboard":
+    if selected_tab == "📊 Dash":
         col_tog, col_tim = st.columns([1.5, 8.5])
         with col_tog:
             # Text hidden (Sirf Switch)
@@ -154,12 +174,12 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         with col_tim:
             st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
     else:
-        # Chart wale view mein sirf Timer dikhega (Toggle hide rahega)
+        # Chart wale view mein sirf Timer dikhega
         st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
 
     st.markdown("<div style='margin-bottom: 10px;'></div>", unsafe_allow_html=True)
 
-    if selected_tab == "📊 Dashboard":
+    if selected_tab == "📊 Dash":
         
         if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
             missing_str = ", ".join(st.session_state.missing_stocks_list)
@@ -306,7 +326,8 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         with col_c1: 
             sel_stock = st.selectbox("Stock:", raw_symbols, index=0, key="c_stock", label_visibility="collapsed")
         with col_c2: 
-            chart_mode = st.radio("View:", ["Vol CPR", "Option PCR"], horizontal=True, label_visibility="collapsed")
+            # 🔥 Short Name "OPT PCR" used here as well 🔥
+            chart_mode = st.radio("View:", ["Vol CPR", "OPT PCR"], horizontal=True, label_visibility="collapsed")
 
         c_main_h, c_iframe_h = 350, 470    
 
@@ -320,6 +341,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                     if not df_sym.empty:
                         df_sym = df_sym.sort_values(by='Time')
                         
+                        # Logic matched to new short name "OPT PCR"
                         target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
                         indicator_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF"
                         
