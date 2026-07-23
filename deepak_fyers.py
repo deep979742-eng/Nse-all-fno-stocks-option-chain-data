@@ -7,7 +7,10 @@ import requests
 from streamlit_autorefresh import st_autorefresh
 import streamlit.components.v1 as components  
 
-st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide")
+# ==========================================
+# PAGE CONFIG 
+# ==========================================
+st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
 # ==========================================
 # 1. UI CSS (ULTRA COMPACT & ZERO TOP SPACE)
@@ -19,7 +22,10 @@ css_str = """
 #MainMenu { visibility: hidden !important; }
 footer { visibility: hidden !important; }
 
-/* 🔥 HIDE STREAMLIT LOGO, DEPLOY BUTTON, AND PROFILE BADGE 🔥 */
+/* 🔥 100% FIX: HIDE STREAMLIT "MANAGE APP" BLACK BUTTON & LOGO 🔥 */
+[data-testid="stAppDeployButton"] { display: none !important; visibility: hidden !important; opacity: 0 !important; }
+.stAppDeployButton { display: none !important; }
+[data-testid="stToolbar"] { display: none !important; }
 .viewerBadge_container__1QSob, .viewerBadge_link__1S137, .styles_viewerBadge__1yB5_ { display: none !important; }
 .stDeployButton { display: none !important; }
 
@@ -65,25 +71,11 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
 
 /* 🔥 MOBILE STRICT 1-LINE LAYOUT 🔥 */
 @media (max-width: 768px) { 
-    /* Top space ko ekdum khatam kar diya hai */
     .block-container { padding-top: 0.5rem !important; margin-top: -30px !important; } 
-    
     .stRadio div[role='radiogroup'] > label { font-size: 12px !important; height: 34px !important; padding: 0 2px !important; }
     .time-box { font-size: 11px !important; height: 34px !important; padding: 0 2px !important; }
-    
-    /* Toggle, Menu aur Timer ko ek hi line mein force karna */
-    div[data-testid="stColumns"] {
-        display: flex !important;
-        flex-direction: row !important;
-        align-items: center !important;
-        flex-wrap: nowrap !important; 
-        gap: 4px !important; 
-    }
-    div[data-testid="stColumns"] > div[data-testid="column"] {
-        width: auto !important;
-        min-width: 0 !important;
-        padding: 0 !important;
-    }
+    div[data-testid="stColumns"] { display: flex !important; flex-direction: row !important; align-items: center !important; flex-wrap: nowrap !important; gap: 4px !important; }
+    div[data-testid="stColumns"] > div[data-testid="column"] { width: auto !important; min-width: 0 !important; padding: 0 !important; }
     .stToggle { height: 34px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 !important; padding: 0 !important; }
 }
 </style>
@@ -165,7 +157,6 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # 🔥 TOP ROW: Menu(45%) | Toggle(15%) | Timer(40%) sab ek sath ek line mein 🔥
     col_menu, col_tog, col_tim = st.columns([4.5, 1.5, 4.0])
     
     with col_menu:
@@ -178,15 +169,14 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         if selected_tab == "📊 Dash":
             show_pct = st.toggle("pct_btn", value=True, label_visibility="collapsed")
         else:
-            st.empty() # Chart me top toggle hide rahega
+            st.empty() 
             
     with col_tim:
         if selected_tab == "📊 Dash":
             st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
         else:
-            st.empty() # Chart me TOP timer (15:25:05) hide rahega
+            st.empty() 
 
-    # Spacer
     st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
 
     if selected_tab == "📊 Dash":
@@ -288,7 +278,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             <div class="table-wrapper">
                 {html_table}
             </div>
-            
             <script>
                 document.querySelectorAll('th').forEach(th => {{
                     th.title = "Click to Sort Ascending / Descending";
@@ -312,9 +301,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         rows.sort((a, b) => {{
                             let v1 = parseVal(a.children[idx]);
                             let v2 = parseVal(b.children[idx]);
-                            if (typeof v1 === 'number' && typeof v2 === 'number') {{
-                                return asc ? v1 - v2 : v2 - v1;
-                            }}
+                            if (typeof v1 === 'number' && typeof v2 === 'number') {{ return asc ? v1 - v2 : v2 - v1; }}
                             return asc ? String(v1).localeCompare(String(v2)) : String(v2).localeCompare(String(v1));
                         }});
                         rows.forEach(tr => tbody.appendChild(tr));
@@ -334,12 +321,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         col_c1, col_c2 = st.columns([1, 1])
         
         with col_c1: 
-            # 🔥 NAYA AUTO-CLEAR SEARCH BOX YAHAN HAI 🔥
+            # 🔥 NAYA BOX: 'index=None' set kiya hai 🔥
+            # NOTE: Jab aap naya stock search karna chahein, to box mein bane chote 'X' (cross) icon par click karein.
             sel_stock = st.selectbox(
                 "Stock:", 
                 raw_symbols, 
-                index=None,                                # Yahan index None hai taaki khali rahe
-                placeholder="🔍 Search Stock...",          # Type karne ki hint
+                index=None,                                
+                placeholder="🔍 Search Stock...",          
                 key="c_stock", 
                 label_visibility="collapsed"
             )
@@ -350,7 +338,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         c_main_h, c_iframe_h = 350, 470    
 
         if 'chart_df' in st.session_state and not st.session_state.chart_df.empty:
-            if sel_stock: # Jab koi stock select hoga, tabhi aage ka chart banega
+            if sel_stock: 
                 try:
                     hist_df = st.session_state.chart_df.copy()
                     if 'Date' in hist_df.columns:
@@ -390,7 +378,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 <button id="custom-reset-btn">🔄 Reset Zoom</button>
                                 <div id="chart-main"></div>
                                 
-                                <!-- 🔥 ORIGINAL BOTTOM TIMELINE SLIDER (100% SAFE) 🔥 -->
                                 <div class="slider-wrapper">
                                     <div class="time-labels"><span id="lbl-start"></span><span id="lbl-end"></span></div>
                                     <div id="dual-slider"></div>
@@ -446,7 +433,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 except Exception as e: 
                     st.error(f"Chart Load Error: {e}")
             else:
-                # 🔥 Jab stock select nahi hoga to yeh message dikhega 🔥
                 st.info("👆 कृपया ऊपर बॉक्स में कोई भी स्टॉक सर्च करें...")
         else: 
             st.info("⏳ Chart data sheet is empty. Waiting for Master Engine...")
