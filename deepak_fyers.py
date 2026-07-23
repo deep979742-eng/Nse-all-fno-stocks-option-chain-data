@@ -13,21 +13,45 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide", initial_sidebar_state="collapsed")
 
 # ==========================================
-# 1. UI CSS (ULTRA COMPACT & ZERO TOP SPACE)
+# 1. 🔥 THE "HARD RESET" JAVASCRIPT HACK 🔥
+# ==========================================
+# यह कोड Streamlit के काले बटन और लोगो को ज़बरदस्ती (Forcefully) डिलीट करेगा
+components.html(
+    """
+    <script>
+    const targetNode = window.parent.document.body;
+    const config = { childList: true, subtree: true };
+    const callback = function(mutationsList, observer) {
+        // Manage App Button Hide
+        const deployBtn = window.parent.document.querySelector('[data-testid="stAppDeployButton"]');
+        if (deployBtn) { deployBtn.style.display = 'none'; deployBtn.style.visibility = 'hidden'; }
+        
+        // Toolbar Hide
+        const toolbar = window.parent.document.querySelector('[data-testid="stToolbar"]');
+        if (toolbar) { toolbar.style.display = 'none'; }
+        
+        // Header Hide
+        const header = window.parent.document.querySelector('header');
+        if (header) { header.style.display = 'none'; }
+    };
+    const observer = new MutationObserver(callback);
+    observer.observe(targetNode, config);
+    
+    // First run
+    callback();
+    </script>
+    """,
+    height=0,
+    width=0
+)
+
+# ==========================================
+# 2. UI CSS (ULTRA COMPACT & ZERO TOP SPACE)
 # ==========================================
 css_str = """
 <style>
-/* 🔥 TOP HEADER & WHITE SPACE KILLER 🔥 */
-[data-testid="stHeader"], header { display: none !important; }
-#MainMenu { visibility: hidden !important; }
-footer { visibility: hidden !important; }
-
-/* 🔥 100% FIX: HIDE STREAMLIT "MANAGE APP" BLACK BUTTON & LOGO 🔥 */
-[data-testid="stAppDeployButton"] { display: none !important; visibility: hidden !important; opacity: 0 !important; }
-.stAppDeployButton { display: none !important; }
-[data-testid="stToolbar"] { display: none !important; }
-.viewerBadge_container__1QSob, .viewerBadge_link__1S137, .styles_viewerBadge__1yB5_ { display: none !important; }
-.stDeployButton { display: none !important; }
+/* CSS backup for hiding elements */
+header, footer, [data-testid="stAppDeployButton"], [data-testid="stToolbar"] { display: none !important; visibility: hidden !important; opacity: 0 !important; }
 
 /* Streamlit ki default padding ko jabardasti zero karna */
 .block-container { 
@@ -44,7 +68,7 @@ footer { visibility: hidden !important; }
 [data-testid="stRadio"], [data-testid="stToggle"], .stRadio, .stToggle { opacity: 1 !important; filter: none !important; transition: none !important; }
 div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !important; }
 
-/* 🔥 EQUAL SIZE BUTTONS 🔥 */
+/* EQUAL SIZE BUTTONS */
 .stRadio div[role='radiogroup'] { gap: 4px; width: 100%; flex-wrap: nowrap !important; }
 .stRadio div[role='radiogroup'] > label > div:first-child { display: none !important; } 
 .stRadio div[role='radiogroup'] > label { 
@@ -69,7 +93,7 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
 /* Time Box */
 .time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 0px 5px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 13px; color: #00BFFF; margin: 0; display: flex; align-items: center; justify-content: center; height: 36px; white-space: nowrap; }
 
-/* 🔥 MOBILE STRICT 1-LINE LAYOUT 🔥 */
+/* MOBILE STRICT 1-LINE LAYOUT */
 @media (max-width: 768px) { 
     .block-container { padding-top: 0.5rem !important; margin-top: -30px !important; } 
     .stRadio div[role='radiogroup'] > label { font-size: 12px !important; height: 34px !important; padding: 0 2px !important; }
@@ -321,8 +345,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         col_c1, col_c2 = st.columns([1, 1])
         
         with col_c1: 
-            # 🔥 NAYA BOX: 'index=None' set kiya hai 🔥
-            # NOTE: Jab aap naya stock search karna chahein, to box mein bane chote 'X' (cross) icon par click karein.
+            # 🔥 SEARCH BOX: index=None 🔥
             sel_stock = st.selectbox(
                 "Stock:", 
                 raw_symbols, 
