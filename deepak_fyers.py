@@ -345,11 +345,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         col_c1, col_c2 = st.columns([1, 1])
         
         with col_c1: 
-            # 🔥 SEARCH BOX: index=None 🔥
+            # 🔥 SEARCH BOX: index=0 (NIFTY Default) 🔥
             sel_stock = st.selectbox(
                 "Stock:", 
                 raw_symbols, 
-                index=None,                                
+                index=0,                                
                 placeholder="🔍 Search Stock...",          
                 key="c_stock", 
                 label_visibility="collapsed"
@@ -455,8 +455,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         st.info("⏳ Market data hasn't started logging yet today.")
                 except Exception as e: 
                     st.error(f"Chart Load Error: {e}")
-            else:
-                st.info("👆 कृपया ऊपर बॉक्स में कोई भी स्टॉक सर्च करें...")
         else: 
             st.info("⏳ Chart data sheet is empty. Waiting for Master Engine...")
 else:
