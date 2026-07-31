@@ -90,17 +90,23 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
 .stRadio div[role='radiogroup'] > label > div { white-space: nowrap !important; }
 .stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2) !important; }
 
-/* Time Box */
-.time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 0px 5px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 13px; color: #00BFFF; margin: 0; display: flex; align-items: center; justify-content: center; height: 36px; white-space: nowrap; }
+/* Time Box - Width fixed to content size */
+.time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 0px 15px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 13px; color: #00BFFF; margin: 0; display: flex; align-items: center; justify-content: center; height: 36px; white-space: nowrap; width: max-content; }
+
+/* Toggle Box styling for "SHOW %" */
+div[data-testid="stToggle"] label { flex-direction: row-reverse !important; justify-content: flex-end !important; gap: 8px !important; margin-top: 5px; }
+div[data-testid="stToggle"] label p { font-weight: 700 !important; font-size: 14px !important; color: #FF4B4B !important; }
 
 /* MOBILE STRICT 1-LINE LAYOUT */
 @media (max-width: 768px) { 
     .block-container { padding-top: 0.5rem !important; margin-top: -30px !important; } 
     .stRadio div[role='radiogroup'] > label { font-size: 12px !important; height: 34px !important; padding: 0 2px !important; }
-    .time-box { font-size: 11px !important; height: 34px !important; padding: 0 2px !important; }
+    .time-box { font-size: 11px !important; height: 34px !important; padding: 0 10px !important; }
     div[data-testid="stColumns"] { display: flex !important; flex-direction: row !important; align-items: center !important; flex-wrap: nowrap !important; gap: 4px !important; }
     div[data-testid="stColumns"] > div[data-testid="column"] { width: auto !important; min-width: 0 !important; padding: 0 !important; }
+    div[data-testid="stColumns"] > div:nth-child(3) { display: none !important; } /* Hides empty space column on mobile */
     .stToggle { height: 34px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 !important; padding: 0 !important; }
+    div[data-testid="stToggle"] label p { font-size: 12px !important; }
 }
 </style>
 """
@@ -181,23 +187,27 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    col_menu, col_tog, col_tim = st.columns([4.5, 1.5, 4.0])
+    # 🔥 LAYOUT CHANGED: Menu (Left), Time (Middle), Space, Toggle (Right) 🔥
+    col_menu, col_tim, col_space, col_tog = st.columns([3.2, 2.5, 2.5, 1.8])
     
     with col_menu:
         selected_tab = st.radio("Menu", ["📊 Dash", "📈 CHART"], horizontal=True, label_visibility="collapsed")
         
-    show_pct = True 
     ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
+    show_pct = True 
     
-    with col_tog:
-        if selected_tab == "📊 Dash":
-            show_pct = st.toggle("pct_btn", value=True, label_visibility="collapsed")
-        else:
-            st.empty() 
-            
     with col_tim:
         if selected_tab == "📊 Dash":
             st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
+        else:
+            st.empty() 
+            
+    with col_space:
+        st.empty() # Empty space to push toggle to the right
+        
+    with col_tog:
+        if selected_tab == "📊 Dash":
+            show_pct = st.toggle("SHOW %", value=True)
         else:
             st.empty() 
 
