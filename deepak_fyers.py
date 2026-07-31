@@ -187,8 +187,8 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # 🔥 LAYOUT CHANGED: Menu (Left), Time (Middle), Space, Toggle (Right) 🔥
-    col_menu, col_tim, col_space, col_tog = st.columns([3.2, 2.5, 2.5, 1.8])
+    # 🔥 LAYOUT CHANGED: Menu & Time very close to each other on left, Toggle pushed to far right 🔥
+    col_menu, col_tim, col_space, col_tog = st.columns([1.5, 1.2, 5.8, 1.5])
     
     with col_menu:
         selected_tab = st.radio("Menu", ["📊 Dash", "📈 CHART"], horizontal=True, label_visibility="collapsed")
