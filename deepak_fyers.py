@@ -94,12 +94,6 @@ div[data-testid="stToggle"] label p { font-weight: 700 !important; font-size: 14
     .stToggle { height: 34px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 !important; padding: 0 !important; }
     div[data-testid="stToggle"] label p { font-size: 12px !important; }
 }
-
-/* Custom Table for Breakout */
-.breakout-table { width: 100%; border-collapse: collapse; font-size: 14px; background: #fff; margin-top: 10px; }
-.breakout-table th { background-color: #ff4d4d; color: white; padding: 10px; text-align: center; border: 1px solid #ddd; }
-.breakout-table td { padding: 10px; text-align: center; border: 1px solid #ddd; font-weight: bold; }
-.breakout-table tr:hover { background-color: #f1f1f1; }
 </style>
 """
 st.markdown(css_str, unsafe_allow_html=True)
@@ -179,7 +173,6 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # 🔥 LAYOUT CHANGED: Added 3rd Tab "BREAKOUT" 🔥
     col_menu, col_tim, col_space, col_tog = st.columns([2.5, 1.2, 4.8, 1.5])
     
     with col_menu:
@@ -342,52 +335,135 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             """
             components.html(full_interactive_html, height=800, scrolling=False)
 
+
     # ==========================================
-    # 🔥 NEW: VOL BREAKOUT VIEW 🔥
+    # 🔥 BREAKOUT VIEW (WITH INTERACTIVE FILTERING) 🔥
     # ==========================================
     elif selected_tab == "🚀 BREAKOUT":
-        st.markdown("<h4 style='color: #ff4d4d; margin-top: 5px; font-weight: bold;'>🔥 Volume Breakout (VOL CPR > 1.5 & Increasing)</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #ff4d4d; margin-top: 5px; font-weight: bold;'>🔥 Volume Breakout (VOL CPR > 1.5, CE/PE CON ≥ 80%, CHG ≤ 2.5%)</h4>", unsafe_allow_html=True)
         
-        if 'chart_df' in st.session_state and not st.session_state.chart_df.empty:
+        if 'chart_df' in st.session_state and not st.session_state.chart_df.empty and 'cached_data' in st.session_state:
             df_hist = st.session_state.chart_df.copy()
-            df_hist = df_hist[df_hist['Date'] == today_str] # Sirf aaj ka data check hoga
+            df_hist = df_hist[df_hist['Date'] == today_str] 
             
+            cached_dict = {d['SYMS']: d for d in st.session_state.cached_data}
             breakout_data = []
             
             for sym, grp in df_hist.groupby('Symbol'):
                 grp = grp.sort_values(by='Time')
                 
-                # Humhe kam se kam pichle 3 snapshot ka data chahiye check karne ke liye
                 if len(grp) >= 3:
                     last_3 = grp.tail(3)
                     cpr_vals = pd.to_numeric(last_3['VOL CPR'], errors='coerce').fillna(0).tolist()
                     
-                    # LOGIC: Current VOL CPR > 1.5 AND lagatar badh raha ho (cpr1 < cpr2 < cpr3)
                     if cpr_vals[-1] > 1.5 and (cpr_vals[0] < cpr_vals[1] < cpr_vals[2]):
-                        latest_opt_pcr = last_3['OPT PCR'].iloc[-1]
-                        latest_vol_pcr = last_3['VOL PCR'].iloc[-1]
-                        latest_ltp = last_3['LTP'].iloc[-1]
+                        live_data = cached_dict.get(sym)
                         
-                        trend_str = f"{cpr_vals[0]:.2f} ➡️ {cpr_vals[1]:.2f} ➡️ <span style='color:#00AA00; font-size:16px;'>{cpr_vals[-1]:.2f}</span>"
-                        
-                        breakout_data.append({
-                            'SYMBOL': sym,
-                            'LTP': f"{float(latest_ltp):.2f}",
-                            'OPT PCR': f"{float(latest_opt_pcr):.2f}",
-                            'VOL PCR': f"{float(latest_vol_pcr):.2f}",
-                            'VOL CPR': cpr_vals[-1],
-                            'TREND (Last 3)': trend_str
-                        })
+                        if live_data:
+                            ce_con = float(live_data.get('CE_CON', 0))
+                            pe_con = float(live_data.get('PE_CON', 0))
+                            chg_pct = float(live_data.get('CHG_%', 0))
+                            
+                            # 🔥 LOGIC Check: <2.5% condition 🔥
+                            # CE: Has not shot up more than 2.5%
+                            valid_ce = (ce_con >= 80) and (chg_pct <= 2.5)
+                            # PE: Has not fallen more than 2.5%
+                            valid_pe = (pe_con >= 80) and (chg_pct >= -2.5)
+                            
+                            if valid_ce or valid_pe:
+                                latest_opt_pcr = live_data.get('O_PCR', last_3['OPT PCR'].iloc[-1])
+                                latest_vol_pcr = live_data.get('V_PCR', last_3['VOL PCR'].iloc[-1])
+                                latest_ltp = live_data.get('LTP', last_3['LTP'].iloc[-1])
+                                
+                                trend_str = f"{cpr_vals[0]:.2f} ➡️ {cpr_vals[1]:.2f} ➡️ <span style='color:#00AA00; font-size:16px;'>{cpr_vals[-1]:.2f}</span>"
+                                
+                                ce_color = "#00AA00" if ce_con > 0 else "#FF0000" if ce_con < 0 else "#000"
+                                pe_color = "#00AA00" if pe_con > 0 else "#FF0000" if pe_con < 0 else "#000"
+                                chg_color = "#00AA00" if chg_pct > 0 else "#FF0000" if chg_pct < 0 else "#000"
+                                
+                                breakout_data.append({
+                                    'SYMBOL': sym,
+                                    'LTP': f"{float(latest_ltp):.2f}",
+                                    'CHG %': f"<span style='color:{chg_color};'>{chg_pct:+.2f}%</span>",
+                                    'CE CON': f"<span style='color:{ce_color};'>{ce_con:+.2f}%</span>",
+                                    'PE CON': f"<span style='color:{pe_color};'>{pe_con:+.2f}%</span>",
+                                    'OPT PCR': f"{float(latest_opt_pcr):.2f}",
+                                    'VOL PCR': f"{float(latest_vol_pcr):.2f}",
+                                    'VOL CPR': cpr_vals[-1],
+                                    'TREND (Last 3)': trend_str
+                                })
             
             if breakout_data:
                 bo_df = pd.DataFrame(breakout_data).sort_values(by='VOL CPR', ascending=False)
-                # DataFrame ko Drop karke ek khubsurat table me render karenge
                 bo_df['VOL CPR'] = bo_df['VOL CPR'].apply(lambda x: f"{x:.2f}")
                 
-                bo_html = bo_df.to_html(escape=False, index=False, classes="breakout-table")
-                st.markdown(bo_html, unsafe_allow_html=True)
+                # Render using the SAME interactive table styling as Main Dash
+                bo_html_table = bo_df.to_html(escape=False, index=False, classes="dataframe")
+                
+                breakout_interactive_html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                <style>
+                    body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: transparent; }}
+                    .table-wrapper {{ height: 500px; overflow: auto; border-radius: 5px; }}
+                    table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 13px; margin: 0 auto; background-color: #ffffff; color: #000000; }}
+                    table.dataframe th {{ 
+                        background-color: #ff4d4d !important; color: white !important; font-weight: bold !important; text-align: center !important; 
+                        padding: 8px 3px !important; position: sticky; top: 0; z-index: 10; border: 1px solid rgba(255,255,255,0.2);
+                        cursor: pointer; user-select: none; transition: background 0.2s;
+                    }}
+                    table.dataframe th:hover {{ background-color: #cc0000 !important; }}
+                    table.dataframe td {{ 
+                        text-align: center !important; 
+                        padding: 6px 3px !important; 
+                        border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; 
+                    }}
+                    table.dataframe tr:hover {{ background-color: rgba(128,128,128,0.1); }}
+                    ::-webkit-scrollbar {{ width: 6px; height: 6px; }}
+                    ::-webkit-scrollbar-thumb {{ background: rgba(128,128,128,0.5); border-radius: 3px; }}
+                </style>
+                </head>
+                <body>
+                <div class="table-wrapper">
+                    {bo_html_table}
+                </div>
+                <script>
+                    document.querySelectorAll('th').forEach(th => {{
+                        th.title = "Click to Sort Ascending / Descending";
+                        th.addEventListener('click', function() {{
+                            const table = th.closest('table');
+                            const tbody = table.querySelector('tbody');
+                            const rows = Array.from(tbody.querySelectorAll('tr'));
+                            const idx = Array.from(th.parentNode.children).indexOf(th);
+                            const asc = this.asc = !this.asc;
+
+                            table.querySelectorAll('th').forEach(el => el.innerHTML = el.innerHTML.replace(/ ▲| ▼/g, ''));
+                            th.innerHTML += asc ? ' ▲' : ' ▼';
+
+                            const parseVal = (td) => {{
+                                let val = td.innerText || td.textContent;
+                                val = val.replace(/,/g, '').replace(/%/g, '').replace(/[+]/g, '').trim();
+                                let num = parseFloat(val);
+                                return isNaN(num) ? val : num;
+                            }};
+
+                            rows.sort((a, b) => {{
+                                let v1 = parseVal(a.children[idx]);
+                                let v2 = parseVal(b.children[idx]);
+                                if (typeof v1 === 'number' && typeof v2 === 'number') {{ return asc ? v1 - v2 : v2 - v1; }}
+                                return asc ? String(v1).localeCompare(String(v2)) : String(v2).localeCompare(String(v1));
+                            }});
+                            rows.forEach(tr => tbody.appendChild(tr));
+                        }});
+                    }});
+                </script>
+                </body>
+                </html>
+                """
+                components.html(breakout_interactive_html, height=550, scrolling=False)
             else:
-                st.info("🤷‍♂️ Currently no stocks match the Volume Breakout criteria.")
+                st.info("🤷‍♂️ Currently no stocks match the Breakout criteria.")
         else:
             st.info("⏳ Waiting for enough chart history data to analyze trends...")
 
