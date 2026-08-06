@@ -1,6 +1,5 @@
 import streamlit as st
 import pandas as pd
-import numpy as np
 import datetime
 import time
 import json
@@ -354,13 +353,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 grp = grp.sort_values(by='Time')
                 
                 if len(grp) >= 3:
-                    # 1. Calculate 20 EMA for LTP
-                    ltp_series = pd.to_numeric(grp['LTP'], errors='coerce').fillna(method='ffill')
+                    # 🔥 1. Calculate 20 EMA for LTP (Fixed deprecation error here with ffill) 🔥
+                    ltp_series = pd.to_numeric(grp['LTP'], errors='coerce').ffill().bfill()
                     ema_20 = ltp_series.ewm(span=20, adjust=False).mean().iloc[-1]
                     current_ltp = ltp_series.iloc[-1]
                     
                     # 2. Check 9:15 Vol CPR vs Latest Vol CPR (Rising Vol CPR from morning)
-                    cpr_series = pd.to_numeric(grp['VOL CPR'], errors='coerce').fillna(0)
+                    cpr_series = pd.to_numeric(grp['VOL CPR'], errors='coerce').ffill().bfill()
                     first_cpr_915 = cpr_series.iloc[0]
                     last_3_cpr = cpr_series.tail(3).tolist()
                     current_cpr = cpr_series.iloc[-1]
