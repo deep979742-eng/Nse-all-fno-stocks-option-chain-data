@@ -15,29 +15,21 @@ st.set_page_config(page_title="F&O LIVE Dashboard", layout="wide", initial_sideb
 # ==========================================
 # 1. 🔥 THE "HARD RESET" JAVASCRIPT HACK 🔥
 # ==========================================
-# यह कोड Streamlit के काले बटन और लोगो को ज़बरदस्ती (Forcefully) डिलीट करेगा
 components.html(
     """
     <script>
     const targetNode = window.parent.document.body;
     const config = { childList: true, subtree: true };
     const callback = function(mutationsList, observer) {
-        // Manage App Button Hide
         const deployBtn = window.parent.document.querySelector('[data-testid="stAppDeployButton"]');
         if (deployBtn) { deployBtn.style.display = 'none'; deployBtn.style.visibility = 'hidden'; }
-        
-        // Toolbar Hide
         const toolbar = window.parent.document.querySelector('[data-testid="stToolbar"]');
         if (toolbar) { toolbar.style.display = 'none'; }
-        
-        // Header Hide
         const header = window.parent.document.querySelector('header');
         if (header) { header.style.display = 'none'; }
     };
     const observer = new MutationObserver(callback);
     observer.observe(targetNode, config);
-    
-    // First run
     callback();
     </script>
     """,
@@ -50,10 +42,8 @@ components.html(
 # ==========================================
 css_str = """
 <style>
-/* CSS backup for hiding elements */
 header, footer, [data-testid="stAppDeployButton"], [data-testid="stToolbar"] { display: none !important; visibility: hidden !important; opacity: 0 !important; }
 
-/* Streamlit ki default padding ko jabardasti zero karna */
 .block-container { 
     padding-top: 1rem !important; 
     padding-bottom: 0rem !important; 
@@ -62,7 +52,6 @@ header, footer, [data-testid="stAppDeployButton"], [data-testid="stToolbar"] { d
     margin-top: -20px !important; 
 } 
 
-/* Anti-Blur & Anti-Popup (Connection Error Modal Hidden) */
 [data-testid='stAppViewContainer'], [data-testid='stAppViewBlockContainer'], .stApp { opacity: 1 !important; filter: none !important; transition: none !important; } 
 [data-testid='stStatusWidget'], [data-testid="stConnectionStatus"], [data-testid="stModal"], div[role="dialog"], [data-baseweb="modal"] { display: none !important; visibility: hidden !important; opacity: 0 !important; } 
 [data-testid="stRadio"], [data-testid="stToggle"], .stRadio, .stToggle { opacity: 1 !important; filter: none !important; transition: none !important; }
@@ -90,24 +79,27 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
 .stRadio div[role='radiogroup'] > label > div { white-space: nowrap !important; }
 .stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2) !important; }
 
-/* Time Box - Width fixed to content size */
 .time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 0px 15px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 13px; color: #00BFFF; margin: 0; display: flex; align-items: center; justify-content: center; height: 36px; white-space: nowrap; width: max-content; }
 
-/* Toggle Box styling for "SHOW %" */
 div[data-testid="stToggle"] label { flex-direction: row-reverse !important; justify-content: flex-end !important; gap: 8px !important; margin-top: 5px; }
 div[data-testid="stToggle"] label p { font-weight: 700 !important; font-size: 14px !important; color: #FF4B4B !important; }
 
-/* MOBILE STRICT 1-LINE LAYOUT */
 @media (max-width: 768px) { 
     .block-container { padding-top: 0.5rem !important; margin-top: -30px !important; } 
-    .stRadio div[role='radiogroup'] > label { font-size: 12px !important; height: 34px !important; padding: 0 2px !important; }
+    .stRadio div[role='radiogroup'] > label { font-size: 11px !important; height: 34px !important; padding: 0 2px !important; }
     .time-box { font-size: 11px !important; height: 34px !important; padding: 0 10px !important; }
     div[data-testid="stColumns"] { display: flex !important; flex-direction: row !important; align-items: center !important; flex-wrap: nowrap !important; gap: 4px !important; }
     div[data-testid="stColumns"] > div[data-testid="column"] { width: auto !important; min-width: 0 !important; padding: 0 !important; }
-    div[data-testid="stColumns"] > div:nth-child(3) { display: none !important; } /* Hides empty space column on mobile */
+    div[data-testid="stColumns"] > div:nth-child(3) { display: none !important; } 
     .stToggle { height: 34px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 !important; padding: 0 !important; }
     div[data-testid="stToggle"] label p { font-size: 12px !important; }
 }
+
+/* Custom Table for Breakout */
+.breakout-table { width: 100%; border-collapse: collapse; font-size: 14px; background: #fff; margin-top: 10px; }
+.breakout-table th { background-color: #ff4d4d; color: white; padding: 10px; text-align: center; border: 1px solid #ddd; }
+.breakout-table td { padding: 10px; text-align: center; border: 1px solid #ddd; font-weight: bold; }
+.breakout-table tr:hover { background-color: #f1f1f1; }
 </style>
 """
 st.markdown(css_str, unsafe_allow_html=True)
@@ -187,23 +179,23 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # 🔥 LAYOUT CHANGED: Menu & Time very close to each other on left, Toggle pushed to far right 🔥
-    col_menu, col_tim, col_space, col_tog = st.columns([1.5, 1.2, 5.8, 1.5])
+    # 🔥 LAYOUT CHANGED: Added 3rd Tab "BREAKOUT" 🔥
+    col_menu, col_tim, col_space, col_tog = st.columns([2.5, 1.2, 4.8, 1.5])
     
     with col_menu:
-        selected_tab = st.radio("Menu", ["📊 Dash", "📈 CHART"], horizontal=True, label_visibility="collapsed")
+        selected_tab = st.radio("Menu", ["📊 Dash", "📈 CHART", "🚀 BREAKOUT"], horizontal=True, label_visibility="collapsed")
         
     ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
     show_pct = True 
     
     with col_tim:
-        if selected_tab == "📊 Dash":
+        if selected_tab in ["📊 Dash", "🚀 BREAKOUT"]:
             st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
         else:
             st.empty() 
             
     with col_space:
-        st.empty() # Empty space to push toggle to the right
+        st.empty() 
         
     with col_tog:
         if selected_tab == "📊 Dash":
@@ -213,6 +205,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
     st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
 
+    # ==========================================
+    # DASHBOARD VIEW
+    # ==========================================
     if selected_tab == "📊 Dash":
         
         if 'missing_stocks_list' in st.session_state and len(st.session_state.missing_stocks_list) > 0:
@@ -348,6 +343,56 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             components.html(full_interactive_html, height=800, scrolling=False)
 
     # ==========================================
+    # 🔥 NEW: VOL BREAKOUT VIEW 🔥
+    # ==========================================
+    elif selected_tab == "🚀 BREAKOUT":
+        st.markdown("<h4 style='color: #ff4d4d; margin-top: 5px; font-weight: bold;'>🔥 Volume Breakout (VOL CPR > 1.5 & Increasing)</h4>", unsafe_allow_html=True)
+        
+        if 'chart_df' in st.session_state and not st.session_state.chart_df.empty:
+            df_hist = st.session_state.chart_df.copy()
+            df_hist = df_hist[df_hist['Date'] == today_str] # Sirf aaj ka data check hoga
+            
+            breakout_data = []
+            
+            for sym, grp in df_hist.groupby('Symbol'):
+                grp = grp.sort_values(by='Time')
+                
+                # Humhe kam se kam pichle 3 snapshot ka data chahiye check karne ke liye
+                if len(grp) >= 3:
+                    last_3 = grp.tail(3)
+                    cpr_vals = pd.to_numeric(last_3['VOL CPR'], errors='coerce').fillna(0).tolist()
+                    
+                    # LOGIC: Current VOL CPR > 1.5 AND lagatar badh raha ho (cpr1 < cpr2 < cpr3)
+                    if cpr_vals[-1] > 1.5 and (cpr_vals[0] < cpr_vals[1] < cpr_vals[2]):
+                        latest_opt_pcr = last_3['OPT PCR'].iloc[-1]
+                        latest_vol_pcr = last_3['VOL PCR'].iloc[-1]
+                        latest_ltp = last_3['LTP'].iloc[-1]
+                        
+                        trend_str = f"{cpr_vals[0]:.2f} ➡️ {cpr_vals[1]:.2f} ➡️ <span style='color:#00AA00; font-size:16px;'>{cpr_vals[-1]:.2f}</span>"
+                        
+                        breakout_data.append({
+                            'SYMBOL': sym,
+                            'LTP': f"{float(latest_ltp):.2f}",
+                            'OPT PCR': f"{float(latest_opt_pcr):.2f}",
+                            'VOL PCR': f"{float(latest_vol_pcr):.2f}",
+                            'VOL CPR': cpr_vals[-1],
+                            'TREND (Last 3)': trend_str
+                        })
+            
+            if breakout_data:
+                bo_df = pd.DataFrame(breakout_data).sort_values(by='VOL CPR', ascending=False)
+                # DataFrame ko Drop karke ek khubsurat table me render karenge
+                bo_df['VOL CPR'] = bo_df['VOL CPR'].apply(lambda x: f"{x:.2f}")
+                
+                bo_html = bo_df.to_html(escape=False, index=False, classes="breakout-table")
+                st.markdown(bo_html, unsafe_allow_html=True)
+            else:
+                st.info("🤷‍♂️ Currently no stocks match the Volume Breakout criteria.")
+        else:
+            st.info("⏳ Waiting for enough chart history data to analyze trends...")
+
+
+    # ==========================================
     # CHART VIEW
     # ==========================================
     elif selected_tab == "📈 CHART":
@@ -355,7 +400,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         col_c1, col_c2 = st.columns([1, 1])
         
         with col_c1: 
-            # 🔥 SEARCH BOX: index=0 (NIFTY Default) 🔥
             sel_stock = st.selectbox(
                 "Stock:", 
                 raw_symbols, 
