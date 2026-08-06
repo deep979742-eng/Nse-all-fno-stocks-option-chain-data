@@ -23,8 +23,10 @@ components.html(
     const callback = function(mutationsList, observer) {
         const deployBtn = window.parent.document.querySelector('[data-testid="stAppDeployButton"]');
         if (deployBtn) { deployBtn.style.display = 'none'; deployBtn.style.visibility = 'hidden'; }
+        
         const toolbar = window.parent.document.querySelector('[data-testid="stToolbar"]');
         if (toolbar) { toolbar.style.display = 'none'; }
+        
         const header = window.parent.document.querySelector('header');
         if (header) { header.style.display = 'none'; }
     };
@@ -79,18 +81,21 @@ div[data-testid="stVerticalBlock"] > div { opacity: 1 !important; filter: none !
 .stRadio div[role='radiogroup'] > label > div { white-space: nowrap !important; }
 .stRadio div[role='radiogroup'] > label:hover { background-color: rgba(128, 128, 128, 0.2) !important; }
 
+/* Time Box - Width fixed to content size */
 .time-box { border: 1px solid rgba(128, 128, 128, 0.4); padding: 0px 15px; border-radius: 6px; background-color: rgba(128, 128, 128, 0.1); text-align: center; font-weight: bold; font-size: 13px; color: #00BFFF; margin: 0; display: flex; align-items: center; justify-content: center; height: 36px; white-space: nowrap; width: max-content; }
 
+/* Toggle Box styling for "SHOW %" */
 div[data-testid="stToggle"] label { flex-direction: row-reverse !important; justify-content: flex-end !important; gap: 8px !important; margin-top: 5px; }
 div[data-testid="stToggle"] label p { font-weight: 700 !important; font-size: 14px !important; color: #FF4B4B !important; }
 
+/* MOBILE STRICT 1-LINE LAYOUT */
 @media (max-width: 768px) { 
     .block-container { padding-top: 0.5rem !important; margin-top: -30px !important; } 
-    .stRadio div[role='radiogroup'] > label { font-size: 11px !important; height: 34px !important; padding: 0 2px !important; }
+    .stRadio div[role='radiogroup'] > label { font-size: 12px !important; height: 34px !important; padding: 0 2px !important; }
     .time-box { font-size: 11px !important; height: 34px !important; padding: 0 10px !important; }
     div[data-testid="stColumns"] { display: flex !important; flex-direction: row !important; align-items: center !important; flex-wrap: nowrap !important; gap: 4px !important; }
     div[data-testid="stColumns"] > div[data-testid="column"] { width: auto !important; min-width: 0 !important; padding: 0 !important; }
-    div[data-testid="stColumns"] > div:nth-child(3) { display: none !important; } 
+    div[data-testid="stColumns"] > div:nth-child(3) { display: none !important; } /* Hides empty space column on mobile */
     .stToggle { height: 34px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 !important; padding: 0 !important; }
     div[data-testid="stToggle"] label p { font-size: 12px !important; }
 }
@@ -173,22 +178,23 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    col_menu, col_tim, col_space, col_tog = st.columns([2.5, 1.2, 4.8, 1.5])
+    # 🔥 LAYOUT: Menu & Time close on left, Toggle pushed to far right 🔥
+    col_menu, col_tim, col_space, col_tog = st.columns([1.5, 1.2, 5.8, 1.5])
     
     with col_menu:
-        selected_tab = st.radio("Menu", ["📊 Dash", "📈 CHART", "🚀 BREAKOUT"], horizontal=True, label_visibility="collapsed")
+        selected_tab = st.radio("Menu", ["📊 Dash", "📈 CHART"], horizontal=True, label_visibility="collapsed")
         
     ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
     show_pct = True 
     
     with col_tim:
-        if selected_tab in ["📊 Dash", "🚀 BREAKOUT"]:
+        if selected_tab == "📊 Dash":
             st.markdown(f"<div class='time-box'>⏱️ {ref_time}</div>", unsafe_allow_html=True)
         else:
             st.empty() 
             
     with col_space:
-        st.empty() 
+        st.empty() # Empty space to push toggle to the right
         
     with col_tog:
         if selected_tab == "📊 Dash":
@@ -335,150 +341,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             """
             components.html(full_interactive_html, height=800, scrolling=False)
 
-
-    # ==========================================
-    # 🔥 ADVANCED BREAKOUT VIEW (VOL CPR 9:15 TREND + 20 EMA + CONTRATS) 🔥
-    # ==========================================
-    elif selected_tab == "🚀 BREAKOUT":
-        st.markdown("<h4 style='color: #ff4d4d; margin-top: 5px; font-weight: bold;'>🔥 Volume Breakout (9:15 Rising Vol CPR + LTP > 20 EMA + CONTRATS ≥ 80%)</h4>", unsafe_allow_html=True)
-        
-        if 'chart_df' in st.session_state and not st.session_state.chart_df.empty and 'cached_data' in st.session_state:
-            df_hist = st.session_state.chart_df.copy()
-            df_hist = df_hist[df_hist['Date'] == today_str] 
-            
-            cached_dict = {d['SYMS']: d for d in st.session_state.cached_data}
-            breakout_data = []
-            
-            for sym, grp in df_hist.groupby('Symbol'):
-                grp = grp.sort_values(by='Time')
-                
-                if len(grp) >= 3:
-                    # 🔥 1. Calculate 20 EMA for LTP (Fixed deprecation error here with ffill) 🔥
-                    ltp_series = pd.to_numeric(grp['LTP'], errors='coerce').ffill().bfill()
-                    ema_20 = ltp_series.ewm(span=20, adjust=False).mean().iloc[-1]
-                    current_ltp = ltp_series.iloc[-1]
-                    
-                    # 2. Check 9:15 Vol CPR vs Latest Vol CPR (Rising Vol CPR from morning)
-                    cpr_series = pd.to_numeric(grp['VOL CPR'], errors='coerce').ffill().bfill()
-                    first_cpr_915 = cpr_series.iloc[0]
-                    last_3_cpr = cpr_series.tail(3).tolist()
-                    current_cpr = cpr_series.iloc[-1]
-                    
-                    # CONDITION 1: Vol CPR > 1.5 AND Vol CPR is overall higher than 9:15 AM level AND short-term trend is up
-                    cpr_rising = (current_cpr > 1.5) and (current_cpr > first_cpr_915) and (last_3_cpr[-2] <= last_3_cpr[-1])
-                    
-                    # CONDITION 2: Price must be ABOVE 20 EMA (LTP > 20 EMA)
-                    price_above_ema = current_ltp >= ema_20
-                    
-                    if cpr_rising and price_above_ema:
-                        live_data = cached_dict.get(sym)
-                        
-                        if live_data:
-                            ce_con = float(live_data.get('CE_CON', 0))
-                            pe_con = float(live_data.get('PE_CON', 0))
-                            chg_pct = float(live_data.get('CHG_%', 0))
-                            
-                            # CONDITION 3: Contract Filter & CHG <= 2.5%
-                            valid_ce = (ce_con >= 80) and (chg_pct <= 2.5)
-                            valid_pe = (pe_con >= 80) and (chg_pct >= -2.5)
-                            
-                            if valid_ce or valid_pe:
-                                latest_opt_pcr = live_data.get('O_PCR', grp['OPT PCR'].iloc[-1])
-                                latest_vol_pcr = live_data.get('V_PCR', grp['VOL PCR'].iloc[-1])
-                                
-                                trend_str = f"9:15 ({first_cpr_915:.2f}) ➡️ <span style='color:#00AA00; font-size:15px;'>Now ({current_cpr:.2f})</span>"
-                                
-                                ce_color = "#00AA00" if ce_con > 0 else "#FF0000" if ce_con < 0 else "#000"
-                                pe_color = "#00AA00" if pe_con > 0 else "#FF0000" if pe_con < 0 else "#000"
-                                chg_color = "#00AA00" if chg_pct > 0 else "#FF0000" if chg_pct < 0 else "#000"
-                                
-                                breakout_data.append({
-                                    'SYMBOL': sym,
-                                    'LTP': f"{current_ltp:.2f}",
-                                    '20 EMA': f"{ema_20:.2f}",
-                                    'CHG %': f"<span style='color:{chg_color};'>{chg_pct:+.2f}%</span>",
-                                    'CE CON': f"<span style='color:{ce_color};'>{ce_con:+.2f}%</span>",
-                                    'PE CON': f"<span style='color:{pe_color};'>{pe_con:+.2f}%</span>",
-                                    'OPT PCR': f"{float(latest_opt_pcr):.2f}",
-                                    'VOL PCR': f"{float(latest_vol_pcr):.2f}",
-                                    'VOL CPR': current_cpr,
-                                    'VOL TREND': trend_str
-                                })
-            
-            if breakout_data:
-                bo_df = pd.DataFrame(breakout_data).sort_values(by='VOL CPR', ascending=False)
-                bo_df['VOL CPR'] = bo_df['VOL CPR'].apply(lambda x: f"{x:.2f}")
-                
-                bo_html_table = bo_df.to_html(escape=False, index=False, classes="dataframe")
-                
-                breakout_interactive_html = f"""
-                <!DOCTYPE html>
-                <html>
-                <head>
-                <style>
-                    body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: transparent; }}
-                    .table-wrapper {{ height: 600px; overflow: auto; border-radius: 5px; }}
-                    table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 13px; margin: 0 auto; background-color: #ffffff; color: #000000; }}
-                    table.dataframe th {{ 
-                        background-color: #ff4d4d !important; color: white !important; font-weight: bold !important; text-align: center !important; 
-                        padding: 8px 3px !important; position: sticky; top: 0; z-index: 10; border: 1px solid rgba(255,255,255,0.2);
-                        cursor: pointer; user-select: none; transition: background 0.2s;
-                    }}
-                    table.dataframe th:hover {{ background-color: #cc0000 !important; }}
-                    table.dataframe td {{ 
-                        text-align: center !important; 
-                        padding: 6px 3px !important; 
-                        border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; 
-                    }}
-                    table.dataframe tr:hover {{ background-color: rgba(128,128,128,0.1); }}
-                    ::-webkit-scrollbar {{ width: 6px; height: 6px; }}
-                    ::-webkit-scrollbar-thumb {{ background: rgba(128,128,128,0.5); border-radius: 3px; }}
-                </style>
-                </head>
-                <body>
-                <div class="table-wrapper">
-                    {bo_html_table}
-                </div>
-                <script>
-                    document.querySelectorAll('th').forEach(th => {{
-                        th.title = "Click to Sort Ascending / Descending";
-                        th.addEventListener('click', function() {{
-                            const table = th.closest('table');
-                            const tbody = table.querySelector('tbody');
-                            const rows = Array.from(tbody.querySelectorAll('tr'));
-                            const idx = Array.from(th.parentNode.children).indexOf(th);
-                            const asc = this.asc = !this.asc;
-
-                            table.querySelectorAll('th').forEach(el => el.innerHTML = el.innerHTML.replace(/ ▲| ▼/g, ''));
-                            th.innerHTML += asc ? ' ▲' : ' ▼';
-
-                            const parseVal = (td) => {{
-                                let val = td.innerText || td.textContent;
-                                val = val.replace(/,/g, '').replace(/%/g, '').replace(/[+]/g, '').trim();
-                                let num = parseFloat(val);
-                                return isNaN(num) ? val : num;
-                            }};
-
-                            rows.sort((a, b) => {{
-                                let v1 = parseVal(a.children[idx]);
-                                let v2 = parseVal(b.children[idx]);
-                                if (typeof v1 === 'number' && typeof v2 === 'number') {{ return asc ? v1 - v2 : v2 - v1; }}
-                                return asc ? String(v1).localeCompare(String(v2)) : String(v2).localeCompare(String(v1));
-                            }});
-                            rows.forEach(tr => tbody.appendChild(tr));
-                        }});
-                    }});
-                </script>
-                </body>
-                </html>
-                """
-                components.html(breakout_interactive_html, height=650, scrolling=False)
-            else:
-                st.info("🤷‍♂️ Currently no stocks match the Breakout criteria (Vol CPR Rising from 9:15 & Price > 20 EMA).")
-        else:
-            st.info("⏳ Waiting for enough chart history data to analyze trends...")
-
-
     # ==========================================
     # CHART VIEW
     # ==========================================
@@ -487,6 +349,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         col_c1, col_c2 = st.columns([1, 1])
         
         with col_c1: 
+            # 🔥 SEARCH BOX: index=0 (NIFTY Default) 🔥
             sel_stock = st.selectbox(
                 "Stock:", 
                 raw_symbols, 
