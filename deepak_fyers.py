@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 import datetime
 import time
 import json
@@ -337,10 +338,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
 
     # ==========================================
-    # 🔥 BREAKOUT VIEW (WITH INTERACTIVE FILTERING) 🔥
+    # 🔥 ADVANCED BREAKOUT VIEW (VOL CPR 9:15 TREND + 20 EMA + CONTRATS) 🔥
     # ==========================================
     elif selected_tab == "🚀 BREAKOUT":
-        st.markdown("<h4 style='color: #ff4d4d; margin-top: 5px; font-weight: bold;'>🔥 Volume Breakout (VOL CPR > 1.5, CE/PE CON ≥ 80%, CHG ≤ 2.5%)</h4>", unsafe_allow_html=True)
+        st.markdown("<h4 style='color: #ff4d4d; margin-top: 5px; font-weight: bold;'>🔥 Volume Breakout (9:15 Rising Vol CPR + LTP > 20 EMA + CONTRATS ≥ 80%)</h4>", unsafe_allow_html=True)
         
         if 'chart_df' in st.session_state and not st.session_state.chart_df.empty and 'cached_data' in st.session_state:
             df_hist = st.session_state.chart_df.copy()
@@ -353,10 +354,24 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 grp = grp.sort_values(by='Time')
                 
                 if len(grp) >= 3:
-                    last_3 = grp.tail(3)
-                    cpr_vals = pd.to_numeric(last_3['VOL CPR'], errors='coerce').fillna(0).tolist()
+                    # 1. Calculate 20 EMA for LTP
+                    ltp_series = pd.to_numeric(grp['LTP'], errors='coerce').fillna(method='ffill')
+                    ema_20 = ltp_series.ewm(span=20, adjust=False).mean().iloc[-1]
+                    current_ltp = ltp_series.iloc[-1]
                     
-                    if cpr_vals[-1] > 1.5 and (cpr_vals[0] < cpr_vals[1] < cpr_vals[2]):
+                    # 2. Check 9:15 Vol CPR vs Latest Vol CPR (Rising Vol CPR from morning)
+                    cpr_series = pd.to_numeric(grp['VOL CPR'], errors='coerce').fillna(0)
+                    first_cpr_915 = cpr_series.iloc[0]
+                    last_3_cpr = cpr_series.tail(3).tolist()
+                    current_cpr = cpr_series.iloc[-1]
+                    
+                    # CONDITION 1: Vol CPR > 1.5 AND Vol CPR is overall higher than 9:15 AM level AND short-term trend is up
+                    cpr_rising = (current_cpr > 1.5) and (current_cpr > first_cpr_915) and (last_3_cpr[-2] <= last_3_cpr[-1])
+                    
+                    # CONDITION 2: Price must be ABOVE 20 EMA (LTP > 20 EMA)
+                    price_above_ema = current_ltp >= ema_20
+                    
+                    if cpr_rising and price_above_ema:
                         live_data = cached_dict.get(sym)
                         
                         if live_data:
@@ -364,18 +379,15 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             pe_con = float(live_data.get('PE_CON', 0))
                             chg_pct = float(live_data.get('CHG_%', 0))
                             
-                            # 🔥 LOGIC Check: <2.5% condition 🔥
-                            # CE: Has not shot up more than 2.5%
+                            # CONDITION 3: Contract Filter & CHG <= 2.5%
                             valid_ce = (ce_con >= 80) and (chg_pct <= 2.5)
-                            # PE: Has not fallen more than 2.5%
                             valid_pe = (pe_con >= 80) and (chg_pct >= -2.5)
                             
                             if valid_ce or valid_pe:
-                                latest_opt_pcr = live_data.get('O_PCR', last_3['OPT PCR'].iloc[-1])
-                                latest_vol_pcr = live_data.get('V_PCR', last_3['VOL PCR'].iloc[-1])
-                                latest_ltp = live_data.get('LTP', last_3['LTP'].iloc[-1])
+                                latest_opt_pcr = live_data.get('O_PCR', grp['OPT PCR'].iloc[-1])
+                                latest_vol_pcr = live_data.get('V_PCR', grp['VOL PCR'].iloc[-1])
                                 
-                                trend_str = f"{cpr_vals[0]:.2f} ➡️ {cpr_vals[1]:.2f} ➡️ <span style='color:#00AA00; font-size:16px;'>{cpr_vals[-1]:.2f}</span>"
+                                trend_str = f"9:15 ({first_cpr_915:.2f}) ➡️ <span style='color:#00AA00; font-size:15px;'>Now ({current_cpr:.2f})</span>"
                                 
                                 ce_color = "#00AA00" if ce_con > 0 else "#FF0000" if ce_con < 0 else "#000"
                                 pe_color = "#00AA00" if pe_con > 0 else "#FF0000" if pe_con < 0 else "#000"
@@ -383,21 +395,21 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 
                                 breakout_data.append({
                                     'SYMBOL': sym,
-                                    'LTP': f"{float(latest_ltp):.2f}",
+                                    'LTP': f"{current_ltp:.2f}",
+                                    '20 EMA': f"{ema_20:.2f}",
                                     'CHG %': f"<span style='color:{chg_color};'>{chg_pct:+.2f}%</span>",
                                     'CE CON': f"<span style='color:{ce_color};'>{ce_con:+.2f}%</span>",
                                     'PE CON': f"<span style='color:{pe_color};'>{pe_con:+.2f}%</span>",
                                     'OPT PCR': f"{float(latest_opt_pcr):.2f}",
                                     'VOL PCR': f"{float(latest_vol_pcr):.2f}",
-                                    'VOL CPR': cpr_vals[-1],
-                                    'TREND (Last 3)': trend_str
+                                    'VOL CPR': current_cpr,
+                                    'VOL TREND': trend_str
                                 })
             
             if breakout_data:
                 bo_df = pd.DataFrame(breakout_data).sort_values(by='VOL CPR', ascending=False)
                 bo_df['VOL CPR'] = bo_df['VOL CPR'].apply(lambda x: f"{x:.2f}")
                 
-                # Render using the SAME interactive table styling as Main Dash
                 bo_html_table = bo_df.to_html(escape=False, index=False, classes="dataframe")
                 
                 breakout_interactive_html = f"""
@@ -406,7 +418,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 <head>
                 <style>
                     body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: transparent; }}
-                    .table-wrapper {{ height: 500px; overflow: auto; border-radius: 5px; }}
+                    .table-wrapper {{ height: 600px; overflow: auto; border-radius: 5px; }}
                     table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 13px; margin: 0 auto; background-color: #ffffff; color: #000000; }}
                     table.dataframe th {{ 
                         background-color: #ff4d4d !important; color: white !important; font-weight: bold !important; text-align: center !important; 
@@ -461,9 +473,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 </body>
                 </html>
                 """
-                components.html(breakout_interactive_html, height=550, scrolling=False)
+                components.html(breakout_interactive_html, height=650, scrolling=False)
             else:
-                st.info("🤷‍♂️ Currently no stocks match the Breakout criteria.")
+                st.info("🤷‍♂️ Currently no stocks match the Breakout criteria (Vol CPR Rising from 9:15 & Price > 20 EMA).")
         else:
             st.info("⏳ Waiting for enough chart history data to analyze trends...")
 
