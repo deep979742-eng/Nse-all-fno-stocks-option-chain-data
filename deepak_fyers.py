@@ -173,6 +173,82 @@ def fetch_chart_history_raw(prefix):
 raw_chart_data = fetch_chart_history_raw(today_prefix)
 st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else pd.DataFrame()
 
+
+# ==========================================
+# 3B. 🚀 TREND SCANNER LOGIC
+# ==========================================
+# Isse Vol CPR aur OPT PCR dono ka "continuously rising" trend detect hota hai
+# har symbol ke liye, jaise AUROPHARMA ke chart mein dikh raha tha.
+def compute_trending_stocks(chart_df, today_str, symbols, min_rise_pct=15.0, max_pullback_pct=15.0, min_points=8):
+    results = []
+    if chart_df is None or chart_df.empty or 'Date' not in chart_df.columns:
+        return pd.DataFrame(results)
+
+    day_df = chart_df.copy()
+    day_df['Date'] = day_df['Date'].astype(str).str.strip()
+    day_df['Symbol'] = day_df['Symbol'].astype(str).str.strip()
+    day_df = day_df[day_df['Date'] == today_str]
+    if day_df.empty:
+        return pd.DataFrame(results)
+
+    def trend_stats(series):
+        # returns (rise_pct_from_start, pullback_from_high_pct, last_value)
+        series = series.dropna()
+        if len(series) < min_points:
+            return None
+        first_val = series.iloc[0]
+        last_val = series.iloc[-1]
+        max_val = series.max()
+        if first_val == 0 or max_val == 0:
+            return None
+        rise_pct = ((last_val - first_val) / abs(first_val)) * 100.0
+        pullback_pct = ((max_val - last_val) / abs(max_val)) * 100.0
+        return rise_pct, pullback_pct, last_val
+
+    for sym in symbols:
+        sdf = day_df[day_df['Symbol'] == sym]
+        if len(sdf) < min_points:
+            continue
+        sdf = sdf.sort_values(by='Time')
+
+        if 'VOL CPR' not in sdf.columns or 'OPT PCR' not in sdf.columns:
+            continue
+
+        vol_series = pd.to_numeric(sdf['VOL CPR'], errors='coerce')
+        opt_series = pd.to_numeric(sdf['OPT PCR'], errors='coerce')
+        ltp_series = pd.to_numeric(sdf['LTP'], errors='coerce') if 'LTP' in sdf.columns else pd.Series(dtype=float)
+
+        vol_stats = trend_stats(vol_series)
+        opt_stats = trend_stats(opt_series)
+        if vol_stats is None or opt_stats is None:
+            continue
+
+        vol_rise, vol_pullback, vol_last = vol_stats
+        opt_rise, opt_pullback, opt_last = opt_stats
+
+        # 🔥 CORE FILTER: dono indicators rise honi chahiye AUR abhi bhi
+        # apne day-high ke paas hone chahiye (rise karke gir gaye wale bahar)
+        if (vol_rise >= min_rise_pct and vol_pullback <= max_pullback_pct and
+                opt_rise >= min_rise_pct and opt_pullback <= max_pullback_pct):
+
+            ltp_last = ltp_series.dropna().iloc[-1] if not ltp_series.dropna().empty else 0
+
+            results.append({
+                'SYMBOL': sym,
+                'LTP': ltp_last,
+                'VOL CPR': vol_last,
+                'VOL CPR RISE %': vol_rise,
+                'OPT PCR': opt_last,
+                'OPT PCR RISE %': opt_rise,
+                'SCORE': vol_rise + opt_rise
+            })
+
+    res_df = pd.DataFrame(results)
+    if not res_df.empty:
+        res_df = res_df.sort_values(by='SCORE', ascending=False)
+    return res_df
+
+
 # ==========================================
 # 4. DASHBOARD HEADER & RENDERING
 # ==========================================
@@ -182,7 +258,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     col_menu, col_tim, col_space, col_tog = st.columns([1.5, 1.2, 5.8, 1.5])
     
     with col_menu:
-        selected_tab = st.radio("Menu", ["📊 Dash", "📈 CHART"], horizontal=True, label_visibility="collapsed")
+        selected_tab = st.radio("Menu", ["📊 Dash", "📈 CHART", "🚀 TREND"], horizontal=True, label_visibility="collapsed")
         
     ref_time = st.session_state.last_api_call.strftime('%H:%M:%S') if 'last_api_call' in st.session_state else "Waiting..."
     show_pct = True 
@@ -461,5 +537,98 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                     st.error(f"Chart Load Error: {e}")
         else: 
             st.info("⏳ Chart data sheet is empty. Waiting for Master Engine...")
+
+    # ==========================================
+    # 🚀 TREND VIEW (NAYA TAB)
+    # ==========================================
+    elif selected_tab == "🚀 TREND":
+
+        st.markdown("<div style='font-size:13px; opacity:0.75; margin-bottom:4px;'>Vol CPR + OPT PCR dono continuously rising wale stocks (auto-scan, sab symbols par)</div>", unsafe_allow_html=True)
+
+        # Sensitivity sliders — inko adjust karke tum strict/loose scan kar sakte ho
+        col_s1, col_s2 = st.columns(2)
+        with col_s1:
+            min_rise_pct = st.slider("Min Rise % (start se ab tak)", min_value=5, max_value=100, value=15, step=5)
+        with col_s2:
+            max_pullback_pct = st.slider("Max Pullback % (day-high se)", min_value=5, max_value=50, value=15, step=5)
+
+        chart_df = st.session_state.get('chart_df', pd.DataFrame())
+
+        if chart_df is None or chart_df.empty:
+            st.info("⏳ Chart history abhi load nahi hua — thodi der baad try karo.")
+        else:
+            trend_df = compute_trending_stocks(
+                chart_df, today_str, raw_symbols,
+                min_rise_pct=float(min_rise_pct),
+                max_pullback_pct=float(max_pullback_pct)
+            )
+
+            if trend_df.empty:
+                st.info("🔍 Abhi koi stock is criteria pe match nahi kar raha. Sliders thode loose kar ke try karo.")
+            else:
+                def color_pcr_val(v):
+                    try:
+                        v = float(v)
+                        fmt = f"{v:.2f}"
+                        if v >= 1.0: return f"<span style='color:#00AA00;'>{fmt}</span>"
+                        if 0 < v < 1.0: return f"<span style='color:#FF0000;'>{fmt}</span>"
+                        return fmt
+                    except: return str(v)
+
+                def color_rise(v):
+                    try:
+                        v = float(v)
+                        return f"<span style='color:#00AA00;'>+{v:.1f}%</span>"
+                    except: return str(v)
+
+                disp = trend_df.copy()
+                disp['LTP'] = disp['LTP'].apply(lambda x: f"{float(x):.2f}" if pd.notna(x) else "-")
+                disp['VOL CPR'] = disp['VOL CPR'].apply(color_pcr_val)
+                disp['VOL CPR RISE %'] = disp['VOL CPR RISE %'].apply(color_rise)
+                disp['OPT PCR'] = disp['OPT PCR'].apply(color_pcr_val)
+                disp['OPT PCR RISE %'] = disp['OPT PCR RISE %'].apply(color_rise)
+                disp = disp.drop(columns=['SCORE'])
+
+                disp = disp.rename(columns={
+                    'SYMBOL': 'SYMBOL',
+                    'LTP': 'LTP',
+                    'VOL CPR': 'VOL<br>CPR',
+                    'VOL CPR RISE %': 'VOL CPR<br>RISE %',
+                    'OPT PCR': 'OPT<br>PCR',
+                    'OPT PCR RISE %': 'OPT PCR<br>RISE %'
+                })
+
+                html_table = disp.to_html(escape=False, index=False, classes="dataframe")
+
+                trend_html = f"""
+                <!DOCTYPE html>
+                <html>
+                <head>
+                <style>
+                    body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: transparent; }}
+                    .table-wrapper {{ height: 650px; overflow: auto; border-radius: 5px; }}
+                    table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 13px; margin: 0 auto; background-color: #ffffff; color: #000000; }}
+                    table.dataframe th {{ 
+                        background-color: #B8860B !important; color: white !important; font-weight: bold !important; text-align: center !important; 
+                        padding: 8px 6px !important; position: sticky; top: 0; z-index: 10; border: 1px solid rgba(255,255,255,0.2);
+                    }}
+                    table.dataframe td {{ 
+                        text-align: center !important; 
+                        padding: 7px 6px !important; 
+                        border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; 
+                    }}
+                    table.dataframe tr:hover {{ background-color: rgba(128,128,128,0.1); }}
+                </style>
+                </head>
+                <body>
+                <div class="table-wrapper">
+                    {html_table}
+                </div>
+                </body>
+                </html>
+                """
+                components.html(trend_html, height=650, scrolling=False)
+                st.caption(f"✅ {len(trend_df)} stocks match kar rahe hain current criteria pe.")
+
 else:
     st.info("⏳ Booting up... Waiting for Engine to push data.")
