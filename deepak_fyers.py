@@ -179,7 +179,8 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 # ==========================================
 # Isse Vol CPR aur OPT PCR dono ka "continuously rising" trend detect hota hai
 # har symbol ke liye, jaise AUROPHARMA ke chart mein dikh raha tha.
-def compute_trending_stocks(chart_df, today_str, symbols, min_rise_pct=15.0, max_pullback_pct=15.0, min_points=8):
+def compute_trending_stocks(chart_df, today_str, symbols, mode="strict", min_rise_pct=15.0, max_pullback_pct=15.0,
+                             max_opt_decline_pct=10.0, min_points=8):
     results = []
     if chart_df is None or chart_df.empty or 'Date' not in chart_df.columns:
         return pd.DataFrame(results)
@@ -226,10 +227,19 @@ def compute_trending_stocks(chart_df, today_str, symbols, min_rise_pct=15.0, max
         vol_rise, vol_pullback, vol_last = vol_stats
         opt_rise, opt_pullback, opt_last = opt_stats
 
-        # 🔥 CORE FILTER: dono indicators rise honi chahiye AUR abhi bhi
-        # apne day-high ke paas hone chahiye (rise karke gir gaye wale bahar)
-        if (vol_rise >= min_rise_pct and vol_pullback <= max_pullback_pct and
-                opt_rise >= min_rise_pct and opt_pullback <= max_pullback_pct):
+        # Vol CPR ka condition dono mode mein same hai: shuru se continuously badh raha ho
+        # aur abhi bhi apne day-high ke paas ho (rise karke gir gaye wale bahar).
+        vol_condition = (vol_rise >= min_rise_pct and vol_pullback <= max_pullback_pct)
+
+        if mode == "strict":
+            # 🔥 MODE 1: dono indicators (Vol CPR + OPT PCR) rise honi chahiye
+            opt_condition = (opt_rise >= min_rise_pct and opt_pullback <= max_pullback_pct)
+        else:
+            # 🔥 MODE 2: sirf Vol CPR rise chahiye; OPT PCR badhe ya na badhe,
+            # bas bahut zyada gira na ho (max_opt_decline_pct se zyada neeche nahi)
+            opt_condition = (opt_rise >= -max_opt_decline_pct)
+
+        if vol_condition and opt_condition:
 
             ltp_last = ltp_series.dropna().iloc[-1] if not ltp_series.dropna().empty else 0
 
@@ -240,7 +250,7 @@ def compute_trending_stocks(chart_df, today_str, symbols, min_rise_pct=15.0, max
                 'VOL CPR RISE %': vol_rise,
                 'OPT PCR': opt_last,
                 'OPT PCR RISE %': opt_rise,
-                'SCORE': vol_rise + opt_rise
+                'SCORE': vol_rise + max(opt_rise, 0)
             })
 
     res_df = pd.DataFrame(results)
@@ -543,14 +553,31 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     # ==========================================
     elif selected_tab == "🚀 TREND":
 
-        st.markdown("<div style='font-size:13px; opacity:0.75; margin-bottom:4px;'>Vol CPR + OPT PCR dono continuously rising wale stocks (auto-scan, sab symbols par)</div>", unsafe_allow_html=True)
+        scan_mode = st.radio(
+            "Scan Mode:",
+            ["🔥 Dono Rising (Strict)", "📈 Sirf Vol CPR Rising (PCR Stable bhi chalega)"],
+            horizontal=True
+        )
+        is_strict = scan_mode.startswith("🔥")
+
+        if is_strict:
+            st.markdown("<div style='font-size:13px; opacity:0.75; margin-bottom:4px;'>Vol CPR + OPT PCR dono continuously rising wale stocks (auto-scan, sab symbols par)</div>", unsafe_allow_html=True)
+        else:
+            st.markdown("<div style='font-size:13px; opacity:0.75; margin-bottom:4px;'>Vol CPR shuru se continuously rising — OPT PCR badhe ya na badhe, bas zyada gira na ho</div>", unsafe_allow_html=True)
 
         # Sensitivity sliders — inko adjust karke tum strict/loose scan kar sakte ho
         col_s1, col_s2 = st.columns(2)
         with col_s1:
-            min_rise_pct = st.slider("Min Rise % (start se ab tak)", min_value=5, max_value=100, value=15, step=5)
+            min_rise_pct = st.slider("Vol CPR Min Rise % (start se ab tak)", min_value=5, max_value=100, value=15, step=5)
         with col_s2:
-            max_pullback_pct = st.slider("Max Pullback % (day-high se)", min_value=5, max_value=50, value=15, step=5)
+            max_pullback_pct = st.slider("Vol CPR Max Pullback % (day-high se)", min_value=5, max_value=50, value=15, step=5)
+
+        max_opt_decline_pct = 10.0
+        if not is_strict:
+            max_opt_decline_pct = st.slider(
+                "OPT PCR — kitna % tak girna allowed hai (isse zyada gira to bahar)",
+                min_value=0, max_value=50, value=10, step=5
+            )
 
         chart_df = st.session_state.get('chart_df', pd.DataFrame())
 
@@ -559,8 +586,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         else:
             trend_df = compute_trending_stocks(
                 chart_df, today_str, raw_symbols,
+                mode="strict" if is_strict else "vol_only",
                 min_rise_pct=float(min_rise_pct),
-                max_pullback_pct=float(max_pullback_pct)
+                max_pullback_pct=float(max_pullback_pct),
+                max_opt_decline_pct=float(max_opt_decline_pct)
             )
 
             if trend_df.empty:
@@ -578,7 +607,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 def color_rise(v):
                     try:
                         v = float(v)
-                        return f"<span style='color:#00AA00;'>+{v:.1f}%</span>"
+                        color = "#00AA00" if v >= 0 else "#FF0000"
+                        sign = "+" if v >= 0 else ""
+                        return f"<span style='color:{color};'>{sign}{v:.1f}%</span>"
                     except: return str(v)
 
                 disp = trend_df.copy()
