@@ -175,7 +175,7 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 
 
 # ==========================================
-# 3B. 🔥 SMART DIVERGENCE SCANNER (BULLISH/BEARISH) 🔥
+# 3B. 🔥 SMART DIVERGENCE SCANNER (FLEXIBLE OPT PCR) 🔥
 # ==========================================
 def find_divergence_stocks(chart_df, latest_data_list):
     bullish_list = []
@@ -214,12 +214,12 @@ def find_divergence_stocks(chart_df, latest_data_list):
         ce_con = float(latest_info.get('CE_CON', 0))
         pe_con = float(latest_info.get('PE_CON', 0))
         chg_pct = float(latest_info.get('CHG_%', 0))
-        curr_opt_pcr = float(latest_info.get('O_PCR', 0))  # Yaha VOL PCR ki jagah OPT PCR fetch kiya
+        curr_opt_pcr = float(latest_info.get('O_PCR', 0))  
         curr_vol_cpr = float(latest_info.get('V_CPR', 0))
 
         if is_price_stuck:
-            # 🟢 BULLISH: Indicator rising & CE >= 70
-            if (last_vol > first_vol) and (last_pcr > first_pcr) and (ce_con >= 70):
+            # 🟢 SMART BULLISH: VOL CPR strictly rising. OPT PCR can be flat or slightly falling (max 10% drop allowed)
+            if (last_vol > first_vol) and (last_pcr >= first_pcr * 0.90) and (ce_con >= 70):
                 bullish_list.append({
                     'SYMBOL': sym,
                     'CHANGE %': chg_pct,
@@ -228,8 +228,8 @@ def find_divergence_stocks(chart_df, latest_data_list):
                     'CE CONTRACT': ce_con
                 })
 
-            # 🔴 BEARISH: Indicator falling & PE >= 70
-            elif (last_vol < first_vol) and (last_pcr < first_pcr) and (pe_con >= 70):
+            # 🔴 SMART BEARISH: VOL CPR strictly falling. OPT PCR can be flat or slightly rising (max 10% rise allowed)
+            elif (last_vol < first_vol) and (last_pcr <= first_pcr * 1.10) and (pe_con >= 70):
                 bearish_list.append({
                     'SYMBOL': sym,
                     'CHANGE %': chg_pct,
@@ -569,7 +569,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             
             # Apply formatting
             df['CHANGE %'] = df['CHANGE %'].apply(fmt_pct)
-            df['OPT PCR'] = df['OPT PCR'].apply(fmt_pcr)  # Yaha VOL PCR se badalkar OPT PCR kar diya gaya
+            df['OPT PCR'] = df['OPT PCR'].apply(fmt_pcr)  
             df['VOL CPR'] = df['VOL CPR'].apply(fmt_pcr)
             
             if tab_type == "Bullish":
@@ -605,13 +605,13 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         tab_bullish, tab_bearish = st.tabs(["🟢 Bullish Stocks", "🔴 Bearish Stocks"])
 
         with tab_bullish:
-            st.markdown("<div style='font-size:13px; opacity:0.8; margin-bottom:8px;'><b>Logic:</b> Price Wahin ruka hai | Vol CPR + OPT PCR Badh raha hai | CE Contract >= 70%</div>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size:13px; opacity:0.8; margin-bottom:8px;'><b>Logic:</b> Vol CPR Rising | OPT PCR can be flat (-10% max drop) | CE Contract >= 70%</div>", unsafe_allow_html=True)
             if not df_bullish.empty:
                 df_bullish = df_bullish.sort_values(by='CE CONTRACT', ascending=False)
             components.html(generate_trend_html(df_bullish, "Bullish"), height=650, scrolling=True)
 
         with tab_bearish:
-            st.markdown("<div style='font-size:13px; opacity:0.8; margin-bottom:8px;'><b>Logic:</b> Price Wahin ruka hai | Vol CPR + OPT PCR Gir raha hai | PE Contract >= 70%</div>", unsafe_allow_html=True)
+            st.markdown("<div style='font-size:13px; opacity:0.8; margin-bottom:8px;'><b>Logic:</b> Vol CPR Falling | OPT PCR can be flat (+10% max rise) | PE Contract >= 70%</div>", unsafe_allow_html=True)
             if not df_bearish.empty:
                 df_bearish = df_bearish.sort_values(by='PE CONTRACT', ascending=False)
             components.html(generate_trend_html(df_bearish, "Bearish"), height=650, scrolling=True)
