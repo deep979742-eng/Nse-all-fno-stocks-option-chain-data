@@ -214,7 +214,7 @@ def find_divergence_stocks(chart_df, latest_data_list):
         ce_con = float(latest_info.get('CE_CON', 0))
         pe_con = float(latest_info.get('PE_CON', 0))
         chg_pct = float(latest_info.get('CHG_%', 0))
-        curr_vol_pcr = float(latest_info.get('V_PCR', 0))
+        curr_opt_pcr = float(latest_info.get('O_PCR', 0))  # Yaha VOL PCR ki jagah OPT PCR fetch kiya
         curr_vol_cpr = float(latest_info.get('V_CPR', 0))
 
         if is_price_stuck:
@@ -223,7 +223,7 @@ def find_divergence_stocks(chart_df, latest_data_list):
                 bullish_list.append({
                     'SYMBOL': sym,
                     'CHANGE %': chg_pct,
-                    'VOL PCR': curr_vol_pcr,
+                    'OPT PCR': curr_opt_pcr,
                     'VOL CPR': curr_vol_cpr,
                     'CE CONTRACT': ce_con
                 })
@@ -233,7 +233,7 @@ def find_divergence_stocks(chart_df, latest_data_list):
                 bearish_list.append({
                     'SYMBOL': sym,
                     'CHANGE %': chg_pct,
-                    'VOL PCR': curr_vol_pcr,
+                    'OPT PCR': curr_opt_pcr,
                     'VOL CPR': curr_vol_cpr,
                     'PE CONTRACT': pe_con
                 })
@@ -569,7 +569,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             
             # Apply formatting
             df['CHANGE %'] = df['CHANGE %'].apply(fmt_pct)
-            df['VOL PCR'] = df['VOL PCR'].apply(fmt_pcr)
+            df['OPT PCR'] = df['OPT PCR'].apply(fmt_pcr)  # Yaha VOL PCR se badalkar OPT PCR kar diya gaya
             df['VOL CPR'] = df['VOL CPR'].apply(fmt_pcr)
             
             if tab_type == "Bullish":
