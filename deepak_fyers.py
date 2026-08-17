@@ -95,7 +95,7 @@ div[data-testid="stToggle"] label p { font-weight: 700 !important; font-size: 14
     .time-box { font-size: 11px !important; height: 34px !important; padding: 0 10px !important; }
     div[data-testid="stColumns"] { display: flex !important; flex-direction: row !important; align-items: center !important; flex-wrap: nowrap !important; gap: 4px !important; }
     div[data-testid="stColumns"] > div[data-testid="column"] { width: auto !important; min-width: 0 !important; padding: 0 !important; }
-    div[data-testid="stColumns"] > div:nth-child(3) { display: none !important; } /* Hides empty space column on mobile */
+    div[data-testid="stColumns"] > div:nth-child(3) { display: none !important; } 
     .stToggle { height: 34px !important; display: flex !important; align-items: center !important; justify-content: center !important; margin: 0 !important; padding: 0 !important; }
     div[data-testid="stToggle"] label p { font-size: 12px !important; }
 }
@@ -175,88 +175,70 @@ st.session_state.chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else 
 
 
 # ==========================================
-# 3B. 🚀 TREND SCANNER LOGIC
+# 3B. 🔥 SMART DIVERGENCE SCANNER (BULLISH/BEARISH) 🔥
 # ==========================================
-# Isse Vol CPR aur OPT PCR dono ka "continuously rising" trend detect hota hai
-# har symbol ke liye, jaise AUROPHARMA ke chart mein dikh raha tha.
-def compute_trending_stocks(chart_df, today_str, symbols, mode="strict", min_rise_pct=15.0, max_pullback_pct=15.0,
-                             max_opt_decline_pct=10.0, min_points=8):
-    results = []
-    if chart_df is None or chart_df.empty or 'Date' not in chart_df.columns:
-        return pd.DataFrame(results)
+def find_divergence_stocks(chart_df, latest_data_list):
+    bullish_list = []
+    bearish_list = []
 
+    if chart_df is None or chart_df.empty or not latest_data_list:
+        return pd.DataFrame(bullish_list), pd.DataFrame(bearish_list)
+
+    latest_lookup = {item['SYMS']: item for item in latest_data_list}
+    
     day_df = chart_df.copy()
     day_df['Date'] = day_df['Date'].astype(str).str.strip()
-    day_df['Symbol'] = day_df['Symbol'].astype(str).str.strip()
     day_df = day_df[day_df['Date'] == today_str]
-    if day_df.empty:
-        return pd.DataFrame(results)
 
-    def trend_stats(series):
-        # returns (rise_pct_from_start, pullback_from_high_pct, last_value)
-        series = series.dropna()
-        if len(series) < min_points:
-            return None
-        first_val = series.iloc[0]
-        last_val = series.iloc[-1]
-        max_val = series.max()
-        if first_val == 0 or max_val == 0:
-            return None
-        rise_pct = ((last_val - first_val) / abs(first_val)) * 100.0
-        pullback_pct = ((max_val - last_val) / abs(max_val)) * 100.0
-        return rise_pct, pullback_pct, last_val
+    for sym in day_df['Symbol'].unique():
+        sdf = day_df[day_df['Symbol'] == sym].sort_values(by='Time')
+        if len(sdf) < 3: 
+            continue 
 
-    for sym in symbols:
-        sdf = day_df[day_df['Symbol'] == sym]
-        if len(sdf) < min_points:
-            continue
-        sdf = sdf.sort_values(by='Time')
+        first_vol = pd.to_numeric(sdf['VOL CPR'].iloc[0], errors='coerce')
+        last_vol = pd.to_numeric(sdf['VOL CPR'].iloc[-1], errors='coerce')
+        
+        first_pcr = pd.to_numeric(sdf['OPT PCR'].iloc[0], errors='coerce')
+        last_pcr = pd.to_numeric(sdf['OPT PCR'].iloc[-1], errors='coerce')
+        
+        first_ltp = pd.to_numeric(sdf['LTP'].iloc[0], errors='coerce')
+        last_ltp = pd.to_numeric(sdf['LTP'].iloc[-1], errors='coerce')
 
-        if 'VOL CPR' not in sdf.columns or 'OPT PCR' not in sdf.columns:
+        if pd.isna(first_vol) or pd.isna(last_ltp) or first_ltp == 0: 
             continue
 
-        vol_series = pd.to_numeric(sdf['VOL CPR'], errors='coerce')
-        opt_series = pd.to_numeric(sdf['OPT PCR'], errors='coerce')
-        ltp_series = pd.to_numeric(sdf['LTP'], errors='coerce') if 'LTP' in sdf.columns else pd.Series(dtype=float)
+        price_movement_pct = abs((last_ltp - first_ltp) / first_ltp) * 100
+        is_price_stuck = price_movement_pct <= 1.5 
 
-        vol_stats = trend_stats(vol_series)
-        opt_stats = trend_stats(opt_series)
-        if vol_stats is None or opt_stats is None:
-            continue
+        latest_info = latest_lookup.get(sym, {})
+        ce_con = float(latest_info.get('CE_CON', 0))
+        pe_con = float(latest_info.get('PE_CON', 0))
+        chg_pct = float(latest_info.get('CHG_%', 0))
+        curr_vol_pcr = float(latest_info.get('V_PCR', 0))
+        curr_vol_cpr = float(latest_info.get('V_CPR', 0))
 
-        vol_rise, vol_pullback, vol_last = vol_stats
-        opt_rise, opt_pullback, opt_last = opt_stats
+        if is_price_stuck:
+            # 🟢 BULLISH: Indicator rising & CE >= 70
+            if (last_vol > first_vol) and (last_pcr > first_pcr) and (ce_con >= 70):
+                bullish_list.append({
+                    'SYMBOL': sym,
+                    'CHANGE %': chg_pct,
+                    'VOL PCR': curr_vol_pcr,
+                    'VOL CPR': curr_vol_cpr,
+                    'CE CONTRACT': ce_con
+                })
 
-        # Vol CPR ka condition dono mode mein same hai: shuru se continuously badh raha ho
-        # aur abhi bhi apne day-high ke paas ho (rise karke gir gaye wale bahar).
-        vol_condition = (vol_rise >= min_rise_pct and vol_pullback <= max_pullback_pct)
+            # 🔴 BEARISH: Indicator falling & PE >= 70
+            elif (last_vol < first_vol) and (last_pcr < first_pcr) and (pe_con >= 70):
+                bearish_list.append({
+                    'SYMBOL': sym,
+                    'CHANGE %': chg_pct,
+                    'VOL PCR': curr_vol_pcr,
+                    'VOL CPR': curr_vol_cpr,
+                    'PE CONTRACT': pe_con
+                })
 
-        if mode == "strict":
-            # 🔥 MODE 1: dono indicators (Vol CPR + OPT PCR) rise honi chahiye
-            opt_condition = (opt_rise >= min_rise_pct and opt_pullback <= max_pullback_pct)
-        else:
-            # 🔥 MODE 2: sirf Vol CPR rise chahiye; OPT PCR badhe ya na badhe,
-            # bas bahut zyada gira na ho (max_opt_decline_pct se zyada neeche nahi)
-            opt_condition = (opt_rise >= -max_opt_decline_pct)
-
-        if vol_condition and opt_condition:
-
-            ltp_last = ltp_series.dropna().iloc[-1] if not ltp_series.dropna().empty else 0
-
-            results.append({
-                'SYMBOL': sym,
-                'LTP': ltp_last,
-                'VOL CPR': vol_last,
-                'VOL CPR RISE %': vol_rise,
-                'OPT PCR': opt_last,
-                'OPT PCR RISE %': opt_rise,
-                'SCORE': vol_rise + max(opt_rise, 0)
-            })
-
-    res_df = pd.DataFrame(results)
-    if not res_df.empty:
-        res_df = res_df.sort_values(by='SCORE', ascending=False)
-    return res_df
+    return pd.DataFrame(bullish_list), pd.DataFrame(bearish_list)
 
 
 # ==========================================
@@ -264,7 +246,6 @@ def compute_trending_stocks(chart_df, today_str, symbols, mode="strict", min_ris
 # ==========================================
 if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     
-    # 🔥 LAYOUT: Menu & Time close on left, Toggle pushed to far right 🔥
     col_menu, col_tim, col_space, col_tog = st.columns([1.5, 1.2, 5.8, 1.5])
     
     with col_menu:
@@ -280,7 +261,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             st.empty() 
             
     with col_space:
-        st.empty() # Empty space to push toggle to the right
+        st.empty() 
         
     with col_tog:
         if selected_tab == "📊 Dash":
@@ -435,7 +416,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         col_c1, col_c2 = st.columns([1, 1])
         
         with col_c1: 
-            # 🔥 SEARCH BOX: index=0 (NIFTY Default) 🔥
             sel_stock = st.selectbox(
                 "Stock:", 
                 raw_symbols, 
@@ -549,117 +529,92 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             st.info("⏳ Chart data sheet is empty. Waiting for Master Engine...")
 
     # ==========================================
-    # 🚀 TREND VIEW (NAYA TAB)
+    # 🚀 TREND VIEW (NEW DIVERGENCE TABS)
     # ==========================================
     elif selected_tab == "🚀 TREND":
-
-        scan_mode = st.radio(
-            "Scan Mode:",
-            ["🔥 Dono Rising (Strict)", "📈 Sirf Vol CPR Rising (PCR Stable bhi chalega)"],
-            horizontal=True
-        )
-        is_strict = scan_mode.startswith("🔥")
-
-        if is_strict:
-            st.markdown("<div style='font-size:13px; opacity:0.75; margin-bottom:4px;'>Vol CPR + OPT PCR dono continuously rising wale stocks (auto-scan, sab symbols par)</div>", unsafe_allow_html=True)
-        else:
-            st.markdown("<div style='font-size:13px; opacity:0.75; margin-bottom:4px;'>Vol CPR shuru se continuously rising — OPT PCR badhe ya na badhe, bas zyada gira na ho</div>", unsafe_allow_html=True)
-
-        # Sensitivity sliders — inko adjust karke tum strict/loose scan kar sakte ho
-        col_s1, col_s2 = st.columns(2)
-        with col_s1:
-            min_rise_pct = st.slider("Vol CPR Min Rise % (start se ab tak)", min_value=5, max_value=100, value=15, step=5)
-        with col_s2:
-            max_pullback_pct = st.slider("Vol CPR Max Pullback % (day-high se)", min_value=5, max_value=50, value=15, step=5)
-
-        max_opt_decline_pct = 10.0
-        if not is_strict:
-            max_opt_decline_pct = st.slider(
-                "OPT PCR — kitna % tak girna allowed hai (isse zyada gira to bahar)",
-                min_value=0, max_value=50, value=10, step=5
-            )
-
+        
+        # Calling our new function to get data
         chart_df = st.session_state.get('chart_df', pd.DataFrame())
+        latest_data = st.session_state.get('cached_data', [])
+        
+        df_bullish, df_bearish = find_divergence_stocks(chart_df, latest_data)
 
-        if chart_df is None or chart_df.empty:
-            st.info("⏳ Chart history abhi load nahi hua — thodi der baad try karo.")
-        else:
-            trend_df = compute_trending_stocks(
-                chart_df, today_str, raw_symbols,
-                mode="strict" if is_strict else "vol_only",
-                min_rise_pct=float(min_rise_pct),
-                max_pullback_pct=float(max_pullback_pct),
-                max_opt_decline_pct=float(max_opt_decline_pct)
-            )
+        # HTML Table Generator Helper
+        def generate_trend_html(df, tab_type="Bullish"):
+            if df.empty: return "<div style='text-align:center; padding: 20px; font-weight:bold; color: #555;'>⏳ Koi data match nahi hua.</div>"
+            
+            df = df.copy()
 
-            if trend_df.empty:
-                st.info("🔍 Abhi koi stock is criteria pe match nahi kar raha. Sliders thode loose kar ke try karo.")
+            # Formatting functions for HTML display
+            def fmt_pct(v):
+                try:
+                    val = float(v)
+                    color = "#00AA00" if val >= 0 else "#FF0000"
+                    return f"<span style='color:{color}; font-weight:bold;'>{val:+.2f}%</span>"
+                except: return str(v)
+
+            def fmt_pcr(v):
+                try:
+                    val = float(v)
+                    color = "#00AA00" if val >= 1.0 else "#FF0000"
+                    return f"<span style='color:{color}; font-weight:bold;'>{val:.2f}</span>"
+                except: return str(v)
+
+            def fmt_contract(v):
+                try:
+                    val = float(v)
+                    color = "#00AA00" if val >= 70 else ("#FF0000" if val <= -70 else "#888888")
+                    return f"<span style='color:{color}; font-weight:bold;'>{val:+.1f}%</span>"
+                except: return str(v)
+            
+            # Apply formatting
+            df['CHANGE %'] = df['CHANGE %'].apply(fmt_pct)
+            df['VOL PCR'] = df['VOL PCR'].apply(fmt_pcr)
+            df['VOL CPR'] = df['VOL CPR'].apply(fmt_pcr)
+            
+            if tab_type == "Bullish":
+                df['CE CONTRACT'] = df['CE CONTRACT'].apply(fmt_contract)
+                head_color = "#00AA00" # Green header for Bullish
             else:
-                def color_pcr_val(v):
-                    try:
-                        v = float(v)
-                        fmt = f"{v:.2f}"
-                        if v >= 1.0: return f"<span style='color:#00AA00;'>{fmt}</span>"
-                        if 0 < v < 1.0: return f"<span style='color:#FF0000;'>{fmt}</span>"
-                        return fmt
-                    except: return str(v)
-
-                def color_rise(v):
-                    try:
-                        v = float(v)
-                        color = "#00AA00" if v >= 0 else "#FF0000"
-                        sign = "+" if v >= 0 else ""
-                        return f"<span style='color:{color};'>{sign}{v:.1f}%</span>"
-                    except: return str(v)
-
-                disp = trend_df.copy()
-                disp['LTP'] = disp['LTP'].apply(lambda x: f"{float(x):.2f}" if pd.notna(x) else "-")
-                disp['VOL CPR'] = disp['VOL CPR'].apply(color_pcr_val)
-                disp['VOL CPR RISE %'] = disp['VOL CPR RISE %'].apply(color_rise)
-                disp['OPT PCR'] = disp['OPT PCR'].apply(color_pcr_val)
-                disp['OPT PCR RISE %'] = disp['OPT PCR RISE %'].apply(color_rise)
-                disp = disp.drop(columns=['SCORE'])
-
-                disp = disp.rename(columns={
-                    'SYMBOL': 'SYMBOL',
-                    'LTP': 'LTP',
-                    'VOL CPR': 'VOL<br>CPR',
-                    'VOL CPR RISE %': 'VOL CPR<br>RISE %',
-                    'OPT PCR': 'OPT<br>PCR',
-                    'OPT PCR RISE %': 'OPT PCR<br>RISE %'
-                })
-
-                html_table = disp.to_html(escape=False, index=False, classes="dataframe")
-
-                trend_html = f"""
-                <!DOCTYPE html>
-                <html>
-                <head>
-                <style>
-                    body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: transparent; }}
-                    .table-wrapper {{ height: 650px; overflow: auto; border-radius: 5px; }}
-                    table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 13px; margin: 0 auto; background-color: #ffffff; color: #000000; }}
-                    table.dataframe th {{ 
-                        background-color: #B8860B !important; color: white !important; font-weight: bold !important; text-align: center !important; 
-                        padding: 8px 6px !important; position: sticky; top: 0; z-index: 10; border: 1px solid rgba(255,255,255,0.2);
-                    }}
-                    table.dataframe td {{ 
-                        text-align: center !important; 
-                        padding: 7px 6px !important; 
-                        border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; 
-                    }}
-                    table.dataframe tr:hover {{ background-color: rgba(128,128,128,0.1); }}
-                </style>
-                </head>
-                <body>
-                <div class="table-wrapper">
-                    {html_table}
+                df['PE CONTRACT'] = df['PE CONTRACT'].apply(fmt_contract)
+                head_color = "#FF0000" # Red header for Bearish
+                
+            html_content = df.to_html(escape=False, index=False, classes="dataframe")
+            
+            return f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+            <style>
+                body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: transparent; }}
+                table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 13px; margin: 0 auto; background-color: #ffffff; color: #000000; }}
+                table.dataframe th {{ background-color: {head_color} !important; color: white !important; font-weight: bold !important; text-align: center !important; padding: 8px 6px !important; border: 1px solid rgba(255,255,255,0.2); position: sticky; top: 0; }}
+                table.dataframe td {{ text-align: center !important; padding: 7px 6px !important; border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); }}
+                table.dataframe tr:hover {{ background-color: rgba(128,128,128,0.1); }}
+            </style>
+            </head>
+            <body>
+                <div style="height: 600px; overflow: auto; border-radius: 5px;">
+                    {html_content}
                 </div>
-                </body>
-                </html>
-                """
-                components.html(trend_html, height=650, scrolling=False)
-                st.caption(f"✅ {len(trend_df)} stocks match kar rahe hain current criteria pe.")
+            </body>
+            </html>
+            """
+
+        # UI TABS
+        tab_bullish, tab_bearish = st.tabs(["🟢 Bullish Stocks", "🔴 Bearish Stocks"])
+
+        with tab_bullish:
+            st.markdown("<div style='font-size:13px; opacity:0.8; margin-bottom:8px;'><b>Logic:</b> Price Wahin ruka hai | Vol CPR + OPT PCR Badh raha hai | CE Contract >= 70%</div>", unsafe_allow_html=True)
+            if not df_bullish.empty:
+                df_bullish = df_bullish.sort_values(by='CE CONTRACT', ascending=False)
+            components.html(generate_trend_html(df_bullish, "Bullish"), height=650, scrolling=True)
+
+        with tab_bearish:
+            st.markdown("<div style='font-size:13px; opacity:0.8; margin-bottom:8px;'><b>Logic:</b> Price Wahin ruka hai | Vol CPR + OPT PCR Gir raha hai | PE Contract >= 70%</div>", unsafe_allow_html=True)
+            if not df_bearish.empty:
+                df_bearish = df_bearish.sort_values(by='PE CONTRACT', ascending=False)
+            components.html(generate_trend_html(df_bearish, "Bearish"), height=650, scrolling=True)
 
 else:
     st.info("⏳ Booting up... Waiting for Engine to push data.")
