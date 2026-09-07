@@ -12,54 +12,43 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Chart Engine", layout="wide", initial_sidebar_state="collapsed")
 
 # ==========================================
-# 1. 🔥 HIDE STREAMLIT WATERMARK & HEADERS
-# ==========================================
-components.html(
-    """
-    <script>
-    const targetNode = window.parent.document.body;
-    const observer = new MutationObserver(() => {
-        const elementsToHide = [
-            '[data-testid="stAppDeployButton"]',
-            '[data-testid="stToolbar"]',
-            'header',
-            'footer'
-        ];
-        elementsToHide.forEach(selector => {
-            const el = window.parent.document.querySelector(selector);
-            if (el) { el.style.display = 'none'; el.style.visibility = 'hidden'; el.style.opacity = '0'; }
-        });
-    });
-    observer.observe(targetNode, { childList: true, subtree: true });
-    </script>
-    """,
-    height=0,
-    width=0
-)
-
-# ==========================================
-# 2. ULTRA COMPACT CSS (ZERO PADDING)
+# 1. 🔥 FORCE LIGHT THEME, HIDE WATERMARK & FULLSCREEN
 # ==========================================
 st.markdown("""
 <style>
-    header, footer, .stDeployButton, [data-testid="stToolbar"], [data-testid="stHeader"] { display: none !important; visibility: hidden !important; }
+    /* Hide Header, Footer (Built with Streamlit) */
+    header, footer, .stDeployButton, [data-testid="stToolbar"], [data-testid="stHeader"], [data-testid="stBottom"] { 
+        display: none !important; visibility: hidden !important; opacity: 0 !important;
+    }
+    
+    /* Hide Fullscreen Button inside components */
+    [data-testid="StyledFullScreenButton"], button[title="View fullscreen"] {
+        display: none !important; visibility: hidden !important;
+    }
+
+    /* Force Light Mode Background & Text */
+    .stApp, .block-container, iframe { 
+        background-color: #ffffff !important; 
+        color: #000000 !important; 
+    }
+
+    /* Ultra Compact Layout & Edge-to-Edge Fitting */
     .block-container { 
         padding-top: 0rem !important; 
         padding-bottom: 0rem !important; 
-        padding-left: 0.5rem !important; 
-        padding-right: 0.5rem !important; 
-        margin-top: -55px !important; 
-    }
-    div[data-testid="stColumns"] { gap: 0.5rem !important; margin-bottom: -15px !important;}
-    .stRadio div[role='radiogroup'] { flex-wrap: nowrap !important; }
-    .stRadio div[role='radiogroup'] > label { 
-        background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 6px; 
-        padding: 5px 15px; font-weight: bold; font-size: 13px; cursor: pointer;
+        padding-left: 0.2rem !important; 
+        padding-right: 0.2rem !important; 
+        margin-top: -60px !important; 
+        max-width: 100% !important;
     }
     
-    /* Dark mode support for radio */
-    @media (prefers-color-scheme: dark) {
-        .stRadio div[role='radiogroup'] > label { background: #1e293b; border-color: #334155; color: white;}
+    div[data-testid="stColumns"] { gap: 0.5rem !important; margin-bottom: -15px !important; padding: 0 10px;}
+    
+    .stRadio div[role='radiogroup'] { flex-wrap: nowrap !important; }
+    .stRadio div[role='radiogroup'] > label { 
+        background: #f1f5f9 !important; border: 1px solid #cbd5e1 !important; border-radius: 6px !important; 
+        padding: 5px 15px !important; font-weight: bold !important; font-size: 13px !important; 
+        cursor: pointer !important; color: #000000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -73,7 +62,7 @@ today_prefix = today_str.replace("-", "")
 st_autorefresh(interval=5000, limit=100000, key="viewer_fetch_loop") 
 
 # ==========================================
-# 3. GET SYMBOLS FROM DASHBOARD LATEST
+# 2. GET SYMBOLS FROM DASHBOARD LATEST
 # ==========================================
 dynamic_symbols = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"]
 try:
@@ -85,7 +74,7 @@ try:
 except: pass
 
 # ==========================================
-# 4. GET CHART DATA
+# 3. GET CHART DATA
 # ==========================================
 @st.cache_data(ttl=30)
 def fetch_chart_history_raw(prefix):
@@ -106,7 +95,7 @@ raw_chart_data = fetch_chart_history_raw(today_prefix)
 chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else pd.DataFrame()
 
 # ==========================================
-# 5. PURE CHART UI
+# 4. PURE CHART UI
 # ==========================================
 col1, col2 = st.columns([2, 2])
 with col1: 
@@ -139,7 +128,7 @@ if not chart_df.empty and sel_stock:
                 <link href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css" rel="stylesheet">
                 <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
                 <style> 
-                    body {{ margin: 0; padding: 0; background-color: transparent; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; }} 
+                    body {{ margin: 0; padding: 0; background-color: #ffffff; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; }} 
                     .apexcharts-toolbar {{ display: none !important; }}
                     #custom-reset-btn {{ position: absolute; top: 10px; left: 15px; z-index: 9999; background: #2962FF; border: none; border-radius: 4px; padding: 5px 12px; font-size: 11px; font-weight: bold; color: #fff; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }}
                     .slider-wrapper {{ padding: 0px 25px; margin-top: -15px; position: relative; }}
@@ -164,10 +153,6 @@ if not chart_df.empty and sel_stock:
                     var dataLTP = {json.dumps(ltp_list)}; 
                     var timeCats = {json.dumps(time_list)}; 
                     
-                    var isDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-                    var gridColor = isDark ? "#334155" : "#e2e8f0";
-                    var textColor = isDark ? "#94a3b8" : "#888";
-                    
                     var optionsMain = {{
                         series: [{{ name: '{chart_mode}', type: 'area', data: dataIndicator }}, {{ name: 'LTP', type: 'line', data: dataLTP }}],
                         chart: {{ id: 'mainChart', height: 420, type: 'line', toolbar: {{ show: false }}, zoom: {{ enabled: false }}, animations: {{ enabled: false }} }},
@@ -175,14 +160,14 @@ if not chart_df.empty and sel_stock:
                         stroke: {{ curve: 'smooth', width: [3, 3] }}, 
                         fill: {{ type: ['gradient', 'solid'], gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }} }},
                         dataLabels: {{ enabled: false }}, 
-                        xaxis: {{ categories: timeCats, tickAmount: 10, labels: {{ style: {{ colors: textColor }} }}, tooltip: {{ enabled: false }} }},
+                        xaxis: {{ categories: timeCats, tickAmount: 10, labels: {{ style: {{ colors: '#888' }} }}, tooltip: {{ enabled: false }} }},
                         yaxis: [
                             {{ title: {{ text: '{chart_mode}', style: {{ color: '{indicator_color}' }} }}, labels: {{ style: {{ colors: '{indicator_color}' }} }}, decimalsInFloat: 2 }}, 
                             {{ opposite: true, title: {{ text: 'LTP', style: {{ color: '#00CC66' }} }}, labels: {{ style: {{ colors: '#00CC66' }} }}, decimalsInFloat: 2 }}
                         ],
-                        grid: {{ borderColor: gridColor, strokeDashArray: 3 }},
-                        tooltip: {{ shared: true, intersect: false, theme: isDark ? 'dark' : 'light' }}, 
-                        legend: {{ position: 'top', horizontalAlign: 'right', labels: {{ colors: isDark ? '#fff' : '#000' }} }}
+                        grid: {{ borderColor: '#e2e8f0', strokeDashArray: 3 }},
+                        tooltip: {{ shared: true, intersect: false, theme: 'light' }}, 
+                        legend: {{ position: 'top', horizontalAlign: 'right', labels: {{ colors: '#000' }} }}
                     }};
                     
                     var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain); 
@@ -206,7 +191,8 @@ if not chart_df.empty and sel_stock:
             </body>
             </html>
             """
-            components.html(apex_html, height=500, width=None)
+            # Height increased slightly so nothing gets cut off
+            components.html(apex_html, height=520, width=None)
         else: 
             st.info(f"⏳ Waiting for Market Data for {sel_stock}...")
     except Exception as e: 
