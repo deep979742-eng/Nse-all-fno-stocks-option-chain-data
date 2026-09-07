@@ -12,7 +12,7 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Chart Engine", layout="wide", initial_sidebar_state="collapsed")
 
 # ==========================================
-# 1. 🔥 FORCE LIGHT THEME, HIDE WATERMARK & FULLSCREEN
+# 1. 🔥 FORCE LIGHT THEME & HIDE WATERMARK
 # ==========================================
 st.markdown("""
 <style>
@@ -44,11 +44,31 @@ st.markdown("""
     
     div[data-testid="stColumns"] { gap: 0.5rem !important; margin-bottom: -15px !important; padding: 0 10px;}
     
+    /* --- RADIO BUTTONS (VOL CPR / OPT PCR) WHITE FIX --- */
     .stRadio div[role='radiogroup'] { flex-wrap: nowrap !important; }
     .stRadio div[role='radiogroup'] > label { 
-        background: #f1f5f9 !important; border: 1px solid #cbd5e1 !important; border-radius: 6px !important; 
-        padding: 5px 15px !important; font-weight: bold !important; font-size: 13px !important; 
-        cursor: pointer !important; color: #000000 !important;
+        background-color: #ffffff !important; 
+        border: 1px solid #cbd5e1 !important; 
+        border-radius: 6px !important; 
+        padding: 5px 15px !important; 
+        font-weight: bold !important; 
+        font-size: 13px !important; 
+        cursor: pointer !important; 
+        color: #000000 !important;
+    }
+    .stRadio div[role='radiogroup'] > label div, 
+    .stRadio div[role='radiogroup'] > label p {
+        color: #000000 !important;
+    }
+
+    /* --- SELECTBOX (STOCK DROPDOWN) WHITE FIX --- */
+    div[data-baseweb="select"] > div {
+        background-color: #ffffff !important;
+        color: #000000 !important;
+        border-color: #cbd5e1 !important;
+    }
+    div[data-baseweb="select"] span {
+        color: #000000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -191,7 +211,6 @@ if not chart_df.empty and sel_stock:
             </body>
             </html>
             """
-            # Height increased slightly so nothing gets cut off
             components.html(apex_html, height=520, width=None)
         else: 
             st.info(f"⏳ Waiting for Market Data for {sel_stock}...")
