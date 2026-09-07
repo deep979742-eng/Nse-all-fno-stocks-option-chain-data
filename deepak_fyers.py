@@ -9,85 +9,56 @@ import streamlit.components.v1 as components
 # ==========================================
 # PAGE CONFIG 
 # ==========================================
-st.set_page_config(page_title="Chart Engine", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(page_title="Chart & Trend Engine", layout="wide", initial_sidebar_state="collapsed")
 
 # ==========================================
-# 1. 🔥 FORCE LIGHT THEME & NUKE WATERMARK / FULLSCREEN
+# 1. 🔥 FORCE LIGHT THEME & HIDE WATERMARK / FULLSCREEN
 # ==========================================
 st.markdown("""
 <style>
-    /* --- Hide Footer (Built with Streamlit) --- */
-    footer { visibility: hidden !important; display: none !important; height: 0px !important; margin: 0px !important; padding: 0px !important; }
-    #MainMenu { visibility: hidden !important; display: none !important; }
-    header { visibility: hidden !important; display: none !important; }
-
-    /* --- Hide Fullscreen Button --- */
-    button[title="View fullscreen"] { visibility: hidden !important; display: none !important; }
-    [data-testid="StyledFullScreenButton"] { visibility: hidden !important; display: none !important; }
-
-    /* --- Force Light Mode --- */
+    header, footer, .stDeployButton, [data-testid="stToolbar"], [data-testid="stHeader"], [data-testid="stBottom"] { 
+        display: none !important; visibility: hidden !important; opacity: 0 !important;
+    }
+    button[title="View fullscreen"], [data-testid="StyledFullScreenButton"] { 
+        display: none !important; visibility: hidden !important; 
+    }
     .stApp, .block-container, iframe { 
         background-color: #ffffff !important; 
         color: #000000 !important; 
     }
-
-    /* --- Compact Layout --- */
     .block-container { 
-        padding-top: 0rem !important; 
-        padding-bottom: 0rem !important; 
-        padding-left: 0.2rem !important; 
-        padding-right: 0.2rem !important; 
-        margin-top: -60px !important; 
-        max-width: 100% !important;
+        padding-top: 0rem !important; padding-bottom: 0rem !important; 
+        padding-left: 0.2rem !important; padding-right: 0.2rem !important; 
+        margin-top: -60px !important; max-width: 100% !important;
     }
-    
     div[data-testid="stColumns"] { gap: 0.5rem !important; margin-bottom: -15px !important; padding: 0 10px;}
     
-    /* --- RADIO BUTTONS (VOL CPR / OPT PCR) WHITE FIX --- */
     .stRadio div[role='radiogroup'] { flex-wrap: nowrap !important; }
     .stRadio div[role='radiogroup'] > label { 
-        background-color: #ffffff !important; 
-        border: 1px solid #cbd5e1 !important; 
-        border-radius: 6px !important; 
-        padding: 5px 15px !important; 
-        font-weight: bold !important; 
-        font-size: 13px !important; 
-        cursor: pointer !important; 
-        color: #000000 !important;
+        background-color: #ffffff !important; border: 1px solid #cbd5e1 !important; 
+        border-radius: 6px !important; padding: 5px 15px !important; 
+        font-weight: bold !important; font-size: 13px !important; cursor: pointer !important; color: #000000 !important;
     }
-    .stRadio div[role='radiogroup'] > label div, 
-    .stRadio div[role='radiogroup'] > label p {
-        color: #000000 !important;
-    }
+    .stRadio div[role='radiogroup'] > label div, .stRadio div[role='radiogroup'] > label p { color: #000000 !important; }
 
-    /* --- SELECTBOX (STOCK DROPDOWN) WHITE FIX --- */
-    div[data-baseweb="select"] > div {
-        background-color: #ffffff !important;
-        color: #000000 !important;
-        border-color: #cbd5e1 !important;
-    }
-    div[data-baseweb="select"] span {
-        color: #000000 !important;
-    }
+    div[data-baseweb="select"] > div { background-color: #ffffff !important; color: #000000 !important; border-color: #cbd5e1 !important; }
+    div[data-baseweb="select"] span { color: #000000 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# 🛠️ Aggressive JS to constantly remove footer & fullscreen
 components.html(
     """
     <script>
     const observer = new MutationObserver(() => {
         const footer = window.parent.document.querySelector('footer');
         if (footer) footer.style.display = 'none';
-        
         const fullScreenBtns = window.parent.document.querySelectorAll('button[title="View fullscreen"]');
         fullScreenBtns.forEach(btn => btn.style.display = 'none');
     });
     observer.observe(window.parent.document.body, { childList: true, subtree: true });
     </script>
     """,
-    height=0,
-    width=0
+    height=0, width=0
 )
 
 FIREBASE_URL = "https://fyers-bot-606b9-default-rtdb.firebaseio.com"
@@ -95,24 +66,22 @@ IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
 today_str = datetime.datetime.now(IST).strftime("%Y-%m-%d")
 today_prefix = today_str.replace("-", "")
 
-# Auto Refresh Chart Data
 st_autorefresh(interval=5000, limit=100000, key="viewer_fetch_loop") 
 
 # ==========================================
-# 2. GET SYMBOLS FROM DASHBOARD LATEST
+# 2. FETCH DATA FROM FIREBASE (Dashboard & Charts)
 # ==========================================
 dynamic_symbols = ["NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY"]
 try:
     dash_resp = requests.get(f"{FIREBASE_URL}/Dashboard/Latest.json", timeout=3)
     if dash_resp.status_code == 200 and dash_resp.json():
-        data = dash_resp.json().get("data", [])
+        shared_pack = dash_resp.json()
+        data = shared_pack.get("data", [])
+        st.session_state.cached_data = data
         fetched_syms = sorted(list(set([item.get('SYMS', item.get('SYMBOL', '')) for item in data if item.get('SYMS') or item.get('SYMBOL')])))
         if fetched_syms: dynamic_symbols = fetched_syms
 except: pass
 
-# ==========================================
-# 3. GET CHART DATA
-# ==========================================
 @st.cache_data(ttl=30)
 def fetch_chart_history_raw(prefix):
     try:
@@ -132,7 +101,7 @@ raw_chart_data = fetch_chart_history_raw(today_prefix)
 chart_df = pd.DataFrame(raw_chart_data) if raw_chart_data else pd.DataFrame()
 
 # ==========================================
-# 4. PURE CHART UI
+# 3. PURE CHART UI & BACKEND SUPPORT
 # ==========================================
 col1, col2 = st.columns([2, 2])
 with col1: 
@@ -149,7 +118,6 @@ if not chart_df.empty and sel_stock:
         
         if not df_sym.empty:
             df_sym = df_sym.sort_values(by='Time')
-            
             target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
             indicator_color = "#FF4D4D" if chart_mode == "Vol CPR" else "#00BFFF"
             
@@ -229,9 +197,5 @@ if not chart_df.empty and sel_stock:
             </html>
             """
             components.html(apex_html, height=520, width=None)
-        else: 
-            st.info(f"⏳ Waiting for Market Data for {sel_stock}...")
     except Exception as e: 
         st.error(f"Chart Load Error: {e}")
-else: 
-    st.info("⏳ Chart data is empty. Waiting for Master Engine...")
