@@ -206,6 +206,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     # VIEW 1: DASHBOARD
     # ==========================================
     if selected_tab == "📊 Dash":
+        # 🔍 STOCK FILTER INPUT FIELD
+        search_query = st.text_input("🔍 Search Stock Symbol...", placeholder="Type symbol e.g. NIFTY, RELIANCE...", label_visibility="collapsed")
+        st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
+
         def color_open(val):
             if "Gap Up" in str(val): return f"<span style='color: #00AA00;'>{val}</span>"
             if "Gap Down" in str(val): return f"<span style='color: #FF0000;'>{val}</span>"
@@ -236,6 +240,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
         df = pd.DataFrame(st.session_state.cached_data)
         if not df.empty:
+            # Apply search filter if user typed something
+            if search_query:
+                q = search_query.strip().upper()
+                df = df[df['SYMS'].astype(str).str.upper().str.contains(q) | df['SYMBOL'].astype(str).str.upper().str.contains(q)]
+
             df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
             df = df.sort_values(by='Conv_Rank', ascending=False)
             df['VOL CHECKER'] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
@@ -243,23 +252,23 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             df = df[['SYMS', 'OPEN_STATUS', 'V_PCR', 'O_PCR', 'V_CPR', 'LTP_CH', 'CHG_%', 'LTP', 'CE_CON', 'PE_CON', 'PCR CHECKER', 'VOL CHECKER']]
             
             df = df.rename(columns={
-                'SYMS': 'SYMBOL', 'OPEN_STATUS': 'OPENING', 'V_PCR': 'VOL<br>PCR', 
-                'O_PCR': 'OPTION<br>PCR', 'V_CPR': 'VOL<br>CPR', 'LTP_CH': 'LTP<br>CHANGE', 
-                'CHG_%': 'CHANGE<br>%', 'LTP': 'LTP', 'CE_CON': 'CE<br>CONTRACT', 
-                'PE_CON': 'PE<br>CONTRACT', 'PCR CHECKER': 'PCR<br>CHECKER', 'VOL CHECKER': 'VOL<br>CHECKER'
+                'SYMS': 'SYMBOL ↕', 'OPEN_STATUS': 'OPENING ↕', 'V_PCR': 'VOL PCR ↕', 
+                'O_PCR': 'OPTION PCR ↕', 'V_CPR': 'VOL CPR ↕', 'LTP_CH': 'LTP CHANGE ↕', 
+                'CHG_%': 'CHANGE % ↕', 'LTP': 'LTP ↕', 'CE_CON': 'CE CONTRACT ↕', 
+                'PE_CON': 'PE CONTRACT ↕', 'PCR CHECKER': 'PCR CHECKER ↕', 'VOL CHECKER': 'VOL CHECKER ↕'
             })
 
-            df['OPENING'] = df['OPENING'].apply(color_open)
-            df['LTP<br>CHANGE'] = df['LTP<br>CHANGE'].apply(lambda x: color_num(x, False))
-            df['CHANGE<br>%'] = df['CHANGE<br>%'].apply(lambda x: color_num(x, True))
-            df['CE<br>CONTRACT'] = df['CE<br>CONTRACT'].apply(lambda x: color_num(x, True))
-            df['PE<br>CONTRACT'] = df['PE<br>CONTRACT'].apply(lambda x: color_num(x, True))
-            df['PCR<br>CHECKER'] = df['PCR<br>CHECKER'].apply(lambda x: color_num(x, show_pct))
-            df['VOL<br>CHECKER'] = df['VOL<br>CHECKER'].apply(lambda x: color_num(x, show_pct))
-            df['VOL<br>PCR'] = df['VOL<br>PCR'].apply(color_pcr)
-            df['OPTION<br>PCR'] = df['OPTION<br>PCR'].apply(color_pcr)
-            df['VOL<br>CPR'] = df['VOL<br>CPR'].apply(color_pcr)
-            df['LTP'] = df['LTP'].apply(format_ltp)
+            df['OPENING ↕'] = df['OPENING ↕'].apply(color_open)
+            df['LTP CHANGE ↕'] = df['LTP CHANGE ↕'].apply(lambda x: color_num(x, False))
+            df['CHANGE % ↕'] = df['CHANGE % ↕'].apply(lambda x: color_num(x, True))
+            df['CE CONTRACT ↕'] = df['CE CONTRACT ↕'].apply(lambda x: color_num(x, True))
+            df['PE CONTRACT ↕'] = df['PE CONTRACT ↕'].apply(lambda x: color_num(x, True))
+            df['PCR CHECKER ↕'] = df['PCR CHECKER ↕'].apply(lambda x: color_num(x, show_pct))
+            df['VOL CHECKER ↕'] = df['VOL CHECKER ↕'].apply(lambda x: color_num(x, show_pct))
+            df['VOL PCR ↕'] = df['VOL PCR ↕'].apply(color_pcr)
+            df['OPTION PCR ↕'] = df['OPTION PCR ↕'].apply(color_pcr)
+            df['VOL CPR ↕'] = df['VOL CPR ↕'].apply(color_pcr)
+            df['LTP ↕'] = df['LTP ↕'].apply(format_ltp)
             
             html_table = df.to_html(escape=False, index=False, classes="dataframe")
             
@@ -269,13 +278,14 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             <head>
             <style>
                 body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: transparent; }}
-                .table-wrapper {{ height: 750px; overflow: auto; border-radius: 6px; border: 1px solid #cbd5e1; }}
+                .table-wrapper {{ height: 710px; overflow: auto; border-radius: 6px; border: 1px solid #cbd5e1; }}
                 table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 12px; background-color: #ffffff; color: #000000; }}
                 table.dataframe th {{ 
                     background-color: #172554 !important; color: white !important; font-weight: bold !important; text-align: center !important; 
                     padding: 9px 4px !important; position: sticky; top: 0; z-index: 10; border: 1px solid rgba(255,255,255,0.2);
-                    cursor: pointer; user-select: none;
+                    cursor: pointer; user-select: none; transition: background 0.2s;
                 }}
+                table.dataframe th:hover {{ background-color: #0000cc !important; }}
                 table.dataframe td {{ 
                     text-align: center !important; padding: 7px 4px !important; 
                     border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; 
@@ -289,10 +299,42 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             <div class="table-wrapper">
                 {html_table}
             </div>
+            <script>
+                document.querySelectorAll('th').forEach(th => {{
+                    th.title = "Click to Sort Ascending / Descending";
+                    th.addEventListener('click', function() {{
+                        const table = th.closest('table');
+                        const tbody = table.querySelector('tbody');
+                        const rows = Array.from(tbody.querySelectorAll('tr'));
+                        const idx = Array.from(th.parentNode.children).indexOf(th);
+                        const asc = this.asc = !this.asc;
+
+                        table.querySelectorAll('th').forEach(el => {{
+                            el.innerHTML = el.innerHTML.replace(/ ▲| ▼/g, ' ↕');
+                        }});
+                        th.innerHTML = th.innerHTML.replace(/ ↕| ▲| ▼/g, '') + (asc ? ' ▲' : ' ▼');
+
+                        const parseVal = (td) => {{
+                            let val = td.innerText || td.textContent;
+                            val = val.replace(/,/g, '').replace(/%/g, '').replace(/[+]/g, '').trim();
+                            let num = parseFloat(val);
+                            return isNaN(num) ? val : num;
+                        }};
+
+                        rows.sort((a, b) => {{
+                            let v1 = parseVal(a.children[idx]);
+                            let v2 = parseVal(b.children[idx]);
+                            if (typeof v1 === 'number' && typeof v2 === 'number') {{ return asc ? v1 - v2 : v2 - v1; }}
+                            return asc ? String(v1).localeCompare(String(v2)) : String(v2).localeCompare(String(v1));
+                        }});
+                        rows.forEach(tr => tbody.appendChild(tr));
+                    }});
+                }});
+            </script>
             </body>
             </html>
             """
-            components.html(full_interactive_html, height=770, scrolling=False)
+            components.html(full_interactive_html, height=730, scrolling=False)
 
     # ==========================================
     # VIEW 2: CHART VIEW
