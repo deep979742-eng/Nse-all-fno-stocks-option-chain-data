@@ -206,10 +206,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
     # VIEW 1: DASHBOARD
     # ==========================================
     if selected_tab == "📊 Dash":
-        # 🔍 STOCK FILTER INPUT FIELD
-        search_query = st.text_input("🔍 Search Stock Symbol...", placeholder="Type symbol e.g. NIFTY, RELIANCE...", label_visibility="collapsed")
-        st.markdown("<div style='margin-bottom: 5px;'></div>", unsafe_allow_html=True)
-
         def color_open(val):
             if "Gap Up" in str(val): return f"<span style='color: #00AA00;'>{val}</span>"
             if "Gap Down" in str(val): return f"<span style='color: #FF0000;'>{val}</span>"
@@ -240,11 +236,6 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
         
         df = pd.DataFrame(st.session_state.cached_data)
         if not df.empty:
-            # Apply search filter if user typed something
-            if search_query:
-                q = search_query.strip().upper()
-                df = df[df['SYMS'].astype(str).str.upper().str.contains(q) | df['SYMBOL'].astype(str).str.upper().str.contains(q)]
-
             df['Conv_Rank'] = df['CE_CON'].abs() + df['PE_CON'].abs()
             df = df.sort_values(by='Conv_Rank', ascending=False)
             df['VOL CHECKER'] = df['VOL_PCT'] if show_pct else df['VOL_ABS']
@@ -278,7 +269,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             <head>
             <style>
                 body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: transparent; }}
-                .table-wrapper {{ height: 710px; overflow: auto; border-radius: 6px; border: 1px solid #cbd5e1; }}
+                .table-wrapper {{ height: 760px; overflow: auto; border-radius: 6px; border: 1px solid #cbd5e1; }}
                 table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 12px; background-color: #ffffff; color: #000000; }}
                 table.dataframe th {{ 
                     background-color: #172554 !important; color: white !important; font-weight: bold !important; text-align: center !important; 
@@ -334,7 +325,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             </body>
             </html>
             """
-            components.html(full_interactive_html, height=730, scrolling=False)
+            components.html(full_interactive_html, height=780, scrolling=False)
 
     # ==========================================
     # VIEW 2: CHART VIEW
