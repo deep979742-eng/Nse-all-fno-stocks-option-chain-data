@@ -12,27 +12,26 @@ import streamlit.components.v1 as components
 st.set_page_config(page_title="Chart Engine", layout="wide", initial_sidebar_state="collapsed")
 
 # ==========================================
-# 1. 🔥 FORCE LIGHT THEME & HIDE WATERMARK
+# 1. 🔥 FORCE LIGHT THEME & NUKE WATERMARK / FULLSCREEN
 # ==========================================
 st.markdown("""
 <style>
-    /* Hide Header, Footer (Built with Streamlit) */
-    header, footer, .stDeployButton, [data-testid="stToolbar"], [data-testid="stHeader"], [data-testid="stBottom"] { 
-        display: none !important; visibility: hidden !important; opacity: 0 !important;
-    }
-    
-    /* Hide Fullscreen Button inside components */
-    [data-testid="StyledFullScreenButton"], button[title="View fullscreen"] {
-        display: none !important; visibility: hidden !important;
-    }
+    /* --- Hide Footer (Built with Streamlit) --- */
+    footer { visibility: hidden !important; display: none !important; height: 0px !important; margin: 0px !important; padding: 0px !important; }
+    #MainMenu { visibility: hidden !important; display: none !important; }
+    header { visibility: hidden !important; display: none !important; }
 
-    /* Force Light Mode Background & Text */
+    /* --- Hide Fullscreen Button --- */
+    button[title="View fullscreen"] { visibility: hidden !important; display: none !important; }
+    [data-testid="StyledFullScreenButton"] { visibility: hidden !important; display: none !important; }
+
+    /* --- Force Light Mode --- */
     .stApp, .block-container, iframe { 
         background-color: #ffffff !important; 
         color: #000000 !important; 
     }
 
-    /* Ultra Compact Layout & Edge-to-Edge Fitting */
+    /* --- Compact Layout --- */
     .block-container { 
         padding-top: 0rem !important; 
         padding-bottom: 0rem !important; 
@@ -72,6 +71,24 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
+
+# 🛠️ Aggressive JS to constantly remove footer & fullscreen
+components.html(
+    """
+    <script>
+    const observer = new MutationObserver(() => {
+        const footer = window.parent.document.querySelector('footer');
+        if (footer) footer.style.display = 'none';
+        
+        const fullScreenBtns = window.parent.document.querySelectorAll('button[title="View fullscreen"]');
+        fullScreenBtns.forEach(btn => btn.style.display = 'none');
+    });
+    observer.observe(window.parent.document.body, { childList: true, subtree: true });
+    </script>
+    """,
+    height=0,
+    width=0
+)
 
 FIREBASE_URL = "https://fyers-bot-606b9-default-rtdb.firebaseio.com"
 IST = datetime.timezone(datetime.timedelta(hours=5, minutes=30))
