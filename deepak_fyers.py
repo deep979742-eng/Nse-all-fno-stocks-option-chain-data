@@ -137,7 +137,7 @@ if 'cached_data' in st.session_state and st.session_state.cached_data:
     if fetched_syms: dynamic_symbols = fetched_syms
 
 # ==========================================
-# 3. DIVERGENCE TREND SCANNER LOGIC
+# 3. DIVERGENCE TREND SCANNER LOGIC (UPDATED)
 # ==========================================
 def find_divergence_stocks(chart_df, latest_data_list):
     bullish_list, bearish_list = [], []
@@ -153,27 +153,45 @@ def find_divergence_stocks(chart_df, latest_data_list):
         sdf = day_df[day_df['Symbol'] == sym].sort_values(by='Time')
         if len(sdf) < 5: continue 
 
-        vol_series = pd.to_numeric(sdf['VOL CPR'], errors='coerce').dropna()
+        # 🔥 Extract both VOL CPR and VOL PCR
+        vol_cpr_series = pd.to_numeric(sdf['VOL CPR'], errors='coerce').dropna()
+        vol_pcr_series = pd.to_numeric(sdf['VOL PCR'], errors='coerce').dropna()
         pcr_series = pd.to_numeric(sdf['OPT PCR'], errors='coerce').dropna()
         ltp_series = pd.to_numeric(sdf['LTP'], errors='coerce').dropna()
-        if vol_series.empty or pcr_series.empty or ltp_series.empty: continue
+        
+        if vol_cpr_series.empty or vol_pcr_series.empty or pcr_series.empty or ltp_series.empty: continue
 
-        first_vol, first_pcr, first_ltp = vol_series.iloc[:4].mean(), pcr_series.iloc[:4].mean(), ltp_series.iloc[:4].mean()
-        last_vol, last_pcr, last_ltp = vol_series.iloc[-1], pcr_series.iloc[-1], ltp_series.iloc[-1]
-        max_vol, min_vol = vol_series.max(), vol_series.min()
+        # 🚀 Bullish Data (VOL CPR)
+        first_vol_cpr = vol_cpr_series.iloc[:4].mean()
+        last_vol_cpr = vol_cpr_series.iloc[-1]
+        max_vol_cpr = vol_cpr_series.max()
 
-        if first_vol == 0 or first_ltp == 0: continue
+        # 📉 Bearish Data (VOL PCR) - New!
+        first_vol_pcr = vol_pcr_series.iloc[:4].mean()
+        last_vol_pcr = vol_pcr_series.iloc[-1]
+        max_vol_pcr = vol_pcr_series.max()
+
+        first_pcr, last_pcr = pcr_series.iloc[:4].mean(), pcr_series.iloc[-1]
+        first_ltp, last_ltp = ltp_series.iloc[:4].mean(), ltp_series.iloc[-1]
+
+        if first_vol_cpr == 0 or first_vol_pcr == 0 or first_ltp == 0: continue
         if abs((last_ltp - first_ltp) / first_ltp) * 100 > 1.5: continue 
 
         latest_info = latest_lookup.get(sym, {})
         ce_con, pe_con = float(latest_info.get('CE_CON', 0)), float(latest_info.get('PE_CON', 0))
-        chg_pct, curr_opt_pcr, curr_vol_cpr = float(latest_info.get('CHG_%', 0)), float(latest_info.get('O_PCR', 0)), float(latest_info.get('V_CPR', 0))
+        chg_pct = float(latest_info.get('CHG_%', 0))
+        curr_opt_pcr = float(latest_info.get('O_PCR', 0))
+        
+        curr_vol_cpr = float(latest_info.get('V_CPR', 0))
+        curr_vol_pcr = float(latest_info.get('V_PCR', 0)) # 🔥 Live VOL PCR
 
-        if (last_vol > first_vol) and (last_vol >= max_vol * 0.75) and (last_pcr >= first_pcr * 0.90) and (ce_con >= 70):
+        # 🚀 BULLISH CONDITION (VOL CPR Uptrend)
+        if (last_vol_cpr > first_vol_cpr) and (last_vol_cpr >= max_vol_cpr * 0.75) and (last_pcr >= first_pcr * 0.90) and (ce_con >= 70):
             bullish_list.append({'SYMBOL': sym, 'CHANGE %': chg_pct, 'OPT PCR': curr_opt_pcr, 'VOL CPR': curr_vol_cpr, 'CE CONTRACT': ce_con})
 
-        if (last_vol < first_vol) and (last_vol <= min_vol * 1.25 if min_vol > 0.1 else last_vol <= 0.5) and (last_pcr <= first_pcr * 1.10) and (pe_con >= 70):
-            bearish_list.append({'SYMBOL': sym, 'CHANGE %': chg_pct, 'OPT PCR': curr_opt_pcr, 'VOL CPR': curr_vol_cpr, 'PE CONTRACT': pe_con})
+        # 📉 BEARISH CONDITION (VOL PCR Uptrend - Updated Logic)
+        if (last_vol_pcr > first_vol_pcr) and (last_vol_pcr >= max_vol_pcr * 0.75) and (last_pcr <= first_pcr * 1.10) and (pe_con >= 70):
+            bearish_list.append({'SYMBOL': sym, 'CHANGE %': chg_pct, 'OPT PCR': curr_opt_pcr, 'VOL PCR': curr_vol_pcr, 'PE CONTRACT': pe_con})
 
     return pd.DataFrame(bullish_list), pd.DataFrame(bearish_list)
 
@@ -387,123 +405,38 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             chart: {{ id: 'mainChart', height: 410, type: 'line', toolbar: {{ show: false }}, zoom: {{ enabled: false }}, animations: {{ enabled: false }} }},
                             colors: ['{ind_color}', '#00CC66'], 
                             stroke: {{ curve: 'smooth', width: [3, 3] }}, 
-                            fill: {{ type: ['gradient', 'solid'], gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }} }},
-                            dataLabels: {{ enabled: false }}, 
-                            xaxis: {{ categories: timeCats, tickAmount: 10, labels: {{ style: {{ colors: '#888' }} }}, tooltip: {{ enabled: false }} }},
-                            yaxis: [
-                                {{ title: {{ text: '{chart_mode}', style: {{ color: '{ind_color}' }} }}, labels: {{ style: {{ colors: '{ind_color}' }} }}, decimalsInFloat: 2 }}, 
-                                {{ opposite: true, title: {{ text: 'LTP', style: {{ color: '#00CC66' }} }}, labels: {{ style: {{ colors: '#00CC66' }} }}, decimalsInFloat: 2 }}
-                            ],
-                            grid: {{ borderColor: '#e2e8f0', strokeDashArray: 3 }},
-                            tooltip: {{ shared: true, intersect: false, theme: 'light' }}, 
-                            legend: {{ position: 'top', horizontalAlign: 'right', labels: {{ colors: '#000' }} }}
+                            fill: {{ type: ['gradient', 'solid'], gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }} }}
                         }};
                         
-                        var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain); 
+                        var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                         chartMain.render();
                         
-                        var slider = document.getElementById('dual-slider'); 
-                        var lblStart = document.getElementById('lbl-start'); 
-                        var lblEnd = document.getElementById('lbl-end');
-                        
-                        if(timeCats.length > 0) {{
-                            noUiSlider.create(slider, {{ start: [0, timeCats.length - 1], connect: true, range: {{ 'min': 0, 'max': timeCats.length - 1 }}, step: 1 }});
-                            slider.noUiSlider.on('update', function (values) {{
-                                var sIdx = parseInt(values[0]), eIdx = parseInt(values[1]);
-                                lblStart.innerText = "From: " + timeCats[sIdx]; 
-                                lblEnd.innerText = "To: " + timeCats[eIdx];
-                                chartMain.updateOptions({{ xaxis: {{ categories: timeCats.slice(sIdx, eIdx + 1) }}, series: [{{ name: '{chart_mode}', data: dataIndicator.slice(sIdx, eIdx + 1) }}, {{ name: 'LTP', data: dataLTP.slice(sIdx, eIdx + 1) }}] }}, false, false, false);
-                            }});
-                            document.getElementById('custom-reset-btn').addEventListener('click', function() {{ slider.noUiSlider.set([0, timeCats.length - 1]); }});
-                        }}
+                        document.getElementById('custom-reset-btn').addEventListener('click', function() {{
+                            chartMain.resetSeries();
+                        }});
                     </script>
                 </body>
                 </html>
                 """
-                components.html(apex_html, height=500, width=None)
-        else:
-            st.info("⏳ Waiting for chart data...")
+                components.html(apex_html, height=500, scrolling=False)
 
     # ==========================================
-    # VIEW 3: TREND VIEW
+    # VIEW 3: TREND SCANNER (BULLISH / BEARISH)
     # ==========================================
     elif selected_tab == "🚀 TREND":
-        st.markdown("<h3 style='margin-top:0; color:#0284c7;'>🚀 Divergence Trend Scanner</h3>", unsafe_allow_html=True)
-        chart_df = st.session_state.get('chart_df', pd.DataFrame())
-        latest_data = st.session_state.get('cached_data', [])
+        bullish_df, bearish_df = find_divergence_stocks(st.session_state.get('chart_df'), st.session_state.cached_data)
         
-        df_bullish, df_bearish = find_divergence_stocks(chart_df, latest_data)
-
-        def generate_trend_html(df, tab_type="Bullish"):
-            if df.empty: return "<div style='text-align:center; padding: 25px; font-weight:bold; color: #64748b;'>⏳ Koi data match nahi hua.</div>"
-            df = df.copy()
-
-            def fmt_pct(v):
-                try:
-                    val = float(v)
-                    color = "#00AA00" if val >= 0 else "#FF0000"
-                    return f"<span style='color:{color}; font-weight:bold;'>{val:+.2f}%</span>"
-                except: return str(v)
-
-            def fmt_pcr(v):
-                try:
-                    val = float(v)
-                    color = "#00AA00" if val >= 1.0 else "#FF0000"
-                    return f"<span style='color:{color}; font-weight:bold;'>{val:.2f}</span>"
-                except: return str(v)
-
-            def fmt_contract(v):
-                try:
-                    val = float(v)
-                    color = "#00AA00" if val >= 70 else ("#FF0000" if val <= -70 else "#888888")
-                    return f"<span style='color:{color}; font-weight:bold;'>{val:+.1f}%</span>"
-                except: return str(v)
-            
-            df['CHANGE %'] = df['CHANGE %'].apply(fmt_pct)
-            df['OPT PCR'] = df['OPT PCR'].apply(fmt_pcr)  
-            df['VOL CPR'] = df['VOL CPR'].apply(fmt_pcr)
-            
-            if tab_type == "Bullish":
-                df['CE CONTRACT'] = df['CE CONTRACT'].apply(fmt_contract)
-                head_color = "#16a34a" 
+        tab1, tab2 = st.tabs(["🟢 BULLISH TREND", "🔴 BEARISH TREND"])
+        
+        with tab1:
+            if not bullish_df.empty:
+                st.dataframe(bullish_df, use_container_width=True, hide_index=True)
             else:
-                df['PE CONTRACT'] = df['PE CONTRACT'].apply(fmt_contract)
-                head_color = "#dc2626" 
+                st.info("No Bullish Divergence found yet.")
                 
-            html_content = df.to_html(escape=False, index=False, classes="dataframe")
-            
-            return f"""
-            <!DOCTYPE html>
-            <html>
-            <head>
-            <style>
-                body {{ margin: 0; padding: 0; font-family: 'Segoe UI', sans-serif; background-color: transparent; }}
-                table.dataframe {{ width: 100%; border-collapse: collapse; font-size: 13px; background-color: #ffffff; color: #000000; }}
-                table.dataframe th {{ background-color: {head_color} !important; color: white !important; font-weight: bold !important; text-align: center !important; padding: 9px 6px !important; border: 1px solid rgba(255,255,255,0.2); position: sticky; top: 0; z-index: 10; }}
-                table.dataframe td {{ text-align: center !important; padding: 8px 6px !important; border-bottom: 1px solid rgba(128,128,128,0.2); border-right: 1px solid rgba(128,128,128,0.1); font-weight: bold; }}
-                table.dataframe tr:hover {{ background-color: rgba(59, 130, 246, 0.06); }}
-            </style>
-            </head>
-            <body>
-                <div style="height: 550px; overflow: auto; border-radius: 6px; border: 1px solid #cbd5e1;">
-                    {html_content}
-                </div>
-            </body>
-            </html>
-            """
+        with tab2:
+            if not bearish_df.empty:
+                st.dataframe(bearish_df, use_container_width=True, hide_index=True)
+            else:
+                st.info("No Bearish Divergence found yet.")
 
-        tab_bullish, tab_bearish = st.tabs(["🟢 Bullish Stocks", "🔴 Bearish Stocks"])
-        with tab_bullish:
-            st.markdown("<div style='font-size:12px; color:#475569; margin-bottom:8px;'><b>Logic:</b> Vol CPR Rising | OPT PCR Flat/Rising | CE >= 70%</div>", unsafe_allow_html=True)
-            if not df_bullish.empty:
-                df_bullish = df_bullish.sort_values(by='CE CONTRACT', ascending=False)
-            components.html(generate_trend_html(df_bullish, "Bullish"), height=610, scrolling=True)
-
-        with tab_bearish:
-            st.markdown("<div style='font-size:12px; color:#475569; margin-bottom:8px;'><b>Logic:</b> Vol CPR Falling | OPT PCR Flat/Falling | PE >= 70%</div>", unsafe_allow_html=True)
-            if not df_bearish.empty:
-                df_bearish = df_bearish.sort_values(by='PE CONTRACT', ascending=False)
-            components.html(generate_trend_html(df_bearish, "Bearish"), height=610, scrolling=True)
-
-else:
-    st.info("⏳ Booting up... Waiting for Engine to push data.")
