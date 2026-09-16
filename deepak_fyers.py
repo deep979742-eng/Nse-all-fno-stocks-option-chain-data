@@ -166,7 +166,7 @@ def find_divergence_stocks(chart_df, latest_data_list):
         last_vol_cpr = vol_cpr_series.iloc[-1]
         max_vol_cpr = vol_cpr_series.max()
 
-        # 📉 Bearish Data (VOL PCR) - New!
+        # 📉 Bearish Data (VOL PCR)
         first_vol_pcr = vol_pcr_series.iloc[:4].mean()
         last_vol_pcr = vol_pcr_series.iloc[-1]
         max_vol_pcr = vol_pcr_series.max()
@@ -183,13 +183,13 @@ def find_divergence_stocks(chart_df, latest_data_list):
         curr_opt_pcr = float(latest_info.get('O_PCR', 0))
         
         curr_vol_cpr = float(latest_info.get('V_CPR', 0))
-        curr_vol_pcr = float(latest_info.get('V_PCR', 0)) # 🔥 Live VOL PCR
+        curr_vol_pcr = float(latest_info.get('V_PCR', 0))
 
         # 🚀 BULLISH CONDITION (VOL CPR Uptrend)
         if (last_vol_cpr > first_vol_cpr) and (last_vol_cpr >= max_vol_cpr * 0.75) and (last_pcr >= first_pcr * 0.90) and (ce_con >= 70):
             bullish_list.append({'SYMBOL': sym, 'CHANGE %': chg_pct, 'OPT PCR': curr_opt_pcr, 'VOL CPR': curr_vol_cpr, 'CE CONTRACT': ce_con})
 
-        # 📉 BEARISH CONDITION (VOL PCR Uptrend - Updated Logic)
+        # 📉 BEARISH CONDITION (VOL PCR Uptrend)
         if (last_vol_pcr > first_vol_pcr) and (last_vol_pcr >= max_vol_pcr * 0.75) and (last_pcr <= first_pcr * 1.10) and (pe_con >= 70):
             bearish_list.append({'SYMBOL': sym, 'CHANGE %': chg_pct, 'OPT PCR': curr_opt_pcr, 'VOL PCR': curr_vol_pcr, 'PE CONTRACT': pe_con})
 
@@ -346,7 +346,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             components.html(full_interactive_html, height=780, scrolling=False)
 
     # ==========================================
-    # VIEW 2: CHART VIEW
+    # VIEW 2: CHART VIEW (DUAL Y-AXIS & TIME)
     # ==========================================
     elif selected_tab == "📈 CHART":
         col_c1, col_c2 = st.columns([2, 2])
@@ -357,7 +357,9 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
 
         chart_df = st.session_state.get('chart_df', pd.DataFrame())
         if not chart_df.empty and sel_stock:
-            df_sym = chart_df[(chart_df['Date'].astype(str).str.strip() == today_str) & (chart_df['Symbol'].astype(str).str.strip() == sel_stock)].copy()
+            clean_stock = sel_stock.split(" 🔴")[0] 
+            
+            df_sym = chart_df[(chart_df['Date'].astype(str).str.strip() == today_str) & (chart_df['Symbol'].astype(str).str.strip() == clean_stock)].copy()
             if not df_sym.empty:
                 df_sym = df_sym.sort_values(by='Time')
                 target_col = 'VOL CPR' if chart_mode == "Vol CPR" else 'OPT PCR'
@@ -372,28 +374,15 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 <html>
                 <head>
                     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-                    <link href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css" rel="stylesheet">
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
                     <style> 
                         body {{ margin: 0; padding: 0; background-color: #ffffff; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; }} 
                         .apexcharts-toolbar {{ display: none !important; }}
                         #custom-reset-btn {{ position: absolute; top: 5px; left: 10px; z-index: 9999; background: #2962FF; border: none; border-radius: 4px; padding: 5px 12px; font-size: 11px; font-weight: bold; color: #fff; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }}
-                        .slider-wrapper {{ padding: 0px 25px; margin-top: -10px; position: relative; }}
-                        .time-labels {{ display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; color: #888; margin-bottom: 8px; }}
-                        .noUi-target {{ background: #e2e8f0; border: none; box-shadow: none; height: 6px; }}
-                        .noUi-connect {{ background: #2962FF; }}
-                        .noUi-handle {{ width: 20px !important; height: 20px !important; border-radius: 50%; background: #2962FF; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: none; right: -10px !important; top: -7px !important; cursor: pointer; }}
-                        .noUi-handle:before, .noUi-handle:after {{ display: none; }}
                     </style>
                 </head>
                 <body>
                     <button id="custom-reset-btn">🔄 Reset Zoom</button>
                     <div id="chart-main"></div>
-                    
-                    <div class="slider-wrapper">
-                        <div class="time-labels"><span id="lbl-start"></span><span id="lbl-end"></span></div>
-                        <div id="dual-slider"></div>
-                    </div>
                     
                     <script>
                         var dataIndicator = {json.dumps(ind_list)}; 
@@ -401,11 +390,45 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                         var timeCats = {json.dumps(time_list)}; 
                         
                         var optionsMain = {{
-                            series: [{{ name: '{chart_mode}', type: 'area', data: dataIndicator }}, {{ name: 'LTP', type: 'line', data: dataLTP }}],
-                            chart: {{ id: 'mainChart', height: 410, type: 'line', toolbar: {{ show: false }}, zoom: {{ enabled: false }}, animations: {{ enabled: false }} }},
+                            series: [
+                                {{ name: '{chart_mode}', type: 'area', data: dataIndicator }}, 
+                                {{ name: 'LTP', type: 'line', data: dataLTP }}
+                            ],
+                            chart: {{ 
+                                id: 'mainChart', 
+                                height: 410, 
+                                type: 'line', 
+                                toolbar: {{ show: false }}, 
+                                zoom: {{ enabled: false }}, 
+                                animations: {{ enabled: false }} 
+                            }},
                             colors: ['{ind_color}', '#00CC66'], 
                             stroke: {{ curve: 'smooth', width: [3, 3] }}, 
-                            fill: {{ type: ['gradient', 'solid'], gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }} }}
+                            fill: {{ type: ['gradient', 'solid'], gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }} }},
+                            
+                            // 🔥 TIMESTAMPS ADDED HERE (9:15, 9:20 etc) 🔥
+                            xaxis: {{
+                                categories: timeCats,
+                                tickAmount: 10,
+                                labels: {{ style: {{ fontSize: '10px', colors: '#888' }} }}
+                            }},
+                            
+                            // 🔥 DUAL Y-AXIS ADDED HERE (Lines will cross now) 🔥
+                            yaxis: [
+                                {{
+                                    title: {{ text: '{chart_mode}', style: {{ color: '{ind_color}', fontWeight: 'bold' }} }},
+                                    labels: {{ style: {{ colors: '{ind_color}' }}, formatter: function(val) {{ return val.toFixed(2); }} }}
+                                }},
+                                {{
+                                    opposite: true,
+                                    title: {{ text: 'LTP', style: {{ color: '#00CC66', fontWeight: 'bold' }} }},
+                                    labels: {{ style: {{ colors: '#00CC66' }}, formatter: function(val) {{ return val.toFixed(1); }} }}
+                                }}
+                            ],
+                            tooltip: {{
+                                shared: true,
+                                intersect: false
+                            }}
                         }};
                         
                         var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
@@ -439,4 +462,3 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 st.dataframe(bearish_df, use_container_width=True, hide_index=True)
             else:
                 st.info("No Bearish Divergence found yet.")
-
