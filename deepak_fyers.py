@@ -137,7 +137,7 @@ if 'cached_data' in st.session_state and st.session_state.cached_data:
     if fetched_syms: dynamic_symbols = fetched_syms
 
 # ==========================================
-# 3. DIVERGENCE TREND SCANNER LOGIC (RISING LOGIC UPDATED)
+# 3. DIVERGENCE TREND SCANNER LOGIC 
 # ==========================================
 def find_divergence_stocks(chart_df, latest_data_list):
     bullish_list, bearish_list = [], []
@@ -184,14 +184,10 @@ def find_divergence_stocks(chart_df, latest_data_list):
         curr_vol_pcr = float(latest_info.get('V_PCR', 0))
 
         # 🚀 BULLISH CONDITION
-        # 1. VOL CPR is RISING (last > first)
-        # 2. OPTION PCR is FLAT OR RISING (last >= first * 0.95 gives a 5% buffer for flat)
         if (last_vol_cpr > first_vol_cpr) and (last_vol_cpr >= max_vol_cpr * 0.75) and (last_pcr >= first_pcr * 0.95) and (ce_con >= 70):
             bullish_list.append({'SYMBOL': sym, 'CHANGE %': chg_pct, 'OPT PCR': curr_opt_pcr, 'VOL CPR': curr_vol_cpr, 'CE CONTRACT': ce_con})
 
         # 📉 BEARISH CONDITION
-        # 1. VOL PCR is RISING (last > first)
-        # 2. OPTION PCR is FLAT OR FALLING (last <= first * 1.05 gives a 5% buffer for flat)
         if (last_vol_pcr > first_vol_pcr) and (last_vol_pcr >= max_vol_pcr * 0.75) and (last_pcr <= first_pcr * 1.05) and (pe_con >= 70):
             bearish_list.append({'SYMBOL': sym, 'CHANGE %': chg_pct, 'OPT PCR': curr_opt_pcr, 'VOL PCR': curr_vol_pcr, 'PE CONTRACT': pe_con})
 
@@ -467,21 +463,39 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 components.html(apex_html, height=520, scrolling=False)
 
     # ==========================================
-    # VIEW 3: TREND SCANNER (BULLISH / BEARISH)
+    # VIEW 3: TREND SCANNER (WITH COLORS) 🔥
     # ==========================================
     elif selected_tab == "🚀 TREND":
         bullish_df, bearish_df = find_divergence_stocks(st.session_state.get('chart_df'), st.session_state.cached_data)
         
+        # 🔥 यह फंक्शन आपके ट्रेंड वाले डेटा को हरा-लाल (Green-Red) बनाएगा 🔥
+        def color_trend_df(df):
+            def row_style(row):
+                styles = [''] * len(row)
+                for i, (col, val) in enumerate(row.items()):
+                    try:
+                        v = float(val)
+                        if col == 'CHANGE %':
+                            if v > 0: styles[i] = 'color: #00AA00; font-weight: bold;'
+                            elif v < 0: styles[i] = 'color: #FF0000; font-weight: bold;'
+                        elif 'PCR' in col or 'CPR' in col:
+                            if v >= 1.0: styles[i] = 'color: #00AA00; font-weight: bold;'
+                            elif 0 < v < 1.0: styles[i] = 'color: #FF0000; font-weight: bold;'
+                    except:
+                        pass
+                return styles
+            return df.style.apply(row_style, axis=1).format(precision=2)
+
         tab1, tab2 = st.tabs(["🟢 BULLISH TREND", "🔴 BEARISH TREND"])
         
         with tab1:
             if not bullish_df.empty:
-                st.dataframe(bullish_df, use_container_width=True, hide_index=True)
+                st.dataframe(color_trend_df(bullish_df), use_container_width=True, hide_index=True)
             else:
                 st.info("No Bullish Divergence found yet.")
                 
         with tab2:
             if not bearish_df.empty:
-                st.dataframe(bearish_df, use_container_width=True, hide_index=True)
+                st.dataframe(color_trend_df(bearish_df), use_container_width=True, hide_index=True)
             else:
                 st.info("No Bearish Divergence found yet.")
