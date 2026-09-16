@@ -344,7 +344,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             components.html(full_interactive_html, height=780, scrolling=False)
 
     # ==========================================
-    # VIEW 2: CHART VIEW (🔥 DYNAMIC DATA SLICING LOGIC ADDED)
+    # VIEW 2: CHART VIEW (🔥 BLURRY LINE FIXED)
     # ==========================================
     elif selected_tab == "📈 CHART":
         col_c1, col_c2 = st.columns([2, 2])
@@ -447,15 +447,14 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 document.getElementById('lbl-start').innerHTML = timeCats[startIdx];
                                 document.getElementById('lbl-end').innerHTML = timeCats[endIdx];
                                 
-                                // 🔥 YAHAN JADOO HAI (DATA SLICING) 🔥
-                                // Sirf X-axis nahi, poore data array ko kaat rahe hain, taaki Y-axis auto-scale ho jaaye!
                                 var slicedInd = dataIndicator.slice(startIdx, endIdx + 1);
                                 var slicedLtp = dataLTP.slice(startIdx, endIdx + 1);
                                 var slicedTime = timeCats.slice(startIdx, endIdx + 1);
 
+                                // 🔥 FIXED: Added "type" back so lines don't get blurry/gray! 🔥
                                 chartMain.updateSeries([
-                                    {{ name: '{chart_mode}', data: slicedInd }},
-                                    {{ name: 'LTP', data: slicedLtp }}
+                                    {{ name: '{chart_mode}', type: 'area', data: slicedInd }},
+                                    {{ name: 'LTP', type: 'line', data: slicedLtp }}
                                 ]);
                                 chartMain.updateOptions({{
                                     xaxis: {{ categories: slicedTime }}
@@ -468,10 +467,10 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             
                             document.getElementById('custom-reset-btn').addEventListener('click', function() {{
                                 slider.noUiSlider.set([0, timeCats.length - 1]);
-                                // Reset par waapas poora data bhej diya
+                                // 🔥 FIXED: Added "type" back here too! 🔥
                                 chartMain.updateSeries([
-                                    {{ name: '{chart_mode}', data: dataIndicator }},
-                                    {{ name: 'LTP', data: dataLTP }}
+                                    {{ name: '{chart_mode}', type: 'area', data: dataIndicator }},
+                                    {{ name: 'LTP', type: 'line', data: dataLTP }}
                                 ]);
                                 chartMain.updateOptions({{
                                     xaxis: {{ categories: timeCats }}
