@@ -137,7 +137,7 @@ if 'cached_data' in st.session_state and st.session_state.cached_data:
     if fetched_syms: dynamic_symbols = fetched_syms
 
 # ==========================================
-# 3. DIVERGENCE TREND SCANNER LOGIC (UPDATED)
+# 3. DIVERGENCE TREND SCANNER LOGIC (RISING LOGIC UPDATED)
 # ==========================================
 def find_divergence_stocks(chart_df, latest_data_list):
     bullish_list, bearish_list = [], []
@@ -153,7 +153,6 @@ def find_divergence_stocks(chart_df, latest_data_list):
         sdf = day_df[day_df['Symbol'] == sym].sort_values(by='Time')
         if len(sdf) < 5: continue 
 
-        # 🔥 Extract both VOL CPR and VOL PCR
         vol_cpr_series = pd.to_numeric(sdf['VOL CPR'], errors='coerce').dropna()
         vol_pcr_series = pd.to_numeric(sdf['VOL PCR'], errors='coerce').dropna()
         pcr_series = pd.to_numeric(sdf['OPT PCR'], errors='coerce').dropna()
@@ -161,12 +160,12 @@ def find_divergence_stocks(chart_df, latest_data_list):
         
         if vol_cpr_series.empty or vol_pcr_series.empty or pcr_series.empty or ltp_series.empty: continue
 
-        # 🚀 Bullish Data (VOL CPR)
+        # Bullish Data Extraction
         first_vol_cpr = vol_cpr_series.iloc[:4].mean()
         last_vol_cpr = vol_cpr_series.iloc[-1]
         max_vol_cpr = vol_cpr_series.max()
 
-        # 📉 Bearish Data (VOL PCR)
+        # Bearish Data Extraction
         first_vol_pcr = vol_pcr_series.iloc[:4].mean()
         last_vol_pcr = vol_pcr_series.iloc[-1]
         max_vol_pcr = vol_pcr_series.max()
@@ -181,16 +180,19 @@ def find_divergence_stocks(chart_df, latest_data_list):
         ce_con, pe_con = float(latest_info.get('CE_CON', 0)), float(latest_info.get('PE_CON', 0))
         chg_pct = float(latest_info.get('CHG_%', 0))
         curr_opt_pcr = float(latest_info.get('O_PCR', 0))
-        
         curr_vol_cpr = float(latest_info.get('V_CPR', 0))
         curr_vol_pcr = float(latest_info.get('V_PCR', 0))
 
-        # 🚀 BULLISH CONDITION (VOL CPR Uptrend)
-        if (last_vol_cpr > first_vol_cpr) and (last_vol_cpr >= max_vol_cpr * 0.75) and (last_pcr >= first_pcr * 0.90) and (ce_con >= 70):
+        # 🚀 BULLISH CONDITION
+        # 1. VOL CPR is RISING (last > first)
+        # 2. OPTION PCR is FLAT OR RISING (last >= first * 0.95 gives a 5% buffer for flat)
+        if (last_vol_cpr > first_vol_cpr) and (last_vol_cpr >= max_vol_cpr * 0.75) and (last_pcr >= first_pcr * 0.95) and (ce_con >= 70):
             bullish_list.append({'SYMBOL': sym, 'CHANGE %': chg_pct, 'OPT PCR': curr_opt_pcr, 'VOL CPR': curr_vol_cpr, 'CE CONTRACT': ce_con})
 
-        # 📉 BEARISH CONDITION (VOL PCR Uptrend)
-        if (last_vol_pcr > first_vol_pcr) and (last_vol_pcr >= max_vol_pcr * 0.75) and (last_pcr <= first_pcr * 1.10) and (pe_con >= 70):
+        # 📉 BEARISH CONDITION
+        # 1. VOL PCR is RISING (last > first)
+        # 2. OPTION PCR is FLAT OR FALLING (last <= first * 1.05 gives a 5% buffer for flat)
+        if (last_vol_pcr > first_vol_pcr) and (last_vol_pcr >= max_vol_pcr * 0.75) and (last_pcr <= first_pcr * 1.05) and (pe_con >= 70):
             bearish_list.append({'SYMBOL': sym, 'CHANGE %': chg_pct, 'OPT PCR': curr_opt_pcr, 'VOL PCR': curr_vol_pcr, 'PE CONTRACT': pe_con})
 
     return pd.DataFrame(bullish_list), pd.DataFrame(bearish_list)
@@ -346,7 +348,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             components.html(full_interactive_html, height=780, scrolling=False)
 
     # ==========================================
-    # VIEW 2: CHART VIEW (DUAL Y-AXIS & TIME)
+    # VIEW 2: CHART VIEW (WITH ORIGINAL SLIDER)
     # ==========================================
     elif selected_tab == "📈 CHART":
         col_c1, col_c2 = st.columns([2, 2])
@@ -374,15 +376,28 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 <html>
                 <head>
                     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
+                    <link href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.css" rel="stylesheet">
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.7.0/nouislider.min.js"></script>
                     <style> 
                         body {{ margin: 0; padding: 0; background-color: #ffffff; font-family: 'Segoe UI', Arial, sans-serif; overflow: hidden; }} 
                         .apexcharts-toolbar {{ display: none !important; }}
                         #custom-reset-btn {{ position: absolute; top: 5px; left: 10px; z-index: 9999; background: #2962FF; border: none; border-radius: 4px; padding: 5px 12px; font-size: 11px; font-weight: bold; color: #fff; cursor: pointer; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }}
+                        .slider-wrapper {{ padding: 0px 25px; margin-top: -10px; position: relative; }}
+                        .time-labels {{ display: flex; justify-content: space-between; font-size: 11px; font-weight: bold; color: #888; margin-bottom: 8px; }}
+                        .noUi-target {{ background: #e2e8f0; border: none; box-shadow: none; height: 6px; }}
+                        .noUi-connect {{ background: #2962FF; }}
+                        .noUi-handle {{ width: 20px !important; height: 20px !important; border-radius: 50%; background: #2962FF; box-shadow: 0 2px 5px rgba(0,0,0,0.3); border: none; right: -10px !important; top: -7px !important; cursor: pointer; }}
+                        .noUi-handle:before, .noUi-handle:after {{ display: none; }}
                     </style>
                 </head>
                 <body>
                     <button id="custom-reset-btn">🔄 Reset Zoom</button>
                     <div id="chart-main"></div>
+                    
+                    <div class="slider-wrapper">
+                        <div class="time-labels"><span id="lbl-start"></span><span id="lbl-end"></span></div>
+                        <div id="dual-slider"></div>
+                    </div>
                     
                     <script>
                         var dataIndicator = {json.dumps(ind_list)}; 
@@ -395,53 +410,61 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 {{ name: 'LTP', type: 'line', data: dataLTP }}
                             ],
                             chart: {{ 
-                                id: 'mainChart', 
-                                height: 410, 
-                                type: 'line', 
-                                toolbar: {{ show: false }}, 
-                                zoom: {{ enabled: false }}, 
-                                animations: {{ enabled: false }} 
+                                id: 'mainChart', height: 410, type: 'line', 
+                                toolbar: {{ show: false }}, zoom: {{ enabled: false }}, animations: {{ enabled: false }} 
                             }},
                             colors: ['{ind_color}', '#00CC66'], 
                             stroke: {{ curve: 'smooth', width: [3, 3] }}, 
                             fill: {{ type: ['gradient', 'solid'], gradient: {{ shadeIntensity: 1, opacityFrom: 0.35, opacityTo: 0.05, stops: [0, 100] }} }},
                             
-                            // 🔥 TIMESTAMPS ADDED HERE (9:15, 9:20 etc) 🔥
-                            xaxis: {{
-                                categories: timeCats,
-                                tickAmount: 10,
-                                labels: {{ style: {{ fontSize: '10px', colors: '#888' }} }}
-                            }},
+                            xaxis: {{ categories: timeCats, tickAmount: 10, labels: {{ style: {{ fontSize: '10px', colors: '#888' }} }} }},
                             
-                            // 🔥 DUAL Y-AXIS ADDED HERE (Lines will cross now) 🔥
                             yaxis: [
-                                {{
-                                    title: {{ text: '{chart_mode}', style: {{ color: '{ind_color}', fontWeight: 'bold' }} }},
-                                    labels: {{ style: {{ colors: '{ind_color}' }}, formatter: function(val) {{ return val.toFixed(2); }} }}
-                                }},
-                                {{
-                                    opposite: true,
-                                    title: {{ text: 'LTP', style: {{ color: '#00CC66', fontWeight: 'bold' }} }},
-                                    labels: {{ style: {{ colors: '#00CC66' }}, formatter: function(val) {{ return val.toFixed(1); }} }}
-                                }}
+                                {{ title: {{ text: '{chart_mode}', style: {{ color: '{ind_color}', fontWeight: 'bold' }} }}, labels: {{ style: {{ colors: '{ind_color}' }}, formatter: function(val) {{ return val.toFixed(2); }} }} }},
+                                {{ opposite: true, title: {{ text: 'LTP', style: {{ color: '#00CC66', fontWeight: 'bold' }} }}, labels: {{ style: {{ colors: '#00CC66' }}, formatter: function(val) {{ return val.toFixed(1); }} }} }}
                             ],
-                            tooltip: {{
-                                shared: true,
-                                intersect: false
-                            }}
+                            tooltip: {{ shared: true, intersect: false }}
                         }};
                         
                         var chartMain = new ApexCharts(document.querySelector("#chart-main"), optionsMain);
                         chartMain.render();
                         
-                        document.getElementById('custom-reset-btn').addEventListener('click', function() {{
-                            chartMain.resetSeries();
-                        }});
+                        // Slider Initialization Logic
+                        if (timeCats.length > 1) {{
+                            var slider = document.getElementById('dual-slider');
+                            noUiSlider.create(slider, {{
+                                start: [0, timeCats.length - 1],
+                                connect: true, step: 1,
+                                range: {{ 'min': 0, 'max': timeCats.length - 1 }}
+                            }});
+                            
+                            slider.noUiSlider.on('slide', function (values, handle) {{
+                                var startIdx = Math.round(values[0]);
+                                var endIdx = Math.round(values[1]);
+                                document.getElementById('lbl-start').innerHTML = timeCats[startIdx];
+                                document.getElementById('lbl-end').innerHTML = timeCats[endIdx];
+                                
+                                chartMain.updateOptions({{
+                                    xaxis: {{ min: startIdx + 1, max: endIdx + 1 }}
+                                }});
+                            }});
+                            
+                            // Initialize Labels
+                            document.getElementById('lbl-start').innerHTML = timeCats[0];
+                            document.getElementById('lbl-end').innerHTML = timeCats[timeCats.length - 1];
+                            
+                            document.getElementById('custom-reset-btn').addEventListener('click', function() {{
+                                slider.noUiSlider.set([0, timeCats.length - 1]);
+                                chartMain.updateOptions({{ xaxis: {{ min: undefined, max: undefined }} }});
+                            }});
+                        }} else {{
+                            document.querySelector('.slider-wrapper').style.display = 'none';
+                        }}
                     </script>
                 </body>
                 </html>
                 """
-                components.html(apex_html, height=500, scrolling=False)
+                components.html(apex_html, height=520, scrolling=False)
 
     # ==========================================
     # VIEW 3: TREND SCANNER (BULLISH / BEARISH)
