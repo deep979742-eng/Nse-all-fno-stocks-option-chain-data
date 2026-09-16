@@ -160,12 +160,12 @@ def find_divergence_stocks(chart_df, latest_data_list):
         
         if vol_cpr_series.empty or vol_pcr_series.empty or pcr_series.empty or ltp_series.empty: continue
 
-        # Bullish Data Extraction
+        # Bullish Data
         first_vol_cpr = vol_cpr_series.iloc[:4].mean()
         last_vol_cpr = vol_cpr_series.iloc[-1]
         max_vol_cpr = vol_cpr_series.max()
 
-        # Bearish Data Extraction
+        # Bearish Data 
         first_vol_pcr = vol_pcr_series.iloc[:4].mean()
         last_vol_pcr = vol_pcr_series.iloc[-1]
         max_vol_pcr = vol_pcr_series.max()
@@ -344,7 +344,7 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
             components.html(full_interactive_html, height=780, scrolling=False)
 
     # ==========================================
-    # VIEW 2: CHART VIEW (WITH ORIGINAL SLIDER)
+    # VIEW 2: CHART VIEW (🔥 DYNAMIC DATA SLICING LOGIC ADDED)
     # ==========================================
     elif selected_tab == "📈 CHART":
         col_c1, col_c2 = st.columns([2, 2])
@@ -416,8 +416,15 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             xaxis: {{ categories: timeCats, tickAmount: 10, labels: {{ style: {{ fontSize: '10px', colors: '#888' }} }} }},
                             
                             yaxis: [
-                                {{ title: {{ text: '{chart_mode}', style: {{ color: '{ind_color}', fontWeight: 'bold' }} }}, labels: {{ style: {{ colors: '{ind_color}' }}, formatter: function(val) {{ return val.toFixed(2); }} }} }},
-                                {{ opposite: true, title: {{ text: 'LTP', style: {{ color: '#00CC66', fontWeight: 'bold' }} }}, labels: {{ style: {{ colors: '#00CC66' }}, formatter: function(val) {{ return val.toFixed(1); }} }} }}
+                                {{ 
+                                    title: {{ text: '{chart_mode}', style: {{ color: '{ind_color}', fontWeight: 'bold' }} }}, 
+                                    labels: {{ style: {{ colors: '{ind_color}' }}, formatter: function(val) {{ return val.toFixed(2); }} }}
+                                }},
+                                {{ 
+                                    opposite: true, 
+                                    title: {{ text: 'LTP', style: {{ color: '#00CC66', fontWeight: 'bold' }} }}, 
+                                    labels: {{ style: {{ colors: '#00CC66' }}, formatter: function(val) {{ return val.toFixed(1); }} }}
+                                }}
                             ],
                             tooltip: {{ shared: true, intersect: false }}
                         }};
@@ -440,8 +447,18 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                                 document.getElementById('lbl-start').innerHTML = timeCats[startIdx];
                                 document.getElementById('lbl-end').innerHTML = timeCats[endIdx];
                                 
+                                // 🔥 YAHAN JADOO HAI (DATA SLICING) 🔥
+                                // Sirf X-axis nahi, poore data array ko kaat rahe hain, taaki Y-axis auto-scale ho jaaye!
+                                var slicedInd = dataIndicator.slice(startIdx, endIdx + 1);
+                                var slicedLtp = dataLTP.slice(startIdx, endIdx + 1);
+                                var slicedTime = timeCats.slice(startIdx, endIdx + 1);
+
+                                chartMain.updateSeries([
+                                    {{ name: '{chart_mode}', data: slicedInd }},
+                                    {{ name: 'LTP', data: slicedLtp }}
+                                ]);
                                 chartMain.updateOptions({{
-                                    xaxis: {{ min: startIdx + 1, max: endIdx + 1 }}
+                                    xaxis: {{ categories: slicedTime }}
                                 }});
                             }});
                             
@@ -451,7 +468,14 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                             
                             document.getElementById('custom-reset-btn').addEventListener('click', function() {{
                                 slider.noUiSlider.set([0, timeCats.length - 1]);
-                                chartMain.updateOptions({{ xaxis: {{ min: undefined, max: undefined }} }});
+                                // Reset par waapas poora data bhej diya
+                                chartMain.updateSeries([
+                                    {{ name: '{chart_mode}', data: dataIndicator }},
+                                    {{ name: 'LTP', data: dataLTP }}
+                                ]);
+                                chartMain.updateOptions({{
+                                    xaxis: {{ categories: timeCats }}
+                                }});
                             }});
                         }} else {{
                             document.querySelector('.slider-wrapper').style.display = 'none';
@@ -463,12 +487,11 @@ if 'cached_data' in st.session_state and len(st.session_state.cached_data) > 0:
                 components.html(apex_html, height=520, scrolling=False)
 
     # ==========================================
-    # VIEW 3: TREND SCANNER (WITH COLORS) 🔥
+    # VIEW 3: TREND SCANNER (WITH COLORS) 
     # ==========================================
     elif selected_tab == "🚀 TREND":
         bullish_df, bearish_df = find_divergence_stocks(st.session_state.get('chart_df'), st.session_state.cached_data)
         
-        # 🔥 यह फंक्शन आपके ट्रेंड वाले डेटा को हरा-लाल (Green-Red) बनाएगा 🔥
         def color_trend_df(df):
             def row_style(row):
                 styles = [''] * len(row)
